@@ -66,12 +66,23 @@ function roomBounds(room: RoomLayout) {
   return { x: minX * TS, y: minY * TS, w: (Math.max(...xs) - minX + 1) * TS, h: (Math.max(...ys) - minY + 1) * TS, minX, minY };
 }
 
-function Staircase({ at }: { at: Coord }) {
+type TipFn = (t: { x: number; y: number; text: string } | null) => void;
+
+function Staircase({ at, label, onTip }: { at: Coord; label?: string; onTip?: TipFn }) {
   const x = at.x * TS;
   const y = at.y * TS;
   const steps = [0, 1, 2, 3];
+  const hover =
+    label && onTip
+      ? {
+          style: { cursor: 'help' as const },
+          onMouseEnter: (e: React.MouseEvent) => onTip({ x: e.clientX, y: e.clientY, text: label }),
+          onMouseMove: (e: React.MouseEvent) => onTip({ x: e.clientX, y: e.clientY, text: label }),
+          onMouseLeave: () => onTip(null),
+        }
+      : {};
   return (
-    <g transform={`translate(${x + 3} ${y + 3})`}>
+    <g transform={`translate(${x + 3} ${y + 3})`} {...hover}>
       <rect width={TS - 6} height={TS - 6} rx="2" fill="#0c0a14" stroke="#e7c66a" strokeWidth="1" />
       {steps.map((s) => (
         <rect key={s} x={1.5 + s * 1.4} y={1.5 + s * ((TS - 9) / steps.length)} width={TS - 9 - s * 2.8} height={(TS - 9) / steps.length - 0.8} fill={`hsl(44 55% ${60 - s * 11}%)`} />
@@ -130,6 +141,7 @@ export function Board({
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ scale: 0.8, tx: 0, ty: 0 });
+  const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
   const drag = useRef<{ x: number; y: number; tx: number; ty: number; moved: boolean } | null>(null);
 
   // Walk-animation: when a new path arrives, step the moving pawn through it at 0.3s / tile.
@@ -246,13 +258,6 @@ export function Board({
             );
           })}
 
-          {/* water decal for the Grounds (lake by the boat house) */}
-          {(() => {
-            const g = BOARD.sections.find((s) => s.theme === 'grounds')!;
-            const y0 = (g.origin.y + g.height - 6) * TS;
-            return <path d={`M0 ${y0} Q ${4 * TS} ${y0 - 18} ${8 * TS} ${y0 + 6} L ${8 * TS} ${(g.origin.y + g.height) * TS} L 0 ${(g.origin.y + g.height) * TS} Z`} fill="#1f6f93" opacity="0.85" />;
-          })()}
-
           {/* shortcut link lines */}
           <g stroke="#e7c66a" strokeWidth="1.5" strokeDasharray="3 5" opacity="0.22">
             {BOARD.shortcuts.map((sc) => (
@@ -266,8 +271,40 @@ export function Board({
             return <rect key={`p${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={t.path} stroke="rgba(0,0,0,0.18)" strokeWidth="0.5" />;
           })}
 
-          {/* stairs between floors */}
-          {BOARD.stairs.flatMap((s, i) => [<Staircase key={`st${i}a`} at={s.a} />, <Staircase key={`st${i}b`} at={s.b} />])}
+          {/* elevators — one per indoor floor */}
+          {BOARD.elevators.map((e) => {
+            const xs = e.cells.map((c) => c.x);
+            const ys = e.cells.map((c) => c.y);
+            const x = Math.min(...xs) * TS;
+            const y = Math.min(...ys) * TS;
+            const w = (Math.max(...xs) - Math.min(...xs) + 1) * TS;
+            const h = (Math.max(...ys) - Math.min(...ys) + 1) * TS;
+            return (
+              <g key={e.floor}>
+                <rect x={x + 1} y={y + 1} width={w - 2} height={h - 2} rx="3" fill="#3a3f48" stroke="#aab0b6" strokeWidth="2" />
+                <line x1={x + w / 2} y1={y + 4} x2={x + w / 2} y2={y + h - 4} stroke="#6a7078" strokeWidth="1.5" />
+                <text x={x + w / 2} y={y + h / 2 + 6} textAnchor="middle" fontSize="16">
+                  🛗
+                </text>
+              </g>
+            );
+          })}
+
+          {/* cellar stairs: Grounds <-> Basement link */}
+          <g>
+            <line
+              x1={cx(BOARD.cellarLink.a)}
+              y1={cy(BOARD.cellarLink.a)}
+              x2={cx(BOARD.cellarLink.b)}
+              y2={cy(BOARD.cellarLink.b)}
+              stroke="#9aa0a6"
+              strokeWidth="1.5"
+              strokeDasharray="2 4"
+              opacity="0.3"
+            />
+            <Staircase at={BOARD.cellarLink.a} label="Cellar stairs — down to the Basement" onTip={setTip} />
+            <Staircase at={BOARD.cellarLink.b} label="Cellar stairs — up to the Grounds" onTip={setTip} />
+          </g>
 
           {/* rooms */}
           {Object.values(BOARD.rooms).map((room) => {
@@ -335,7 +372,16 @@ export function Board({
             })()}
 
           {/* secret-passage staircases */}
-          {BOARD.shortcuts.flatMap((sc) => [<Staircase key={`${sc.id}a`} at={sc.a} />, <Staircase key={`${sc.id}b`} at={sc.b} />])}
+          {BOARD.shortcuts.flatMap((sc) => {
+            const aLabel =
+              sc.kind === 'room' ? `Secret passage to the ${getCard(sc.bRoomId!)?.title ?? 'unknown'}` : 'Secret passage';
+            const bLabel =
+              sc.kind === 'room' ? `Secret passage to the ${getCard(sc.aRoomId!)?.title ?? 'unknown'}` : 'Secret passage';
+            return [
+              <Staircase key={`${sc.id}a`} at={sc.a} label={aLabel} onTip={setTip} />,
+              <Staircase key={`${sc.id}b`} at={sc.b} label={bLabel} onTip={setTip} />,
+            ];
+          })}
 
           {/* envelope */}
           <rect x={BOARD.envelope.x * TS + 1} y={BOARD.envelope.y * TS + 1} width={TS - 2} height={TS - 2} rx="2" fill="#7a1f2b" stroke="#e7c66a" />
@@ -454,6 +500,11 @@ export function Board({
         </svg>
       </div>
       <div className="bv__hint">scroll or ↑/↓ to zoom · drag to pan</div>
+      {tip && (
+        <div className="bv__tip" style={{ left: tip.x + 14, top: tip.y + 14 }}>
+          {tip.text}
+        </div>
+      )}
     </div>
   );
 }

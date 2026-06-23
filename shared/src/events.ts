@@ -23,6 +23,8 @@ export const SOCKET_EVENTS = {
   // --- client -> server (in-game turn intents) ---
   ROLL_MOVE: 'rollMove', // in-room player elects to roll & move
   MOVE_TO: 'moveTo',
+  CHOOSE_FLOOR: 'chooseFloor', // pick an elevator destination floor
+  TAKE_SHORTCUT: 'takeShortcut', // ride a room's secret passage instead of moving
   SKIP_MOVE: 'skipMove',
   MAKE_SUGGESTION: 'makeSuggestion',
   REVEAL_CARD: 'revealCard',
@@ -87,6 +89,9 @@ export interface GameStartedPayload {
 }
 export interface MoveToPayload {
   tile: Coord;
+}
+export interface ChooseFloorPayload {
+  floor: 'ground-floor' | 'upper-floor' | 'basement';
 }
 export interface MakeSuggestionPayload {
   suspectId: string;

@@ -3,11 +3,19 @@ import { WEAPONS } from './weapons';
 import { ROOMS } from './rooms';
 
 // ---------------------------------------------------------------------------------------------
-// The mansion board, rebuilt as four themed sections (Grounds / Ground Floor / Upper Floor /
-// Basement) stacked into one global grid and joined by stairs. Rooms are organic, varied-size
-// footprints (not a uniform grid); the gaps between them are walkable path/corridor cells. Every
-// other cell is non-walkable scenery rendered as art with NO grid square. Computed once at import
-// and identical on client + server. Movement (BFS over buildAdjacency) lands in M6.
+// The mansion board. Four themed sections laid out in 2D and joined by shared border halls:
+//
+//                         [   The Grounds   ]
+//        [ Upper Floor ]  [  Ground Floor   ]  [ Basement ]
+//
+// The Grounds sit directly above the Ground Floor and merge seamlessly (full-width hall). The
+// Upper Floor abuts the Ground Floor's left edge, the Basement its right edge. So by geometry:
+//   - the Grounds connect only to the Ground Floor (+ a Cellar-stairs link to the Basement);
+//   - the Upper Floor connects only to the Ground Floor (+ the Elevator);
+//   - the Basement connects only to the Ground Floor (+ the Elevator + Cellar stairs).
+// A 3x3 Elevator on each indoor floor lets a player ride to another indoor floor (chosen on
+// arrival). The Elevator is not a room: you can't stop, suspect, or accuse in it, and it has no
+// card. Computed once at import and identical on client + server.
 // ---------------------------------------------------------------------------------------------
 
 export interface Coord {
@@ -16,13 +24,16 @@ export interface Coord {
 }
 
 export type SectionTheme = 'grounds' | 'ground-floor' | 'upper-floor' | 'basement';
-export type CellType = 'room' | 'path';
+export type FloorId = 'ground-floor' | 'upper-floor' | 'basement';
+export type CellType = 'room' | 'path' | 'elevator';
 
 export interface BoardCell {
   x: number;
   y: number;
-  type: CellType; // only walkable cells exist; everything else is scenery (no cell)
+  type: CellType;
   roomId?: string;
+  elevatorFloor?: FloorId;
+  cellar?: boolean; // path tile that is a cellar-stairs landing
   sectionId: string;
 }
 
@@ -42,12 +53,6 @@ export interface Shortcut {
   bRoomId?: string;
 }
 
-/** Structural staircase joining two sections (not one of the 8 secret shortcuts). */
-export interface StairLink {
-  a: Coord;
-  b: Coord;
-}
-
 export interface RoomLayout {
   id: string;
   sectionId: string;
@@ -63,9 +68,15 @@ export interface BoardSection {
   id: string;
   theme: SectionTheme;
   title: string;
-  origin: Coord; // top-left of this section in global coords
+  origin: Coord;
   width: number;
   height: number;
+}
+
+export interface ElevatorInfo {
+  floor: FloorId;
+  cells: Coord[];
+  exit: Coord; // tile a rider lands on when arriving at this floor
 }
 
 export interface Board {
@@ -77,114 +88,114 @@ export interface Board {
   starts: { suspectId: string; tile: Coord }[];
   envelope: Coord;
   shortcuts: Shortcut[];
-  stairs: StairLink[];
+  elevators: ElevatorInfo[];
+  /** Cellar stairs: a free link between a Grounds tile and a Basement tile. */
+  cellarLink: { a: Coord; b: Coord };
 }
 
 export const coordKey = (c: Coord): string => `${c.x},${c.y}`;
 
-// ---- section authoring ----------------------------------------------------------------------
+const ORTHO = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+];
 
-type Rect = [x: number, y: number, w: number, h: number];
+// ---- section authoring via a cell grid -------------------------------------------------------
+// Each section has a 1-tile border hall plus interior band columns/rows; the rectangular regions
+// between them are filled per `grid` (a room id, or a token: ELEV / ENV / CELLAR / '' = open hall).
+
 interface SectionDef {
   id: string;
   theme: SectionTheme;
   title: string;
-  width: number;
-  height: number;
-  rooms: { id: string; rects: Rect[] }[];
-  paths: Rect[]; // walkable corridor/garden-path bands (rooms take precedence on overlap)
+  w: number;
+  h: number;
+  vbands: number[]; // interior hall columns
+  hbands: number[]; // interior hall rows
+  grid: string[][]; // [rowRegion][colRegion]
 }
 
-const GROUNDS: SectionDef = {
-  id: 'grounds',
-  theme: 'grounds',
-  title: 'The Grounds',
-  width: 26,
-  height: 22,
-  rooms: [
-    { id: 'room-gazebo', rects: [[2, 1, 5, 4]] },
-    { id: 'room-hedge-maze', rects: [[9, 1, 8, 6]] },
-    { id: 'room-greenhouse', rects: [[19, 1, 6, 5]] },
-    { id: 'room-orchard', rects: [[1, 9, 6, 5]] },
-    { id: 'room-courtyard', rects: [[11, 9, 6, 5]] },
-    { id: 'room-stables', rects: [[19, 8, 6, 6]] },
-    { id: 'room-boat-house', rects: [[1, 17, 6, 4]] },
-    { id: 'room-veranda', rects: [[9, 17, 5, 4]] },
-    { id: 'room-cemetery', rects: [[16, 16, 5, 5]] },
-    { id: 'room-master-suite', rects: [[23, 16, 2, 5]] },
-    { id: 'room-walk-in-closet', rects: [[21, 18, 2, 2]] },
-  ],
-  paths: [[7, 0, 2, 22], [17, 0, 2, 22], [0, 6, 26, 2], [0, 14, 26, 2]],
-};
+const ROOM_W = 26;
+const ROOM_H = 18;
+const GROUNDS_H = 20;
+const SIDE_W = 22;
 
 const GROUND_FLOOR: SectionDef = {
   id: 'ground-floor',
   theme: 'ground-floor',
   title: 'Ground Floor',
-  width: 26,
-  height: 17,
-  rooms: [
-    { id: 'room-theatre', rects: [[1, 1, 7, 5]] },
-    { id: 'room-ballroom', rects: [[10, 1, 7, 5]] },
-    { id: 'room-library', rects: [[19, 1, 6, 4]] },
-    { id: 'room-dining', rects: [[1, 8, 5, 4]] },
-    { id: 'room-kitchen', rects: [[1, 13, 5, 3]] },
-    { id: 'room-pantry', rects: [[7, 13, 3, 3]] },
-    { id: 'room-parlour', rects: [[8, 8, 5, 4]] },
-    { id: 'room-drawing', rects: [[15, 8, 5, 4]] },
-    { id: 'room-lounge', rects: [[19, 7, 6, 4]] },
-    { id: 'room-billiard', rects: [[12, 13, 8, 3]] },
+  w: ROOM_W,
+  h: ROOM_H,
+  vbands: [8, 17],
+  hbands: [5, 9, 13],
+  grid: [
+    ['room-theatre', 'room-ballroom', 'room-library'],
+    ['room-dining', 'ELEV', 'room-lounge'],
+    ['room-kitchen', 'room-parlour', 'room-drawing'],
+    ['room-pantry', 'ENV', 'room-billiard'],
   ],
-  paths: [[6, 0, 2, 17], [13, 0, 2, 17], [0, 6, 26, 1], [0, 12, 26, 1], [17, 0, 2, 17]],
 };
 
 const UPPER_FLOOR: SectionDef = {
   id: 'upper-floor',
   theme: 'upper-floor',
   title: 'Upper Floor',
-  width: 26,
-  height: 17,
-  rooms: [
-    { id: 'room-study', rects: [[1, 1, 5, 4]] },
-    { id: 'room-music', rects: [[8, 1, 6, 4]] },
-    { id: 'room-gallery', rects: [[16, 1, 8, 4]] },
-    { id: 'room-boudoir', rects: [[1, 7, 5, 4]] },
-    { id: 'room-smoking', rects: [[8, 7, 5, 4]] },
-    { id: 'room-trophy', rects: [[15, 7, 5, 4]] },
-    { id: 'room-gymnasium', rects: [[19, 7, 6, 4]] },
-    { id: 'room-den', rects: [[1, 13, 6, 3]] },
-    { id: 'room-clock-tower', rects: [[9, 13, 4, 3]] },
-    { id: 'room-solarium', rects: [[15, 13, 9, 3]] },
+  w: SIDE_W,
+  h: ROOM_H,
+  vbands: [7, 14],
+  hbands: [5, 9, 13],
+  grid: [
+    ['room-study', 'room-music', 'room-gallery'],
+    ['room-boudoir', 'ELEV', 'room-smoking'],
+    ['room-trophy', 'room-den', 'room-clock-tower'],
+    ['room-gymnasium', '', 'room-solarium'],
   ],
-  paths: [[6, 0, 2, 17], [13, 0, 2, 17], [0, 5, 26, 2], [0, 11, 26, 2]],
 };
 
 const BASEMENT: SectionDef = {
   id: 'basement',
   theme: 'basement',
   title: 'Basement',
-  width: 26,
-  height: 15,
-  rooms: [
-    { id: 'room-wine-cellar', rects: [[1, 1, 6, 4]] },
-    { id: 'room-chapel', rects: [[9, 1, 6, 5]] },
-    { id: 'room-laboratory', rects: [[18, 1, 7, 4]] },
-    { id: 'room-armory', rects: [[1, 7, 5, 4]] },
-    { id: 'room-boiler', rects: [[8, 8, 5, 3]] },
-    { id: 'room-workshop', rects: [[15, 7, 4, 4]] },
-    { id: 'room-planetarium', rects: [[20, 7, 5, 4]] },
-    { id: 'room-bathhouse', rects: [[1, 12, 7, 3]] },
-    { id: 'room-sauna', rects: [[16, 12, 8, 3]] },
+  w: SIDE_W,
+  h: ROOM_H,
+  vbands: [7, 14],
+  hbands: [5, 9, 13],
+  grid: [
+    ['room-wine-cellar', 'room-chapel', 'room-laboratory'],
+    ['room-armory', 'ELEV', 'room-boiler'],
+    ['room-workshop', 'room-planetarium', 'room-bathhouse'],
+    ['room-sauna', 'CELLAR', ''],
   ],
-  paths: [[6, 0, 2, 15], [13, 0, 2, 15], [0, 5, 26, 2], [0, 11, 26, 1]],
 };
 
-const SECTION_DEFS = [GROUNDS, GROUND_FLOOR, UPPER_FLOOR, BASEMENT].map((s) => ({
-  ...s,
-  rooms: s.rooms.filter((r) => r.rects.length > 0),
-}));
+const GROUNDS: SectionDef = {
+  id: 'grounds',
+  theme: 'grounds',
+  title: 'The Grounds',
+  w: ROOM_W,
+  h: GROUNDS_H,
+  vbands: [6, 13, 20],
+  hbands: [6, 13],
+  grid: [
+    ['room-gazebo', 'room-hedge-maze', 'room-greenhouse', 'room-stables'],
+    ['room-orchard', 'room-courtyard', 'room-master-suite', 'CELLAR'],
+    ['room-boat-house', 'room-veranda', 'room-cemetery', ''],
+  ],
+};
 
-// 6 distant room-to-room secret passages + 2 open-world ones (filled in after assembly).
+const SECTION_DEFS = [GROUNDS, GROUND_FLOOR, UPPER_FLOOR, BASEMENT];
+
+// 2D placement (see header diagram).
+const ORIGIN: Record<string, Coord> = {
+  grounds: { x: SIDE_W, y: 0 },
+  'ground-floor': { x: SIDE_W, y: GROUNDS_H },
+  'upper-floor': { x: 0, y: GROUNDS_H },
+  basement: { x: SIDE_W + ROOM_W, y: GROUNDS_H },
+};
+
+// 6 distant room-to-room secret passages + 2 world ones.
 const ROOM_SHORTCUTS: [string, string][] = [
   ['room-gazebo', 'room-sauna'],
   ['room-greenhouse', 'room-wine-cellar'],
@@ -194,18 +205,194 @@ const ROOM_SHORTCUTS: [string, string][] = [
   ['room-hedge-maze', 'room-chapel'],
 ];
 
-const ORTHO = [
-  { x: 1, y: 0 },
-  { x: -1, y: 0 },
-  { x: 0, y: 1 },
-  { x: 0, y: -1 },
-];
+const CLOSET_ID = 'room-walk-in-closet';
+const MASTER_ID = 'room-master-suite';
 
-function inRect(x: number, y: number, [rx, ry, rw, rh]: Rect): boolean {
-  return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+/** Path columns/rows for a section: the border plus the interior bands. */
+function pathLines(size: number, bands: number[]): number[] {
+  return [...new Set([0, size - 1, ...bands])].sort((a, b) => a - b);
 }
 
-/** Reorder so the middle element comes first (used to centre doors on each wall). */
+/** The interior region rectangles between path lines, as [start, end] inclusive pairs. */
+function regions(lines: number[]): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 0; i < lines.length - 1; i++) {
+    const start = lines[i] + 1;
+    const end = lines[i + 1] - 1;
+    if (end >= start) out.push([start, end]);
+  }
+  return out;
+}
+
+function buildBoard(): Board {
+  const cellAt = new Map<string, BoardCell>();
+  const cells: BoardCell[] = [];
+  const sections: BoardSection[] = [];
+  const rooms: Record<string, RoomLayout> = {};
+  const elevators: ElevatorInfo[] = [];
+  let envelope: Coord = { x: 0, y: 0 };
+  const cellarTiles: Record<string, Coord> = {}; // sectionId -> a cellar landing tile
+
+  const put = (cell: BoardCell) => {
+    cells.push(cell);
+    cellAt.set(coordKey(cell), cell);
+  };
+
+  for (const def of SECTION_DEFS) {
+    const origin = ORIGIN[def.id];
+    sections.push({ id: def.id, theme: def.theme, title: def.title, origin, width: def.w, height: def.h });
+    const cols = pathLines(def.w, def.vbands);
+    const rows = pathLines(def.h, def.hbands);
+    const colRegions = regions(cols);
+    const rowRegions = regions(rows);
+    const isPathCol = new Set(cols);
+    const isPathRow = new Set(rows);
+
+    const roomTiles: Record<string, Coord[]> = {};
+
+    for (let ly = 0; ly < def.h; ly++) {
+      for (let lx = 0; lx < def.w; lx++) {
+        const gx = origin.x + lx;
+        const gy = origin.y + ly;
+        if (isPathCol.has(lx) || isPathRow.has(ly)) {
+          put({ x: gx, y: gy, type: 'path', sectionId: def.id });
+          continue;
+        }
+        const ri = rowRegions.findIndex(([s, e]) => ly >= s && ly <= e);
+        const ci = colRegions.findIndex(([s, e]) => lx >= s && lx <= e);
+        const token = def.grid[ri]?.[ci] ?? '';
+        if (token.startsWith('room-')) {
+          put({ x: gx, y: gy, type: 'room', roomId: token, sectionId: def.id });
+          (roomTiles[token] ??= []).push({ x: gx, y: gy });
+        } else if (token === 'ELEV') {
+          // a 3x3 elevator centred in the region; the rest of the region is hall
+          const [rs, re] = rowRegions[ri];
+          const [cs, ce] = colRegions[ci];
+          const ex = Math.floor((cs + ce) / 2);
+          const ey = Math.floor((rs + re) / 2);
+          const inElev = lx >= ex - 1 && lx <= ex + 1 && ly >= ey - 1 && ly <= ey + 1;
+          put(
+            inElev
+              ? { x: gx, y: gy, type: 'elevator', elevatorFloor: def.id as FloorId, sectionId: def.id }
+              : { x: gx, y: gy, type: 'path', sectionId: def.id },
+          );
+        } else if (token === 'CELLAR') {
+          const [rs, re] = rowRegions[ri];
+          const [cs, ce] = colRegions[ci];
+          const lx0 = Math.floor((cs + ce) / 2);
+          const ly0 = Math.floor((rs + re) / 2);
+          const isCellar = (lx === lx0 || lx === lx0 + 1) && ly === ly0;
+          const cell: BoardCell = { x: gx, y: gy, type: 'path', sectionId: def.id, cellar: isCellar };
+          put(cell);
+          if (isCellar && lx === lx0) cellarTiles[def.id] = { x: gx, y: gy };
+        } else if (token === 'ENV') {
+          const [rs, re] = rowRegions[ri];
+          const [cs, ce] = colRegions[ci];
+          const cx2 = Math.floor((cs + ce) / 2);
+          const cy2 = Math.floor((rs + re) / 2);
+          put({ x: gx, y: gy, type: 'path', sectionId: def.id });
+          if (lx === cx2 && ly === cy2) envelope = { x: gx, y: gy };
+        } else {
+          put({ x: gx, y: gy, type: 'path', sectionId: def.id });
+        }
+      }
+    }
+
+    // elevator info for this section (if any)
+    const elevCells = cells.filter((c) => c.sectionId === def.id && c.type === 'elevator');
+    if (elevCells.length) {
+      // exit tile = a path tile orthogonally adjacent to the elevator
+      let exit = { x: elevCells[0].x, y: elevCells[0].y };
+      for (const e of elevCells) {
+        for (const d of ORTHO) {
+          const n = cellAt.get(coordKey({ x: e.x + d.x, y: e.y + d.y }));
+          if (n && n.type === 'path') {
+            exit = { x: n.x, y: n.y };
+          }
+        }
+      }
+      elevators.push({ floor: def.id as FloorId, cells: elevCells.map((c) => ({ x: c.x, y: c.y })), exit });
+    }
+
+    // room layouts
+    for (const [roomId, tiles] of Object.entries(roomTiles)) {
+      const xs = tiles.map((t) => t.x);
+      const ys = tiles.map((t) => t.y);
+      const roomIndex = ROOMS.findIndex((r) => r.id === roomId);
+      rooms[roomId] = {
+        id: roomId,
+        sectionId: def.id,
+        tiles,
+        entrances: [],
+        label: { x: Math.round((Math.min(...xs) + Math.max(...xs)) / 2), y: Math.round((Math.min(...ys) + Math.max(...ys)) / 2) },
+        weaponTile: { x: Math.max(...xs), y: Math.max(...ys) },
+        weaponId: WEAPONS[(roomIndex >= 0 ? roomIndex : 0) % WEAPONS.length].id,
+      };
+    }
+  }
+
+  // Walk-in Closet: carve a 2x2 annex out of the Master Suite's far corner, joined by one door.
+  carveCloset(cells, cellAt, rooms);
+
+  // Doorways: 2–5 per room, centred and spread; closet handled above.
+  for (const room of Object.values(rooms)) {
+    if (room.id === CLOSET_ID) continue;
+    room.entrances = pickEntrances(collectCandidates(room, cellAt));
+  }
+
+  // Cellar stairs: free link between the Grounds landing and the Basement landing.
+  const cellarLink = { a: cellarTiles['grounds'], b: cellarTiles['basement'] };
+
+  // Start tiles: 40 path cells spread across the board, in suspect turn order.
+  const pathCells = cells.filter((c) => c.type === 'path' && !c.cellar);
+  const orderedSuspects = [...SUSPECTS].sort((a, b) => a.turnOrder - b.turnOrder);
+  const starts = orderedSuspects.map((s, i) => {
+    const cell = pathCells[Math.floor((i * pathCells.length) / orderedSuspects.length)];
+    return { suspectId: s.id, tile: { x: cell.x, y: cell.y } };
+  });
+
+  // Shortcuts.
+  const shortcuts: Shortcut[] = [];
+  ROOM_SHORTCUTS.forEach(([aId, bId], i) => {
+    const a = rooms[aId].tiles[0];
+    const b = rooms[bId].tiles[0];
+    rooms[aId].shortcutTile = a;
+    rooms[bId].shortcutTile = b;
+    shortcuts.push({ id: `sc-room-${i + 1}`, kind: 'room', a, b, aRoomId: aId, bRoomId: bId });
+  });
+  const top = pathCells[Math.floor(pathCells.length * 0.1)];
+  const bottom = pathCells[Math.floor(pathCells.length * 0.9)];
+  const tl = pathCells[Math.floor(pathCells.length * 0.3)];
+  const br = pathCells[Math.floor(pathCells.length * 0.7)];
+  shortcuts.push({ id: 'sc-world-1', kind: 'world', a: { x: top.x, y: top.y }, b: { x: bottom.x, y: bottom.y } });
+  shortcuts.push({ id: 'sc-world-2', kind: 'world', a: { x: tl.x, y: tl.y }, b: { x: br.x, y: br.y } });
+
+  const width = Math.max(...cells.map((c) => c.x)) + 1;
+  const height = Math.max(...cells.map((c) => c.y)) + 1;
+
+  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, elevators, cellarLink };
+}
+
+function collectCandidates(
+  room: RoomLayout,
+  cellAt: Map<string, BoardCell>,
+): { side: string; door: Doorway }[] {
+  const seen = new Set<string>();
+  const out: { side: string; door: Doorway }[] = [];
+  for (const t of room.tiles) {
+    for (const d of ORTHO) {
+      const n = cellAt.get(coordKey({ x: t.x + d.x, y: t.y + d.y }));
+      if (!n || n.type !== 'path') continue;
+      const k = `${coordKey(t)}>${coordKey(n)}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const side = d.y < 0 ? 'top' : d.y > 0 ? 'bottom' : d.x < 0 ? 'left' : 'right';
+      out.push({ side, door: { roomId: room.id, roomTile: { x: t.x, y: t.y }, doorTile: { x: n.x, y: n.y } } });
+    }
+  }
+  return out;
+}
+
 function middleOut<T>(arr: T[]): T[] {
   if (arr.length <= 1) return arr;
   const mid = Math.floor(arr.length / 2);
@@ -217,7 +404,6 @@ function middleOut<T>(arr: T[]): T[] {
   return res;
 }
 
-/** Choose 2–5 doorways, centred on each wall and spread round-robin across the room's sides. */
 function pickEntrances(cands: { side: string; door: Doorway }[]): Doorway[] {
   if (cands.length <= 2) return cands.map((c) => c.door);
   const target = Math.min(5, Math.max(2, Math.round(cands.length / 4)));
@@ -248,146 +434,53 @@ function pickEntrances(cands: { side: string; door: Doorway }[]): Doorway[] {
   return picked;
 }
 
-function buildBoard(): Board {
-  // Stack sections vertically with a 1-row void gap between them.
-  let cursorY = 0;
-  const sections: BoardSection[] = [];
-  const placed = SECTION_DEFS.map((def) => {
-    const origin = { x: 0, y: cursorY };
-    sections.push({ id: def.id, theme: def.theme, title: def.title, origin, width: def.width, height: def.height });
-    cursorY += def.height + 1;
-    return { def, origin };
-  });
-
-  const width = Math.max(...SECTION_DEFS.map((s) => s.width));
-  const height = cursorY - 1;
-
-  const cells: BoardCell[] = [];
-  const cellAt = new Map<string, BoardCell>();
-  const rooms: Record<string, RoomLayout> = {};
-
-  for (const { def, origin } of placed) {
-    // classify every section-local cell: room wins over path; otherwise scenery (no cell).
-    for (let ly = 0; ly < def.height; ly++) {
-      for (let lx = 0; lx < def.width; lx++) {
-        const gx = origin.x + lx;
-        const gy = origin.y + ly;
-        const room = def.rooms.find((r) => r.rects.some((rect) => inRect(lx, ly, rect)));
-        const isPath = def.paths.some((rect) => inRect(lx, ly, rect));
-        if (room) {
-          const cell: BoardCell = { x: gx, y: gy, type: 'room', roomId: room.id, sectionId: def.id };
-          cells.push(cell);
-          cellAt.set(coordKey(cell), cell);
-        } else if (isPath) {
-          const cell: BoardCell = { x: gx, y: gy, type: 'path', sectionId: def.id };
-          cells.push(cell);
-          cellAt.set(coordKey(cell), cell);
-        }
-      }
+/** Turn the far 2x2 corner of the Master Suite into the Walk-in Closet, joined by one inner door. */
+function carveCloset(cells: BoardCell[], cellAt: Map<string, BoardCell>, rooms: Record<string, RoomLayout>): void {
+  const master = rooms[MASTER_ID];
+  const xs = master.tiles.map((t) => t.x);
+  const ys = master.tiles.map((t) => t.y);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  // top-right 2x2 of the suite becomes the closet
+  const closetCoords = [
+    { x: maxX - 1, y: minY },
+    { x: maxX, y: minY },
+    { x: maxX - 1, y: minY + 1 },
+    { x: maxX, y: minY + 1 },
+  ];
+  const closetKeys = new Set(closetCoords.map(coordKey));
+  for (const c of cells) {
+    if (closetKeys.has(coordKey(c))) {
+      c.roomId = CLOSET_ID;
     }
-
-    // room layouts (tiles, label, weapon tile)
-    def.rooms.forEach((r, ri) => {
-      const tiles: Coord[] = cells
-        .filter((c) => c.roomId === r.id)
-        .map((c) => ({ x: c.x, y: c.y }));
-      const xs = tiles.map((t) => t.x);
-      const ys = tiles.map((t) => t.y);
-      const roomIndex = ROOMS.findIndex((rm) => rm.id === r.id);
-      rooms[r.id] = {
-        id: r.id,
-        sectionId: def.id,
-        tiles,
-        entrances: [],
-        label: { x: Math.round((Math.min(...xs) + Math.max(...xs)) / 2), y: Math.round((Math.min(...ys) + Math.max(...ys)) / 2) },
-        weaponTile: { x: Math.max(...xs), y: Math.max(...ys) },
-        weaponId: WEAPONS[(roomIndex >= 0 ? roomIndex : ri) % WEAPONS.length].id,
-      };
-    });
   }
-
-  // Doorways: each room gets 2–5 entrances (not enterable from every side), centred and spread
-  // across its walls. (The Walk-in Closet keeps its single Master-Suite door, wired below.)
-  for (const room of Object.values(rooms)) {
-    if (room.id === 'room-walk-in-closet') continue;
-    const candidates: { side: string; door: Doorway }[] = [];
-    const seen = new Set<string>();
-    for (const t of room.tiles) {
-      for (const d of ORTHO) {
-        const n = cellAt.get(coordKey({ x: t.x + d.x, y: t.y + d.y }));
-        if (!n || n.type !== 'path') continue;
-        const k = `${coordKey(t)}>${coordKey(n)}`;
-        if (seen.has(k)) continue;
-        seen.add(k);
-        const side = d.y < 0 ? 'top' : d.y > 0 ? 'bottom' : d.x < 0 ? 'left' : 'right';
-        candidates.push({ side, door: { roomId: room.id, roomTile: { x: t.x, y: t.y }, doorTile: { x: n.x, y: n.y } } });
-      }
-    }
-    room.entrances = pickEntrances(candidates);
-  }
-
-  // Walk-in Closet: single door into an adjacent Master Suite tile (its only way in).
+  master.tiles = master.tiles.filter((t) => !closetKeys.has(coordKey(t)));
+  // recompute master label/weapon
   {
-    const closet = rooms['room-walk-in-closet'];
-    const masterTiles = new Set(rooms['room-master-suite'].tiles.map(coordKey));
-    let linked = false;
-    for (const t of closet.tiles) {
-      for (const d of ORTHO) {
-        const nk = coordKey({ x: t.x + d.x, y: t.y + d.y });
-        if (!linked && masterTiles.has(nk)) {
-          const [mx, my] = nk.split(',').map(Number);
-          closet.entrances = [{ roomId: closet.id, roomTile: t, doorTile: { x: mx, y: my } }];
-          linked = true;
-        }
-      }
-    }
+    const mxs = master.tiles.map((t) => t.x);
+    const mys = master.tiles.map((t) => t.y);
+    master.label = { x: Math.round((Math.min(...mxs) + Math.max(...mxs)) / 2), y: Math.round((Math.min(...mys) + Math.max(...mys)) / 2) };
+    master.weaponTile = { x: Math.max(...mxs), y: Math.max(...mys) };
   }
-
-  // Stairs join consecutive sections at two corridor columns (cols 7 and 14, which are path bands).
-  const stairs: StairLink[] = [];
-  for (let i = 0; i < placed.length - 1; i++) {
-    const top = placed[i];
-    const bot = placed[i + 1];
-    for (const col of [7, 14]) {
-      const a = cellAt.get(coordKey({ x: col, y: top.origin.y + top.def.height - 1 }));
-      const b = cellAt.get(coordKey({ x: col, y: bot.origin.y }));
-      if (a && b && a.type === 'path' && b.type === 'path') stairs.push({ a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y } });
-    }
-  }
-
-  // Start tiles: 40 path cells spread across the board, assigned in suspect turn order.
-  const pathCells = cells.filter((c) => c.type === 'path');
-  const orderedSuspects = [...SUSPECTS].sort((a, b) => a.turnOrder - b.turnOrder);
-  const starts = orderedSuspects.map((s, i) => {
-    const cell = pathCells[Math.floor((i * pathCells.length) / orderedSuspects.length)];
-    return { suspectId: s.id, tile: { x: cell.x, y: cell.y } };
-  });
-
-  // Envelope: a central path cell of the Ground Floor.
-  const gf = placed[1];
-  const envCandidate = cells.find(
-    (c) => c.sectionId === 'ground-floor' && c.type === 'path' && c.x === 6 && c.y === gf.origin.y + 6,
-  );
-  const envelope = envCandidate ? { x: envCandidate.x, y: envCandidate.y } : { x: pathCells[0].x, y: pathCells[0].y };
-
-  // Shortcuts.
-  const shortcuts: Shortcut[] = [];
-  ROOM_SHORTCUTS.forEach(([aId, bId], i) => {
-    const a = rooms[aId].tiles[0];
-    const b = rooms[bId].tiles[0];
-    rooms[aId].shortcutTile = a;
-    rooms[bId].shortcutTile = b;
-    shortcuts.push({ id: `sc-room-${i + 1}`, kind: 'room', a, b, aRoomId: aId, bRoomId: bId });
-  });
-  // 2 world shortcuts between far-apart corridor cells.
-  const top = pathCells[2];
-  const bottom = pathCells[pathCells.length - 3];
-  const topMid = pathCells[Math.floor(pathCells.length * 0.15)];
-  const botMid = pathCells[Math.floor(pathCells.length * 0.85)];
-  shortcuts.push({ id: 'sc-world-1', kind: 'world', a: { x: top.x, y: top.y }, b: { x: bottom.x, y: bottom.y } });
-  shortcuts.push({ id: 'sc-world-2', kind: 'world', a: { x: topMid.x, y: topMid.y }, b: { x: botMid.x, y: botMid.y } });
-
-  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, stairs };
+  const closetTiles = closetCoords;
+  const sectionId = master.sectionId;
+  rooms[CLOSET_ID] = {
+    id: CLOSET_ID,
+    sectionId,
+    tiles: closetTiles,
+    entrances: [
+      // single inner door from the closet's bottom-left tile into the suite tile beneath it
+      {
+        roomId: CLOSET_ID,
+        roomTile: { x: maxX - 1, y: minY + 1 },
+        doorTile: { x: maxX - 1, y: minY + 2 },
+      },
+    ],
+    label: { x: maxX - 1, y: minY + 1 },
+    weaponTile: { x: maxX, y: minY + 1 },
+    weaponId: WEAPONS[ROOMS.findIndex((r) => r.id === CLOSET_ID) % WEAPONS.length].id,
+  };
+  void cellAt;
 }
 
 export const BOARD: Board = buildBoard();
@@ -412,14 +505,18 @@ export function buildAdjacency(board: Board, includeShortcuts = true): Map<strin
     for (const d of ORTHO) {
       const n = byKey.get(coordKey({ x: c.x + d.x, y: c.y + d.y }));
       if (!n) continue;
-      if (c.type === 'path' && n.type === 'path') link(c, n);
+      // halls connect to halls and to elevator cells (entry); rooms only join same-room tiles.
+      const aWalk = c.type === 'path' || c.type === 'elevator';
+      const bWalk = n.type === 'path' || n.type === 'elevator';
+      if (aWalk && bWalk) link(c, n);
       else if (c.type === 'room' && n.type === 'room' && c.roomId === n.roomId) link(c, n);
     }
   }
   for (const room of Object.values(board.rooms)) {
     for (const e of room.entrances) link(e.roomTile, e.doorTile);
   }
-  for (const s of board.stairs) link(s.a, s.b); // structural — always connected
+  // Cellar stairs: a free Grounds <-> Basement link.
+  if (board.cellarLink.a && board.cellarLink.b) link(board.cellarLink.a, board.cellarLink.b);
   if (includeShortcuts) for (const sc of board.shortcuts) link(sc.a, sc.b);
 
   return adj;

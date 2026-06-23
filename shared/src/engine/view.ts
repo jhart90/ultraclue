@@ -1,6 +1,6 @@
 import type { GameState, GameView, PlayerView, SuggestionView } from '../game';
-import { getPlayer } from './util';
-import { activeReachable } from './turn';
+import { getPlayer, currentPlayerId } from './util';
+import { activeReachable, elevatorOptions } from './turn';
 
 /**
  * Project the authoritative state down to what a single viewer is allowed to see. This is the
@@ -61,5 +61,9 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     lastRoll: state.lastRoll,
     lastMove: state.lastMove,
     reachable: activeReachable(state),
+    elevatorFloors:
+      state.turnPhase === 'awaitElevator' && state.elevatorRide && currentPlayerId(state) === viewerId
+        ? elevatorOptions(state.elevatorRide.fromFloor)
+        : undefined,
   };
 }

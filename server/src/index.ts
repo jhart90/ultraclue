@@ -12,6 +12,9 @@ import {
   getPlayer,
   rollAndMove,
   moveTo,
+  chooseFloor,
+  elevatorOptions,
+  takeShortcut,
   skipMovement,
   makeSuggestion,
   respondToSuggestion,
@@ -29,6 +32,7 @@ import {
   type JoinGamePayload,
   type LobbyChatPayload,
   type MoveToPayload,
+  type ChooseFloorPayload,
   type MakeSuggestionPayload,
   type RevealCardPayload,
   type MakeAccusationPayload,
@@ -74,6 +78,9 @@ function emitChat(room: Room): void {
 }
 
 const RNG = makeRng(Math.floor(Math.random() * 0x7fffffff) + 1);
+
+// Pace every bot action ~5s apart so human players can read pop-ups and digest each move.
+const BOT_DELAY = 5000;
 
 // Per-room bot memory: cards each bot has seen revealed, and rooms it has already suggested in.
 const botMem = new Map<string, { reveals: Map<string, Set<string>>; visited: Map<string, Set<string>> }>();
@@ -154,7 +161,7 @@ function scheduleBotReveal(room: Room, botId: string): void {
     } catch {
       /* ignore */
     }
-  }, 900);
+  }, BOT_DELAY);
 }
 
 /** A bot's turn: deduce, move toward a useful room, suggest, and accuse when confident. */
@@ -171,14 +178,21 @@ function scheduleBots(room: Room): void {
     if (!s || s.phase !== 'play' || currentPlayerId(s) !== cur.id || !getPlayer(s, cur.id)?.isBot) return;
     try {
       const ruled = ruledOutFor(s, cur.id, room);
-      if (s.turnPhase === 'awaitRoll') {
-        const me = getPlayer(s, cur.id);
-        const visited = memFor(room).visited.get(cur.id) ?? new Set<string>();
-        s = botShouldStay(me?.inRoomId, ruled, visited) ? skipMovement(s, cur.id) : rollAndMove(s, cur.id, RNG);
-      }
-      if (s.turnPhase === 'awaitMove') {
-        const dest = botMoveTarget(activeReachable(s), ruled, RNG);
-        if (dest) s = moveTo(s, cur.id, dest);
+      for (let step = 0; step < 4; step++) {
+        if (s.turnPhase === 'awaitRoll') {
+          const me = getPlayer(s, cur.id);
+          const visited = memFor(room).visited.get(cur.id) ?? new Set<string>();
+          s = botShouldStay(me?.inRoomId, ruled, visited) ? skipMovement(s, cur.id) : rollAndMove(s, cur.id, RNG);
+        } else if (s.turnPhase === 'awaitMove') {
+          const dest = botMoveTarget(activeReachable(s), ruled, RNG);
+          if (!dest) break;
+          s = moveTo(s, cur.id, dest);
+        } else if (s.turnPhase === 'awaitElevator' && s.elevatorRide) {
+          const opts = elevatorOptions(s.elevatorRide.fromFloor);
+          s = chooseFloor(s, cur.id, opts[Math.floor(RNG() * opts.length)], RNG);
+        } else {
+          break;
+        }
       }
       room.game = s;
       broadcastGame(room);
@@ -228,8 +242,8 @@ function scheduleBots(room: Room): void {
           }
         }
       }
-    }, 750);
-  }, 700);
+    }, BOT_DELAY);
+  }, BOT_DELAY);
 }
 
 function emitError(socket: Socket, message: string): void {
@@ -370,6 +384,10 @@ io.on('connection', (socket) => {
 
   socket.on(SOCKET_EVENTS.ROLL_MOVE, () => withGame(socket, (_room, g) => rollAndMove(g, cid(socket), RNG)));
   socket.on(SOCKET_EVENTS.MOVE_TO, (p: MoveToPayload) => withGame(socket, (_room, g) => moveTo(g, cid(socket), p.tile)));
+  socket.on(SOCKET_EVENTS.CHOOSE_FLOOR, (p: ChooseFloorPayload) =>
+    withGame(socket, (_room, g) => chooseFloor(g, cid(socket), p.floor, RNG)),
+  );
+  socket.on(SOCKET_EVENTS.TAKE_SHORTCUT, () => withGame(socket, (_room, g) => takeShortcut(g, cid(socket))));
   socket.on(SOCKET_EVENTS.SKIP_MOVE, () => withGame(socket, (_room, g) => skipMovement(g, cid(socket))));
   socket.on(SOCKET_EVENTS.END_TURN, () => withGame(socket, (_room, g) => endTurn(g, cid(socket), RNG)));
 

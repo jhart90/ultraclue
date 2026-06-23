@@ -65,6 +65,8 @@ interface StoreState {
   startGame: () => void;
   rollMove: () => void;
   moveTo: (tile: Coord) => void;
+  chooseFloor: (floor: 'ground-floor' | 'upper-floor' | 'basement') => void;
+  takeShortcut: () => void;
   skipMove: () => void;
   suggest: (suspectId: string, weaponId: string) => void;
   revealCard: (cardId: string) => void;
@@ -90,6 +92,8 @@ export const useStore = create<StoreState>((set) => ({
   startGame: () => socket.emit(SOCKET_EVENTS.START_GAME),
   rollMove: () => socket.emit(SOCKET_EVENTS.ROLL_MOVE),
   moveTo: (tile) => socket.emit(SOCKET_EVENTS.MOVE_TO, { tile }),
+  chooseFloor: (floor) => socket.emit(SOCKET_EVENTS.CHOOSE_FLOOR, { floor }),
+  takeShortcut: () => socket.emit(SOCKET_EVENTS.TAKE_SHORTCUT),
   skipMove: () => socket.emit(SOCKET_EVENTS.SKIP_MOVE),
   suggest: (suspectId, weaponId) => socket.emit(SOCKET_EVENTS.MAKE_SUGGESTION, { suspectId, weaponId }),
   revealCard: (cardId) => socket.emit(SOCKET_EVENTS.REVEAL_CARD, { cardId }),

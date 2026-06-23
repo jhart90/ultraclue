@@ -152,6 +152,17 @@
 .sp__cardbtn:hover {
   transform: translateY(-6px);
 }
+.sp__cardbtn--sel {
+  outline: 3px solid var(--accent, #c8a24a);
+  outline-offset: 3px;
+  border-radius: 12px;
+  transform: translateY(-6px);
+}
+.sp__revealbtn {
+  margin-top: 0.5rem;
+  font-size: 1.1rem;
+  padding: 0.6rem 1.8rem;
+}
 
 .sp--reveal,
 .sp--end {

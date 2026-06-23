@@ -2,16 +2,17 @@
 // The server holds one GameState (with hidden info); each client receives a GameView tailored
 // to what that player is allowed to see.
 
-import type { Coord } from './data/board';
+import type { Coord, FloorId } from './data/board';
 
 export type SlotStatus = 'open' | 'closed' | 'bot';
 export type Phase = 'lobby' | 'setup' | 'play' | 'ended';
 
 // Movement sub-state of the current player's turn.
-//  awaitRoll  — player started the turn inside a room: choose ROLL & MOVE or skip movement.
-//  awaitMove  — dice are rolled; pick a highlighted destination square.
-//  postMove   — finished moving (or skipped): end the turn (suggest/accuse arrive in M7).
-export type TurnPhase = 'awaitRoll' | 'awaitMove' | 'postMove';
+//  awaitRoll     — player started the turn inside a room: choose ROLL & MOVE or skip movement.
+//  awaitMove     — dice are rolled; pick a highlighted destination square.
+//  awaitElevator — stepped into the elevator: choose which floor to ride to.
+//  postMove      — finished moving (or skipped): suggest / accuse / end the turn.
+export type TurnPhase = 'awaitRoll' | 'awaitMove' | 'awaitElevator' | 'postMove';
 
 export interface Player {
   /** Socket id for humans, or a synthetic id like "bot-2" for bots. */
@@ -96,6 +97,8 @@ export interface GameState {
   lastRoll?: [number, number];
   /** The path most recently walked, for clients to animate. */
   lastMove?: { playerId: string; path: Coord[] };
+  /** Set while a player is choosing an elevator floor (steps left to continue moving after). */
+  elevatorRide?: { fromFloor: FloorId; stepsLeft: number };
 }
 
 // ---- Per-player view (safe to broadcast) -------------------------------------------------
@@ -151,4 +154,6 @@ export interface GameView {
   lastMove?: { playerId: string; path: Coord[] };
   /** Tiles the active player may move to this turn (for highlighting). */
   reachable?: Coord[];
+  /** Floors the active player may ride the elevator to (when choosing). */
+  elevatorFloors?: FloorId[];
 }

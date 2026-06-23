@@ -36,3 +36,18 @@
   border-radius: 6px;
   pointer-events: none;
 }
+
+.bv__tip {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #f5e9c8;
+  background: rgba(12, 10, 20, 0.95);
+  border: 1px solid #e7c66a;
+  padding: 0.3rem 0.6rem;
+  border-radius: 7px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}

@@ -1,9 +1,20 @@
 import { getCard } from '../data';
-import { BOARD, coordKey, type Coord } from '../data/board';
+import { BOARD, coordKey, type Coord, type FloorId } from '../data/board';
 import type { GameState } from '../game';
 import { type RNG } from '../rng';
-import { blockedCells, pathTo, reachableTiles, roomIdAt } from './movement';
+import { blockedCells, elevatorFloorAt, pathTo, reachableTiles, roomIdAt } from './movement';
 import { advanceTurn, clone, currentPlayerId, getPlayer, log, requirePlayer } from './util';
+
+const FLOOR_NAMES: Record<FloorId, string> = {
+  'ground-floor': 'Ground Floor',
+  'upper-floor': 'Upper Floor',
+  basement: 'Basement',
+};
+
+/** The indoor floors a rider can choose from an elevator (every indoor floor but the one they're on). */
+export function elevatorOptions(fromFloor: FloorId): FloorId[] {
+  return (['ground-floor', 'upper-floor', 'basement'] as FloorId[]).filter((f) => f !== fromFloor);
+}
 
 const die = (rng: RNG) => 1 + Math.floor(rng() * 6);
 
@@ -39,6 +50,32 @@ export function rollAndMove(state: GameState, playerId: string, rng: RNG): GameS
   return s;
 }
 
+/** The room a secret passage leads to from `roomId`, if this room has one. */
+export function shortcutDestForRoom(roomId: string | undefined): string | undefined {
+  if (!roomId) return undefined;
+  const sc = BOARD.shortcuts.find((x) => x.kind === 'room' && (x.aRoomId === roomId || x.bRoomId === roomId));
+  if (!sc) return undefined;
+  return sc.aRoomId === roomId ? sc.bRoomId : sc.aRoomId;
+}
+
+/** Take the secret passage out of the current room — counts as the whole movement phase. */
+export function takeShortcut(state: GameState, playerId: string): GameState {
+  const s = clone(state);
+  if (currentPlayerId(s) !== playerId) throw new Error('Not your turn.');
+  if (s.turnPhase !== 'awaitRoll') throw new Error('You can only take a shortcut at the start of your turn.');
+  const player = requirePlayer(s, playerId);
+  const destRoomId = shortcutDestForRoom(player.inRoomId);
+  if (!destRoomId) throw new Error('There is no secret passage from this room.');
+  const destRoom = BOARD.rooms[destRoomId];
+  const before = player.position;
+  player.position = { x: destRoom.tiles[0].x, y: destRoom.tiles[0].y };
+  player.inRoomId = destRoomId;
+  s.lastMove = { playerId, path: [before, { x: destRoom.tiles[0].x, y: destRoom.tiles[0].y }] };
+  s.turnPhase = 'postMove';
+  log(s, `${player.name} takes the secret passage to the ${getCard(destRoomId)?.title}.`);
+  return s;
+}
+
 /** In-room player skips movement (stays put) to go straight to the suspect/accuse phase. */
 export function skipMovement(state: GameState, playerId: string): GameState {
   const s = clone(state);
@@ -63,12 +100,52 @@ export function moveTo(state: GameState, playerId: string, dest: Coord): GameSta
 
   const path = pathTo(BOARD, player.position, dest, steps, blocked);
   player.position = { x: dest.x, y: dest.y };
-  player.inRoomId = roomIdAt(BOARD, dest);
   s.lastMove = { playerId, path };
-  s.turnPhase = 'postMove';
 
+  // Stepped into an elevator? Stop, and let them choose a floor to ride to (then continue moving).
+  const elevFloor = elevatorFloorAt(BOARD, dest);
+  if (elevFloor) {
+    player.inRoomId = undefined;
+    const used = Math.max(0, path.length - 1);
+    s.elevatorRide = { fromFloor: elevFloor, stepsLeft: Math.max(0, steps - used) };
+    s.turnPhase = 'awaitElevator';
+    log(s, `${player.name} steps into the elevator.`);
+    return s;
+  }
+
+  player.inRoomId = roomIdAt(BOARD, dest);
+  s.turnPhase = 'postMove';
   const where = player.inRoomId ? `enters the ${getCard(player.inRoomId)?.title}` : 'moves';
   log(s, `${player.name} ${where}.`);
+  return s;
+}
+
+/** Ride the elevator to a chosen floor, emerge at its exit, and continue with any steps left. */
+export function chooseFloor(state: GameState, playerId: string, floor: FloorId, rng: RNG): GameState {
+  const s = clone(state);
+  if (currentPlayerId(s) !== playerId) throw new Error('Not your turn.');
+  if (s.turnPhase !== 'awaitElevator' || !s.elevatorRide) throw new Error('You are not in the elevator.');
+  if (!elevatorOptions(s.elevatorRide.fromFloor).includes(floor)) throw new Error('You cannot ride to that floor.');
+
+  const elev = BOARD.elevators.find((e) => e.floor === floor);
+  if (!elev) throw new Error('No elevator there.');
+  const player = requirePlayer(s, playerId);
+  const before = player.position;
+  player.position = { x: elev.exit.x, y: elev.exit.y };
+  player.inRoomId = undefined;
+  s.lastMove = { playerId, path: [before, { x: elev.exit.x, y: elev.exit.y }] };
+
+  const stepsLeft = s.elevatorRide.stepsLeft;
+  log(s, `${player.name} rides the elevator to the ${FLOOR_NAMES[floor]}.`);
+  s.elevatorRide = undefined;
+
+  if (stepsLeft > 0) {
+    s.lastRoll = [stepsLeft, 0];
+    s.turnPhase = 'awaitMove';
+  } else {
+    s.turnPhase = 'postMove';
+  }
+  void rng;
   return s;
 }
 

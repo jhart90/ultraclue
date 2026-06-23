@@ -101,7 +101,7 @@ export function SelectModal({
   );
 }
 
-/** Shown to the player who must disprove a suggestion: pick one matching card to reveal. */
+/** Shown to the player who must disprove a suggestion: select one matching card, then reveal it. */
 export function RevealPanel({
   trio,
   hand,
@@ -114,23 +114,31 @@ export function RevealPanel({
   onReveal: (cardId: string) => void;
 }) {
   const matches = trio.filter((c) => hand.includes(c));
+  const [selected, setSelected] = useState<string | null>(matches.length === 1 ? matches[0] : null);
   return (
     <div className="sp__backdrop">
       <div className="sp sp--reveal">
         <div className="sp__title">Disprove the suggestion</div>
         <div className="sp__hint">
-          You must reveal one matching card to {suggesterName} (only they will see which one).
+          Select one matching card to reveal to {suggesterName} (only they will see which one).
         </div>
         <div className="sp__cards">
           {matches.map((c) => {
             const card = getCard(c);
             return card ? (
-              <button key={c} className="sp__cardbtn" onClick={() => onReveal(c)}>
+              <button
+                key={c}
+                className={`sp__cardbtn${selected === c ? ' sp__cardbtn--sel' : ''}`}
+                onClick={() => setSelected(c)}
+              >
                 <Card card={card} />
               </button>
             ) : null;
           })}
         </div>
+        <button className="btn btn--primary sp__revealbtn" disabled={!selected} onClick={() => selected && onReveal(selected)}>
+          Reveal Card
+        </button>
       </div>
     </div>
   );

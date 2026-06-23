@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getCard } from 'shared';
+import { getCard, shortcutDestForRoom } from 'shared';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
@@ -17,6 +17,12 @@ function suspectColor(suspectId?: string): string {
   return c && c.type === 'suspect' ? c.color : '#555';
 }
 
+const FLOOR_LABELS: Record<string, string> = {
+  'ground-floor': 'Ground Floor',
+  'upper-floor': 'Upper Floor',
+  basement: 'Basement',
+};
+
 export function Game() {
   const game = useStore((s) => s.game);
   const chat = useStore((s) => s.chat);
@@ -25,6 +31,8 @@ export function Game() {
   const leave = useStore((s) => s.leave);
   const rollMove = useStore((s) => s.rollMove);
   const moveTo = useStore((s) => s.moveTo);
+  const chooseFloor = useStore((s) => s.chooseFloor);
+  const takeShortcut = useStore((s) => s.takeShortcut);
   const skipMove = useStore((s) => s.skipMove);
   const suggest = useStore((s) => s.suggest);
   const revealCard = useStore((s) => s.revealCard);
@@ -108,6 +116,8 @@ export function Game() {
     .filter((p): p is NonNullable<typeof p> => !!p);
 
   const myRoom = me?.inRoomId ? getCard(me.inRoomId)?.title : null;
+  const myShortcutDest = me?.inRoomId ? shortcutDestForRoom(me.inRoomId) : undefined;
+  const myShortcutName = myShortcutDest ? getCard(myShortcutDest)?.title : undefined;
 
   const sug = game.currentSuggestion;
   const suggestionPending = !!sug && !sug.resolved;
@@ -120,15 +130,15 @@ export function Game() {
 
   // Big status pop-up content for the active player.
   const statusDesc: { dice?: [number, number]; lines: string[]; buttons: StatusButton[] } | null = (() => {
-    if (!myTurn || suggestionPending) return null;
+    if (!myTurn || suggestionPending || game.turnPhase === 'awaitElevator') return null;
     if (game.turnPhase === 'awaitRoll') {
-      return {
-        lines: [`You are in the ${myRoom}.`, 'Roll & move, or skip to stay.'],
-        buttons: [
-          { label: 'Roll & Move', icon: '🎲', primary: true, onClick: () => (setStatusOpen(false), rollMove()) },
-          { label: 'Skip movement', icon: '⏭️', onClick: () => (setStatusOpen(false), skipMove()) },
-        ],
-      };
+      const buttons: StatusButton[] = [
+        { label: 'Roll & Move', icon: '🎲', primary: true, onClick: () => (setStatusOpen(false), rollMove()) },
+      ];
+      if (myShortcutDest)
+        buttons.push({ label: `Take Shortcut to ${myShortcutName}`, icon: '🕳️', onClick: () => (setStatusOpen(false), takeShortcut()) });
+      buttons.push({ label: 'Skip movement', icon: '⏭️', onClick: () => (setStatusOpen(false), skipMove()) });
+      return { lines: [`You are in the ${myRoom}.`, 'Roll, take the secret passage, or skip to stay.'], buttons };
     }
     if (game.turnPhase === 'awaitMove' && game.lastRoll) {
       return {
@@ -222,6 +232,9 @@ export function Game() {
                 {game.turnPhase === 'awaitRoll' && (
                   <>
                     <button className="btn btn--primary" onClick={rollMove}>🎲 Roll &amp; Move</button>
+                    {myShortcutDest && (
+                      <button className="btn" onClick={takeShortcut}>🕳️ Take Shortcut to {myShortcutName}</button>
+                    )}
                     <button className="btn" onClick={skipMove}>Skip movement</button>
                   </>
                 )}
@@ -332,6 +345,22 @@ export function Game() {
           suggesterName={game.players.find((p) => p.id === sug.suggesterId)?.name ?? 'the suggester'}
           onReveal={(c) => revealCard(c)}
         />
+      )}
+
+      {myTurn && game.turnPhase === 'awaitElevator' && game.elevatorFloors && (
+        <div className="sp__backdrop">
+          <div className="statpop">
+            <div className="statpop__line1">🛗 Elevator</div>
+            <div className="statpop__line2">Which floor would you like to ride to?</div>
+            <div className="statpop__btns">
+              {game.elevatorFloors.map((f) => (
+                <button key={f} className="btn btn--primary statpop__btn" onClick={() => chooseFloor(f)}>
+                  {FLOOR_LABELS[f] ?? f}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {showEnd && <EndScreen game={game} myId={myId} onLeave={leave} />}

@@ -20,6 +20,10 @@ import {
   endTurn,
   passTurn,
   activeReachable,
+  botAccusation,
+  botSuggestion,
+  botMoveTarget,
+  botShouldStay,
   type GameState,
   type CreateGamePayload,
   type JoinGamePayload,
@@ -66,6 +70,32 @@ function emitChat(room: Room): void {
 
 const RNG = makeRng(Math.floor(Math.random() * 0x7fffffff) + 1);
 
+// Per-room bot memory: cards each bot has seen revealed, and rooms it has already suggested in.
+const botMem = new Map<string, { reveals: Map<string, Set<string>>; visited: Map<string, Set<string>> }>();
+function memFor(room: Room) {
+  let m = botMem.get(room.code);
+  if (!m) {
+    m = { reveals: new Map(), visited: new Map() };
+    botMem.set(room.code, m);
+  }
+  return m;
+}
+/** Cards a bot knows are not in the envelope: its own hand plus everything revealed to it. */
+function ruledOutFor(g: GameState, botId: string, room: Room): Set<string> {
+  const hand = getPlayer(g, botId)?.hand ?? [];
+  return new Set([...hand, ...(memFor(room).reveals.get(botId) ?? [])]);
+}
+/** Record a card a bot saw, once a suggestion it made is disproven. */
+function recordReveals(room: Room): void {
+  const g = room.game;
+  const sg = g?.currentSuggestion;
+  if (!g || !sg?.resolved || !sg.anyRevealed || !sg.revealedCardId) return;
+  if (!getPlayer(g, sg.suggesterId)?.isBot) return;
+  const set = memFor(room).reveals.get(sg.suggesterId) ?? new Set<string>();
+  set.add(sg.revealedCardId);
+  memFor(room).reveals.set(sg.suggesterId, set);
+}
+
 /** Push each human their own tailored game view. */
 function broadcastGame(room: Room): void {
   const g = room.game;
@@ -93,6 +123,7 @@ function withGame(socket: Socket, fn: (room: Room, g: GameState) => GameState): 
 function progress(room: Room): void {
   const g = room.game;
   if (!g) return;
+  recordReveals(room); // bots remember what their suggestions surfaced
   broadcastGame(room);
   if (g.phase !== 'play') return;
 
@@ -121,48 +152,78 @@ function scheduleBotReveal(room: Room, botId: string): void {
   }, 900);
 }
 
-/** When the active player is a bot, play a simple turn after a short delay (full AI is M8). */
+/** A bot's turn: deduce, move toward a useful room, suggest, and accuse when confident. */
 function scheduleBots(room: Room): void {
   const g = room.game;
   if (!g || g.phase !== 'play') return;
   const cur = getPlayer(g, currentPlayerId(g));
   if (!cur || !cur.isBot || cur.eliminated) return;
 
+  // --- movement phase ---
   setTimeout(() => {
     let s = room.game;
     if (!s || s.phase !== 'play' || currentPlayerId(s) !== cur.id) return;
     try {
+      const ruled = ruledOutFor(s, cur.id, room);
       if (s.turnPhase === 'awaitRoll') {
-        s = rollAndMove(s, cur.id, RNG); // bots always roll & move
-        room.game = s;
-        broadcastGame(room);
+        const me = getPlayer(s, cur.id);
+        const visited = memFor(room).visited.get(cur.id) ?? new Set<string>();
+        s = botShouldStay(me?.inRoomId, ruled, visited) ? skipMovement(s, cur.id) : rollAndMove(s, cur.id, RNG);
       }
       if (s.turnPhase === 'awaitMove') {
-        const reach = activeReachable(s);
-        if (reach.length) {
-          s = moveTo(s, cur.id, reach[Math.floor(RNG() * reach.length)]);
-          room.game = s;
-          broadcastGame(room);
-        }
+        const dest = botMoveTarget(activeReachable(s), ruled, RNG);
+        if (dest) s = moveTo(s, cur.id, dest);
       }
+      room.game = s;
+      broadcastGame(room);
     } catch {
-      /* fall through to ending the turn */
+      /* fall through to the decision phase */
     }
 
-    // Let the move animate, then end the turn and check the next player.
+    // --- decision phase: accuse if certain, else suggest from a room, else end ---
     setTimeout(() => {
       let s2 = room.game;
       if (!s2 || s2.phase !== 'play' || currentPlayerId(s2) !== cur.id) return;
       try {
+        const ruled = ruledOutFor(s2, cur.id, room);
+        const me = getPlayer(s2, cur.id);
+
+        if (s2.turnPhase === 'postMove') {
+          const accusation = botAccusation(ruled);
+          if (accusation) {
+            s2 = makeAccusation(s2, cur.id, accusation.suspectId, accusation.weaponId, accusation.roomId, RNG).state;
+            room.game = s2;
+            progress(room);
+            return;
+          }
+          if (me?.inRoomId) {
+            const sugg = botSuggestion(ruled, RNG);
+            const visited = memFor(room).visited.get(cur.id) ?? new Set<string>();
+            visited.add(me.inRoomId);
+            memFor(room).visited.set(cur.id, visited);
+            s2 = makeSuggestion(s2, cur.id, sugg.suspectId, sugg.weaponId, me.inRoomId, RNG);
+            room.game = s2;
+            progress(room);
+            return;
+          }
+        }
         s2 = s2.turnPhase === 'postMove' ? endTurn(s2, cur.id, RNG) : passTurn(s2, cur.id, RNG);
         room.game = s2;
-        broadcastGame(room);
+        progress(room);
       } catch {
-        /* ignore */
+        // Last resort: never strand the table — pass the turn.
+        const s3 = room.game;
+        if (s3 && s3.phase === 'play' && currentPlayerId(s3) === cur.id) {
+          try {
+            room.game = passTurn(s3, cur.id, RNG);
+            progress(room);
+          } catch {
+            /* ignore */
+          }
+        }
       }
-      scheduleBots(room);
     }, 750);
-  }, 800);
+  }, 700);
 }
 
 function emitError(socket: Socket, message: string): void {
@@ -233,6 +294,7 @@ io.on('connection', (socket) => {
     const room = findRoomByOccupant(socket.id);
     if (!room) return;
     try {
+      botMem.delete(room.code); // fresh deductions for a new game
       startGameInRoom(room, socket.id);
       emitLobby(room); // phase is now 'play'
       emitChat(room); // so the in-game chat panel carries the lobby history

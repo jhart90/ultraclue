@@ -4,4 +4,5 @@ export * from './turn';
 export * from './setup';
 export * from './suggest';
 export * from './accuse';
+export * from './bot';
 export * from './view';

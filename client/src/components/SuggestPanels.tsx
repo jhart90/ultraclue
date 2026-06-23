@@ -9,11 +9,13 @@ export function SelectModal({
   fixedRoomId,
   onCancel,
   onSubmit,
+  onPeekNotes,
 }: {
   mode: 'suggest' | 'accuse';
   fixedRoomId?: string;
   onCancel: () => void;
   onSubmit: (suspectId: string, weaponId: string, roomId: string) => void;
+  onPeekNotes?: () => void;
 }) {
   const [suspectId, setSuspectId] = useState('');
   const [weaponId, setWeaponId] = useState('');
@@ -82,6 +84,11 @@ export function SelectModal({
           </div>
         </div>
         <div className="sp__foot">
+          {onPeekNotes && (
+            <button className="btn sp__notesbtn" onClick={onPeekNotes}>
+              📓 Detective Notes
+            </button>
+          )}
           <button className="btn" onClick={onCancel}>
             Cancel
           </button>

@@ -29,10 +29,18 @@ export function DetectiveNotes({
   roomCode,
   players,
   onClose,
+  zIndex = 60,
+  backLabel,
+  onBack,
 }: {
   roomCode: string;
   players: PlayerView[];
   onClose: () => void;
+  /** Stacking order — raise it to float the sheet above the suggest/accuse modal. */
+  zIndex?: number;
+  /** When set, the title bar returns to the modal (e.g. "Suggestion") instead of closing. */
+  backLabel?: string;
+  onBack?: () => void;
 }) {
   const storageKey = `ultraclue-notes-${roomCode}`;
   const [notes, setNotes] = useState<NotesState>(() => loadNotes(storageKey));
@@ -88,11 +96,15 @@ export function DetectiveNotes({
   );
 
   return (
-    <div className="notes__backdrop">
+    <div className="notes__backdrop" style={{ zIndex }}>
       <div className="notes">
-        <button className="notes__titlebar" onClick={onClose} title="Close notes">
+        <button
+          className="notes__titlebar"
+          onClick={onBack ?? onClose}
+          title={onBack ? `Back to ${backLabel}` : 'Close notes'}
+        >
           <span>Detective Notes</span>
-          <span className="notes__exit">✕ Exit</span>
+          <span className="notes__exit">{onBack ? `← Back to ${backLabel}` : '✕ Exit'}</span>
         </button>
         <div className="notes__hint">
           Click a cell to cycle through marks · one column per player · saved to this device

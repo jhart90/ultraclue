@@ -106,6 +106,9 @@
   gap: 0.6rem;
   margin-top: 1rem;
 }
+.sp__notesbtn {
+  margin-right: auto; /* push to the far left of the footer */
+}
 
 .sp__cards {
   display: flex;

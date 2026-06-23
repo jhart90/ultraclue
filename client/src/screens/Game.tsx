@@ -31,6 +31,7 @@ export function Game() {
   const endTurn = useStore((s) => s.endTurn);
   const [notesOpen, setNotesOpen] = useState(false);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
+  const [notesFront, setNotesFront] = useState(false); // notes floated above the suggest/accuse modal
 
   if (!game) {
     return (
@@ -178,16 +179,32 @@ export function Game() {
       )}
 
       {modal && me && (
-        <SelectModal
-          mode={modal}
-          fixedRoomId={modal === 'suggest' ? me.inRoomId : undefined}
-          onCancel={() => setModal(null)}
-          onSubmit={(s, w, r) => {
-            if (modal === 'suggest') suggest(s, w);
-            else accuse(s, w, r);
-            setModal(null);
-          }}
-        />
+        <>
+          {/* Detective Notes sits behind the modal; the 📓 button floats it on top and back. */}
+          <DetectiveNotes
+            roomCode={game.code}
+            players={orderedPlayers}
+            zIndex={notesFront ? 90 : 70}
+            backLabel={modal === 'suggest' ? 'Suggestion' : 'Accusation'}
+            onBack={() => setNotesFront(false)}
+            onClose={() => setNotesFront(false)}
+          />
+          <SelectModal
+            mode={modal}
+            fixedRoomId={modal === 'suggest' ? me.inRoomId : undefined}
+            onCancel={() => {
+              setModal(null);
+              setNotesFront(false);
+            }}
+            onPeekNotes={() => setNotesFront(true)}
+            onSubmit={(s, w, r) => {
+              if (modal === 'suggest') suggest(s, w);
+              else accuse(s, w, r);
+              setModal(null);
+              setNotesFront(false);
+            }}
+          />
+        </>
       )}
 
       {iMustReveal && sug && (

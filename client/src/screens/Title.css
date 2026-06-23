@@ -1,0 +1,127 @@
+.title {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+  text-align: center;
+}
+
+.title__crest {
+  font-size: 3rem;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.6));
+}
+
+.title__h1 {
+  font-size: 3.4rem;
+  letter-spacing: 0.12em;
+  margin: 0.2rem 0 0;
+  color: var(--accent, #c8a24a);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+}
+
+.title__tag {
+  color: var(--muted, #9a93b3);
+  font-style: italic;
+  margin-top: 0.3rem;
+}
+
+.title__status {
+  color: var(--muted);
+}
+
+.title__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-top: 2.5rem;
+}
+
+.title__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  text-align: left;
+}
+
+.title__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.title__form input {
+  font-family: 'Georgia', serif;
+  font-size: 1.1rem;
+  padding: 0.6rem 0.8rem;
+  background: #1c1830;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-radius: 8px;
+  color: var(--ink, #ece8f5);
+}
+.title__form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.title__code {
+  letter-spacing: 0.5em;
+  text-align: center;
+  font-size: 1.6rem !important;
+  text-transform: uppercase;
+}
+
+.title__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.title__error {
+  margin-top: 1.2rem;
+  color: #ef6d82;
+  background: rgba(224, 85, 107, 0.12);
+  border: 1px solid rgba(224, 85, 107, 0.4);
+  border-radius: 8px;
+  padding: 0.6rem;
+}
+
+/* shared button styles (used across lobby too) */
+.btn {
+  font-family: 'Georgia', serif;
+  font-size: 1.05rem;
+  padding: 0.7rem 1.4rem;
+  border-radius: 10px;
+  border: 1px solid rgba(200, 162, 74, 0.5);
+  background: #261f38;
+  color: var(--ink, #ece8f5);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn--primary {
+  background: var(--accent, #c8a24a);
+  color: #1a1622;
+  font-weight: 700;
+  border-color: var(--accent);
+}
+.btn--ghost {
+  background: transparent;
+}
+.btn--danger {
+  border-color: rgba(224, 85, 107, 0.6);
+  color: #ef6d82;
+}
+.btn--danger:hover:not(:disabled) {
+  border-color: #ef6d82;
+}

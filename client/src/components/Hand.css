@@ -1,0 +1,94 @@
+.hand {
+  width: 100%;
+}
+
+.hand__strip {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.4rem 0.2rem 0.6rem;
+}
+
+.hand__card {
+  flex: 0 0 auto;
+  width: 84px;
+  background: #221c34;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-bottom-width: 4px;
+  border-radius: 7px;
+  overflow: hidden;
+  cursor: grab;
+  transition:
+    transform 0.12s ease,
+    border-color 0.12s ease;
+  user-select: none;
+}
+.hand__card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent, #c8a24a);
+}
+.hand__card:active {
+  cursor: grabbing;
+}
+.hand__card--suspect {
+  border-bottom-color: #e12b38;
+}
+.hand__card--weapon {
+  border-bottom-color: #9aa0a6;
+}
+.hand__card--room {
+  border-bottom-color: #c8a24a;
+}
+
+.hand__thumb {
+  width: 100%;
+  height: 63px;
+  line-height: 0;
+  background: #14111f;
+}
+
+.hand__name {
+  font-size: 0.62rem;
+  text-align: center;
+  padding: 0.22rem 0.15rem;
+  color: #ddd6ea;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hand__viewer {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 6, 12, 0.8);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+.hand__viewerinner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.hand__nav {
+  background: #241d38;
+  color: var(--accent, #c8a24a);
+  border: 1px solid rgba(200, 162, 74, 0.5);
+  border-radius: 50%;
+  width: 3rem;
+  height: 3rem;
+  font-size: 1.6rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.hand__nav:hover {
+  border-color: var(--accent);
+  background: #2c2444;
+}
+.hand__viewerhint {
+  color: var(--muted, #9a93b3);
+  font-size: 0.85rem;
+}

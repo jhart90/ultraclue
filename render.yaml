@@ -1,0 +1,15 @@
+# Render Blueprint — one-click deploy of Ultra Clue.
+# In the Render dashboard: New > Blueprint > pick the jhart90/ultraclue repo. Render reads this
+# file, builds the client, and runs the Node + Socket.IO server (WebSockets work on the free tier;
+# the instance sleeps after ~15 min idle and wakes on the next request).
+services:
+  - type: web
+    name: ultra-clue
+    runtime: node
+    plan: free
+    # --include=dev so vite/typescript are available for the build even if NODE_ENV=production
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20

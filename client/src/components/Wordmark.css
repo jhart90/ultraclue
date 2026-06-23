@@ -1,0 +1,17 @@
+.wordmark {
+  display: inline-block;
+  width: auto;
+  object-fit: contain;
+  user-select: none;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.55));
+}
+.wordmark--sm {
+  height: 52px;
+  vertical-align: middle;
+}
+.wordmark--md {
+  height: 120px;
+}
+.wordmark--lg {
+  height: clamp(180px, 32vw, 340px);
+}

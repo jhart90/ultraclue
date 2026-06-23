@@ -1,0 +1,81 @@
+.chat {
+  display: flex;
+  flex-direction: column;
+  background: #1b1730;
+  border: 1px solid rgba(200, 162, 74, 0.3);
+  border-radius: 10px;
+  overflow: hidden;
+  height: 100%;
+  min-height: 0;
+}
+
+.chat__header {
+  padding: 0.5rem 0.8rem;
+  background: #241d38;
+  color: var(--accent, #c8a24a);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  border-bottom: 1px solid rgba(200, 162, 74, 0.25);
+}
+
+.chat__log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  min-height: 0;
+}
+
+.chat__empty {
+  color: var(--muted, #9a93b3);
+  font-style: italic;
+}
+
+.chat__msg {
+  margin-bottom: 0.3rem;
+  word-break: break-word;
+}
+
+.chat__from {
+  color: var(--accent, #c8a24a);
+  font-weight: 700;
+}
+.chat__from--sys {
+  color: #7f8aa0;
+  font-style: italic;
+}
+
+.chat__form {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border-top: 1px solid rgba(200, 162, 74, 0.2);
+}
+
+.chat__form input {
+  flex: 1;
+  background: #14111f;
+  border: 1px solid rgba(200, 162, 74, 0.3);
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  color: var(--ink, #ece8f5);
+  font-family: 'Georgia', serif;
+}
+.chat__form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.chat__send {
+  background: var(--accent, #c8a24a);
+  color: #1a1622;
+  border: none;
+  border-radius: 6px;
+  padding: 0 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Georgia', serif;
+}

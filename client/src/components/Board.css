@@ -1,0 +1,38 @@
+.bv {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0c0a14;
+  border: 1px solid rgba(231, 198, 106, 0.35);
+  border-radius: 10px;
+  cursor: grab;
+  touch-action: none;
+}
+.bv:active {
+  cursor: grabbing;
+}
+
+.bv__stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.bv__svg {
+  display: block;
+}
+
+.bv__hint {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 0.7rem;
+  color: var(--muted, #9a93b3);
+  background: rgba(12, 10, 20, 0.7);
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  pointer-events: none;
+}

@@ -1,0 +1,50 @@
+.dice {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.die {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: linear-gradient(145deg, #fbf7ee, #d8cfbb);
+  box-shadow: inset 0 -3px 4px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  perspective: 200px;
+}
+.die--rolling {
+  animation: die-tumble 0.55s ease-in-out;
+}
+@keyframes die-tumble {
+  0% { transform: rotateX(0) rotateY(0); }
+  30% { transform: rotateX(220deg) rotateY(140deg); }
+  60% { transform: rotateX(390deg) rotateY(300deg); }
+  100% { transform: rotateX(360deg) rotateY(360deg); }
+}
+
+.die__grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  place-items: center;
+}
+.pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+.pip--on {
+  background: #2a1f14;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+.dice__sum {
+  font-family: 'Georgia', serif;
+  font-weight: 700;
+  color: var(--accent, #c8a24a);
+  font-size: 1.1rem;
+}

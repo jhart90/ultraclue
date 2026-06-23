@@ -120,7 +120,8 @@ function broadcastGame(room: Room): void {
 
 /** Run an in-game turn intent for the requesting socket, with error reporting. */
 function withGame(socket: Socket, fn: (room: Room, g: GameState) => GameState): void {
-  const room = findRoomByOccupant(socket.id);
+  // Rooms/players are keyed by the stable clientId (not socket.id), so resolve through cid().
+  const room = findRoomByOccupant(cid(socket));
   if (!room?.game || room.game.phase !== 'play') return;
   try {
     room.game = fn(room, room.game);

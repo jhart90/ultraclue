@@ -34,6 +34,7 @@ import {
   type MakeAccusationPayload,
   type PickSuspectPayload,
   type SetSlotPayload,
+  type RejoinPayload,
 } from 'shared';
 import {
   type Room,
@@ -43,6 +44,10 @@ import {
   joinRoom,
   pickSuspect,
   removeOccupant,
+  disconnectOccupant,
+  reconnectOccupant,
+  hasConnectedHuman,
+  deleteRoom,
   setSlot,
   startGameInRoom,
   toLobbyView,
@@ -162,7 +167,8 @@ function scheduleBots(room: Room): void {
   // --- movement phase ---
   setTimeout(() => {
     let s = room.game;
-    if (!s || s.phase !== 'play' || currentPlayerId(s) !== cur.id) return;
+    // re-check isBot: a dropped player may have reconnected and reclaimed human control.
+    if (!s || s.phase !== 'play' || currentPlayerId(s) !== cur.id || !getPlayer(s, cur.id)?.isBot) return;
     try {
       const ruled = ruledOutFor(s, cur.id, room);
       if (s.turnPhase === 'awaitRoll') {
@@ -183,7 +189,7 @@ function scheduleBots(room: Room): void {
     // --- decision phase: accuse if certain, else suggest from a room, else end ---
     setTimeout(() => {
       let s2 = room.game;
-      if (!s2 || s2.phase !== 'play' || currentPlayerId(s2) !== cur.id) return;
+      if (!s2 || s2.phase !== 'play' || currentPlayerId(s2) !== cur.id || !getPlayer(s2, cur.id)?.isBot) return;
       try {
         const ruled = ruledOutFor(s2, cur.id, room);
         const me = getPlayer(s2, cur.id);
@@ -230,17 +236,54 @@ function emitError(socket: Socket, message: string): void {
   socket.emit(SOCKET_EVENTS.ERROR, { message });
 }
 
+// Player identity is a stable clientId (from localStorage), not the socket id — so a refresh keeps
+// the seat. This maps each live socket to its clientId; each socket also joins a room named by its
+// clientId so per-player views can be addressed across reconnects.
+const socketClient = new Map<string, string>();
+const cid = (socket: Socket): string => socketClient.get(socket.id) ?? socket.id;
+
+const roomCleanup = new Map<string, NodeJS.Timeout>();
+const CLEANUP_MS = 3 * 60 * 1000;
+function cancelCleanup(code: string): void {
+  const t = roomCleanup.get(code);
+  if (t) {
+    clearTimeout(t);
+    roomCleanup.delete(code);
+  }
+}
+function scheduleCleanupIfEmpty(room: Room): void {
+  if (hasConnectedHuman(room)) {
+    cancelCleanup(room.code);
+    return;
+  }
+  cancelCleanup(room.code);
+  roomCleanup.set(
+    room.code,
+    setTimeout(() => {
+      deleteRoom(room.code);
+      botMem.delete(room.code);
+      roomCleanup.delete(room.code);
+    }, CLEANUP_MS),
+  );
+}
+
 /** Display name of a socket within its room (for chat / logs). */
 function nameOf(room: Room, id: string): string {
   return room.slots.find((s) => s.occupant?.id === id)?.occupant?.name ?? 'Someone';
 }
 
 io.on('connection', (socket) => {
-  socket.emit(SOCKET_EVENTS.YOU_ARE, { id: socket.id });
+  const register = (clientId: string) => {
+    socketClient.set(socket.id, clientId);
+    socket.join(clientId); // per-player address that survives reconnects
+    socket.emit(SOCKET_EVENTS.YOU_ARE, { id: clientId });
+  };
 
   socket.on(SOCKET_EVENTS.CREATE_GAME, (p: CreateGamePayload) => {
     try {
-      const room = createRoom(socket.id, p?.name ?? '');
+      const clientId = p?.clientId || socket.id;
+      register(clientId);
+      const room = createRoom(clientId, p?.name ?? '');
       socket.join(room.code);
       emitLobby(room);
       emitChat(room);
@@ -251,9 +294,12 @@ io.on('connection', (socket) => {
 
   socket.on(SOCKET_EVENTS.JOIN_GAME, (p: JoinGamePayload) => {
     try {
-      const { room } = joinRoom(p?.code ?? '', socket.id, p?.name ?? '');
+      const clientId = p?.clientId || socket.id;
+      register(clientId);
+      const { room } = joinRoom(p?.code ?? '', clientId, p?.name ?? '');
       socket.join(room.code);
-      addChat(room, 'System', `${nameOf(room, socket.id)} joined the game.`);
+      cancelCleanup(room.code);
+      addChat(room, 'System', `${nameOf(room, clientId)} joined the game.`);
       emitLobby(room);
       emitChat(room);
     } catch (err) {
@@ -261,11 +307,28 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on(SOCKET_EVENTS.REJOIN, (p: RejoinPayload) => {
+    const clientId = p?.clientId;
+    const room = clientId ? findRoomByOccupant(clientId) : undefined;
+    if (!clientId || !room) {
+      socket.emit(SOCKET_EVENTS.REJOIN_FAILED);
+      return;
+    }
+    register(clientId);
+    socket.join(room.code);
+    cancelCleanup(room.code);
+    reconnectOccupant(clientId);
+    addChat(room, 'System', `${nameOf(room, clientId)} reconnected.`);
+    emitLobby(room);
+    emitChat(room);
+    if (room.game) socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: viewFor(room.game, clientId) });
+  });
+
   socket.on(SOCKET_EVENTS.SET_SLOT, (p: SetSlotPayload) => {
-    const room = findRoomByOccupant(socket.id);
+    const room = findRoomByOccupant(cid(socket));
     if (!room) return;
     try {
-      setSlot(room, socket.id, p.index, p.status);
+      setSlot(room, cid(socket), p.index, p.status);
       emitLobby(room);
     } catch (err) {
       emitError(socket, (err as Error).message);
@@ -273,10 +336,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on(SOCKET_EVENTS.PICK_SUSPECT, (p: PickSuspectPayload) => {
-    const room = findRoomByOccupant(socket.id);
+    const room = findRoomByOccupant(cid(socket));
     if (!room) return;
     try {
-      pickSuspect(room, socket.id, p.suspectId);
+      pickSuspect(room, cid(socket), p.suspectId);
       emitLobby(room);
     } catch (err) {
       emitError(socket, (err as Error).message);
@@ -284,18 +347,18 @@ io.on('connection', (socket) => {
   });
 
   socket.on(SOCKET_EVENTS.LOBBY_CHAT, (p: LobbyChatPayload) => {
-    const room = findRoomByOccupant(socket.id);
+    const room = findRoomByOccupant(cid(socket));
     if (!room) return;
-    addChat(room, nameOf(room, socket.id), p?.text ?? '');
+    addChat(room, nameOf(room, cid(socket)), p?.text ?? '');
     emitChat(room);
   });
 
   socket.on(SOCKET_EVENTS.START_GAME, () => {
-    const room = findRoomByOccupant(socket.id);
+    const room = findRoomByOccupant(cid(socket));
     if (!room) return;
     try {
       botMem.delete(room.code); // fresh deductions for a new game
-      startGameInRoom(room, socket.id);
+      startGameInRoom(room, cid(socket));
       emitLobby(room); // phase is now 'play'
       emitChat(room); // so the in-game chat panel carries the lobby history
       broadcastGame(room); // each human their own tailored view
@@ -305,47 +368,66 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on(SOCKET_EVENTS.ROLL_MOVE, () => withGame(socket, (_room, g) => rollAndMove(g, socket.id, RNG)));
-  socket.on(SOCKET_EVENTS.MOVE_TO, (p: MoveToPayload) => withGame(socket, (_room, g) => moveTo(g, socket.id, p.tile)));
-  socket.on(SOCKET_EVENTS.SKIP_MOVE, () => withGame(socket, (_room, g) => skipMovement(g, socket.id)));
-  socket.on(SOCKET_EVENTS.END_TURN, () => withGame(socket, (_room, g) => endTurn(g, socket.id, RNG)));
+  socket.on(SOCKET_EVENTS.ROLL_MOVE, () => withGame(socket, (_room, g) => rollAndMove(g, cid(socket), RNG)));
+  socket.on(SOCKET_EVENTS.MOVE_TO, (p: MoveToPayload) => withGame(socket, (_room, g) => moveTo(g, cid(socket), p.tile)));
+  socket.on(SOCKET_EVENTS.SKIP_MOVE, () => withGame(socket, (_room, g) => skipMovement(g, cid(socket))));
+  socket.on(SOCKET_EVENTS.END_TURN, () => withGame(socket, (_room, g) => endTurn(g, cid(socket), RNG)));
 
   socket.on(SOCKET_EVENTS.MAKE_SUGGESTION, (p: MakeSuggestionPayload) =>
     withGame(socket, (_room, g) => {
-      const me = getPlayer(g, socket.id);
-      if (currentPlayerId(g) !== socket.id) throw new Error('Not your turn.');
+      const me = getPlayer(g, cid(socket));
+      if (currentPlayerId(g) !== cid(socket)) throw new Error('Not your turn.');
       if (g.turnPhase !== 'postMove') throw new Error('You can only suggest after the movement phase.');
       if (!me?.inRoomId) throw new Error('You must be in a room to make a suggestion.');
-      return makeSuggestion(g, socket.id, p.suspectId, p.weaponId, me.inRoomId, RNG);
+      return makeSuggestion(g, cid(socket), p.suspectId, p.weaponId, me.inRoomId, RNG);
     }),
   );
   socket.on(SOCKET_EVENTS.REVEAL_CARD, (p: RevealCardPayload) =>
-    withGame(socket, (_room, g) => respondToSuggestion(g, socket.id, p.cardId, RNG)),
+    withGame(socket, (_room, g) => respondToSuggestion(g, cid(socket), p.cardId, RNG)),
   );
   socket.on(SOCKET_EVENTS.MAKE_ACCUSATION, (p: MakeAccusationPayload) =>
     withGame(socket, (_room, g) => {
-      if (currentPlayerId(g) !== socket.id) throw new Error('Not your turn.');
+      if (currentPlayerId(g) !== cid(socket)) throw new Error('Not your turn.');
       if (g.turnPhase !== 'postMove') throw new Error('You can only accuse after the movement phase.');
-      return makeAccusation(g, socket.id, p.suspectId, p.weaponId, p.roomId, RNG).state;
+      return makeAccusation(g, cid(socket), p.suspectId, p.weaponId, p.roomId, RNG).state;
     }),
   );
 
   socket.on(SOCKET_EVENTS.LEAVE, () => {
-    const { room, deleted } = removeOccupant(socket.id);
-    socket.rooms.forEach((r) => r !== socket.id && socket.leave(r));
-    if (room && !deleted) emitLobby(room);
+    const clientId = cid(socket);
+    socketClient.delete(socket.id);
+    const inGame = findRoomByOccupant(clientId)?.game;
+    if (inGame) {
+      // leaving mid-game: hand the seat to a bot so the others can finish
+      const room = disconnectOccupant(clientId);
+      if (room) {
+        emitLobby(room);
+        broadcastGame(room);
+        scheduleBots(room);
+        scheduleCleanupIfEmpty(room);
+      }
+    } else {
+      const { room, deleted } = removeOccupant(clientId);
+      socket.rooms.forEach((r) => r !== socket.id && socket.leave(r));
+      if (room && !deleted) emitLobby(room);
+    }
   });
 
   socket.on('disconnect', () => {
-    const room = findRoomByOccupant(socket.id);
+    const clientId = socketClient.get(socket.id);
+    socketClient.delete(socket.id);
+    if (!clientId) return;
+    if ([...socketClient.values()].includes(clientId)) return; // another tab still open
+    const room = disconnectOccupant(clientId);
     if (!room) return;
-    const name = nameOf(room, socket.id);
-    const { deleted } = removeOccupant(socket.id);
-    if (!deleted) {
-      addChat(room, 'System', `${name} disconnected.`);
-      emitLobby(room);
-      emitChat(room);
+    addChat(room, 'System', `${nameOf(room, clientId)} disconnected — reconnecting…`);
+    emitLobby(room);
+    emitChat(room);
+    if (room.game) {
+      broadcastGame(room);
+      scheduleBots(room); // bot may need to take the dropped player's turn
     }
+    scheduleCleanupIfEmpty(room);
   });
 });
 

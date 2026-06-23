@@ -82,7 +82,10 @@ export function setSlot(room: Room, requesterId: string, index: number, status: 
   const slot = room.slots[index];
   if (!slot) throw new Error('Invalid slot.');
   if (slot.occupant?.id === room.hostId) throw new Error('The host slot cannot be changed.');
-  if (slot.occupant && !slot.occupant.isBot) throw new Error('A player is sitting in that slot.');
+  // A connected human may not be evicted; a disconnected one (or a bot) can be.
+  if (slot.occupant && !slot.occupant.isBot && slot.occupant.connected) {
+    throw new Error('A player is sitting in that slot.');
+  }
 
   if (status === 'bot') {
     slot.status = 'bot';
@@ -118,7 +121,44 @@ export function addChat(room: Room, fromName: string, text: string): void {
   if (room.chat.length > 200) room.chat.shift();
 }
 
-/** Remove a participant (on disconnect/leave). Migrates host or deletes the room if empty. */
+/** Mark a participant disconnected. In-game their player is handed to a bot until they return. */
+export function disconnectOccupant(id: string): Room | undefined {
+  const room = findRoomByOccupant(id);
+  if (!room) return undefined;
+  const occ = room.slots.find((s) => s.occupant?.id === id)?.occupant;
+  if (occ) occ.connected = false;
+  const gp = room.game?.players.find((p) => p.id === id);
+  if (gp && !gp.eliminated) {
+    gp.connected = false;
+    gp.isBot = true; // bot takeover so the table never stalls
+  }
+  return room;
+}
+
+/** Re-attach a returning participant to their seat (restoring human control in-game). */
+export function reconnectOccupant(id: string): Room | undefined {
+  const room = findRoomByOccupant(id);
+  if (!room) return undefined;
+  const occ = room.slots.find((s) => s.occupant?.id === id)?.occupant;
+  if (occ) occ.connected = true;
+  const gp = room.game?.players.find((p) => p.id === id);
+  if (gp) {
+    gp.connected = true;
+    gp.isBot = false;
+  }
+  return room;
+}
+
+/** True if at least one human occupant is still connected. */
+export function hasConnectedHuman(room: Room): boolean {
+  return room.slots.some((s) => s.occupant && !s.occupant.isBot && s.occupant.connected);
+}
+
+export function deleteRoom(code: string): void {
+  rooms.delete(code);
+}
+
+/** Remove a participant (on explicit leave). Migrates host or deletes the room if empty. */
 export function removeOccupant(id: string): { room?: Room; deleted: boolean } {
   const room = findRoomByOccupant(id);
   if (!room) return { deleted: false };

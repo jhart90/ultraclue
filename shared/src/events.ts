@@ -13,6 +13,7 @@ export const SOCKET_EVENTS = {
   // --- client -> server (lobby intents) ---
   CREATE_GAME: 'createGame',
   JOIN_GAME: 'joinGame',
+  REJOIN: 'rejoin', // reconnect to an existing seat after a refresh/drop
   SET_SLOT: 'setSlot',
   PICK_SUSPECT: 'pickSuspect',
   LOBBY_CHAT: 'lobbyChat',
@@ -33,6 +34,7 @@ export const SOCKET_EVENTS = {
   LOBBY: 'lobby',
   CHAT: 'chat', // broadcast of the full chat list; works in both lobby and in-game
   GAME_STARTED: 'gameStarted',
+  REJOIN_FAILED: 'rejoinFailed', // the saved seat is gone; client should reset to the title
   ERROR: 'errorMsg',
 } as const;
 
@@ -50,10 +52,15 @@ export interface HelloAckPayload {
 
 export interface CreateGamePayload {
   name: string;
+  clientId: string;
 }
 export interface JoinGamePayload {
   code: string;
   name: string;
+  clientId: string;
+}
+export interface RejoinPayload {
+  clientId: string;
 }
 export interface SetSlotPayload {
   index: number;

@@ -1,3 +1,22 @@
+@keyframes uc-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes uc-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .sp__backdrop {
   position: fixed;
   inset: 0;
@@ -7,6 +26,11 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
+  animation: uc-fade 0.15s ease;
+}
+.sp,
+.statpop {
+  animation: uc-pop 0.18s ease;
 }
 
 .sp {

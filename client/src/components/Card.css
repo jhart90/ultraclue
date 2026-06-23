@@ -16,12 +16,33 @@
   background: #1b1f26;
   border-bottom: 2px solid rgba(200, 162, 74, 0.5);
   line-height: 0;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
 }
 
 .card__override {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Portrait and weapon art may break the top of the frame slightly, so the very top of a head or
+   weapon is never clipped by the rounded corner — it pokes just above the upper edge instead. */
+.card--suspect,
+.card--weapon {
+  overflow: visible;
+}
+.card--suspect .card__art,
+.card--weapon .card__art {
+  overflow: visible;
+}
+.card--suspect .card__override,
+.card--weapon .card__override {
+  margin-top: -10px;
+  height: calc(100% + 10px);
+  object-position: top;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
 }
 
 .card__body {

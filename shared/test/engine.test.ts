@@ -195,16 +195,16 @@ describe('per-player view (hidden-information boundary)', () => {
     expect(p2View.hand).toBeUndefined();
   });
 
-  it('reveals a disproving card only to the suggester', () => {
+  it('reveals a disproving card to the suggester and the responder, but no one else', () => {
     const st = baseState();
     st.players[1].hand = [];
     st.players[2].hand = ['weapon-candlestick'];
     let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
     s = respondToSuggestion(s, 'p3', 'weapon-candlestick', makeRng(1));
 
-    expect(viewFor(s, 'p1').currentSuggestion?.revealedCardId).toBe('weapon-candlestick');
-    expect(viewFor(s, 'p3').currentSuggestion?.revealedCardId).toBeUndefined();
-    expect(viewFor(s, 'p2').currentSuggestion?.revealedCardId).toBeUndefined();
+    expect(viewFor(s, 'p1').currentSuggestion?.revealedCardId).toBe('weapon-candlestick'); // suggester
+    expect(viewFor(s, 'p3').currentSuggestion?.revealedCardId).toBe('weapon-candlestick'); // responder
+    expect(viewFor(s, 'p2').currentSuggestion?.revealedCardId).toBeUndefined(); // uninvolved
   });
 
   it('reveals the envelope to everyone once the game has ended', () => {

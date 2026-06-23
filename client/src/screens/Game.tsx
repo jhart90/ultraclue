@@ -336,6 +336,7 @@ export function Game() {
         <RevealModal
           responderName={game.players.find((p) => p.id === sug.responderId)?.name ?? 'A player'}
           suggesterName={game.players.find((p) => p.id === sug.suggesterId)?.name ?? 'the suggester'}
+          revealedCardId={sug.revealedCardId}
           onClose={() => setRevealOpen(false)}
         />
       )}

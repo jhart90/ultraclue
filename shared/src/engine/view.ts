@@ -7,7 +7,8 @@ import { activeReachable, elevatorOptions } from './turn';
  * security boundary for hidden information:
  *   - other players' hands become a count only;
  *   - the envelope is withheld until the game ends;
- *   - a revealed card is shown only to the suggester it was revealed to.
+ *   - a revealed card is shown only to the two players in on it: the suggester it was
+ *     revealed to, and the responder who revealed it.
  */
 export function viewFor(state: GameState, viewerId: string): GameView {
   const players: PlayerView[] = state.players.map((p) => ({
@@ -26,7 +27,7 @@ export function viewFor(state: GameState, viewerId: string): GameView {
   let currentSuggestion: SuggestionView | undefined;
   if (state.currentSuggestion) {
     const sg = state.currentSuggestion;
-    const isSuggester = viewerId === sg.suggesterId;
+    const inOnIt = viewerId === sg.suggesterId || viewerId === sg.responderId;
     currentSuggestion = {
       suggesterId: sg.suggesterId,
       suspectId: sg.suspectId,
@@ -36,8 +37,8 @@ export function viewFor(state: GameState, viewerId: string): GameView {
       passes: sg.passes,
       pendingResponderId: sg.pendingResponderId,
       responderId: sg.responderId,
-      // Only the suggester learns which card was shown.
-      revealedCardId: isSuggester ? sg.revealedCardId : undefined,
+      // Only the two players in on the reveal (suggester + responder) learn which card was shown.
+      revealedCardId: inOnIt ? sg.revealedCardId : undefined,
       anyRevealed: sg.anyRevealed,
       resolved: sg.resolved,
     };

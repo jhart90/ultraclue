@@ -76,25 +76,30 @@ export function AnnouncementModal({ announcement, onClose }: { announcement: Ann
   );
 }
 
-/** "<responder> has shown a card to <suggester>, disproving the suggestion" + a face-down card. */
+/**
+ * "<responder> has shown a card to <suggester>, disproving the suggestion." The two players in on
+ * the reveal (the suggester it was shown to, and the responder who showed it) see the actual card
+ * face-up; everyone else sees a generic face-down back.
+ */
 export function RevealModal({
   responderName,
   suggesterName,
+  revealedCardId,
   onClose,
 }: {
   responderName: string;
   suggesterName: string;
+  revealedCardId?: string;
   onClose: () => void;
 }) {
+  const revealedCard = revealedCardId ? getCard(revealedCardId) : undefined;
   return (
     <div className="sp__backdrop" onClick={onClose}>
       <div className="sp sp--end" onClick={(e) => e.stopPropagation()}>
         <div className="popup__title">
           {responderName} has shown a card to {suggesterName}, disproving the suggestion.
         </div>
-        <div className="sp__cards">
-          <CardBack />
-        </div>
+        <div className="sp__cards">{revealedCard ? <Card card={revealedCard} /> : <CardBack />}</div>
         <button className="btn btn--primary" onClick={onClose}>
           Dismiss
         </button>

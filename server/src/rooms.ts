@@ -206,17 +206,22 @@ export function startGameInRoom(room: Room, requesterId: string): GameState {
   );
   let next = 0;
 
-  const players: Player[] = occupants.map((o) => ({
-    id: o.id,
-    name: o.name,
-    suspectId: o.suspectId ?? freeSuspects[next++],
-    isBot: o.isBot,
-    isHost: o.id === room.hostId,
-    connected: o.connected,
-    hand: [],
-    eliminated: false,
-    position: { x: 0, y: 0 }, // real start tile assigned inside startGame()
-  }));
+  const players: Player[] = occupants.map((o) => {
+    const suspectId = o.suspectId ?? freeSuspects[next++];
+    // Bots play (and are named after) a random suspect not claimed by a human, e.g. "Miss Coral".
+    const name = o.isBot ? SUSPECTS.find((s) => s.id === suspectId)?.title ?? o.name : o.name;
+    return {
+      id: o.id,
+      name,
+      suspectId,
+      isBot: o.isBot,
+      isHost: o.id === room.hostId,
+      connected: o.connected,
+      hand: [],
+      eliminated: false,
+      position: { x: 0, y: 0 }, // real start tile assigned inside startGame()
+    };
+  });
 
   const game = startGame(room.code, players, rng);
   room.game = game;

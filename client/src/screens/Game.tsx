@@ -193,7 +193,9 @@ export function Game() {
                   {p.name}
                   {p.id === myId ? ' (you)' : ''}
                 </span>
-                <span className="po__char">{getCard(p.suspectId)?.title}</span>
+                {getCard(p.suspectId)?.title !== p.name && (
+                  <span className="po__char">{getCard(p.suspectId)?.title}</span>
+                )}
                 {p.id === activeId && <span className="po__tag">to move</span>}
               </div>
             ))}

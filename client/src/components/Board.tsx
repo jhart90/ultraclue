@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { BOARD, coordKey, getCard, type Coord, type PlayerView, type RoomLayout, type SectionTheme } from 'shared';
+import { resolveOverride } from '../render/overrides';
 import './Board.css';
 
 interface LastMove {
@@ -312,6 +313,7 @@ export function Board({
             const theme = BOARD.sections.find((s) => s.id === room.sectionId)?.theme ?? 'ground-floor';
             const t = THEME[theme];
             const title = getCard(room.id)?.title ?? room.id;
+            const art = resolveOverride(room.id, 'room', title);
             const gate = theme === 'grounds' && room.id !== 'room-walk-in-closet';
             // centred white name bubble
             const cxr = b.x + b.w / 2;
@@ -323,6 +325,35 @@ export function Board({
               <g key={room.id}>
                 {/* one cohesive room space (no internal grid) with a soft inset */}
                 <rect x={b.x + 1} y={b.y + 1} width={b.w - 2} height={b.h - 2} rx="5" fill={t.floor} stroke="#e7c66a" strokeWidth="2" />
+                {/* override art (if supplied) fills the room, clipped to its rounded bounds; a soft
+                    scrim keeps the white name bubble and glyph legible over busy images */}
+                {art && (
+                  <>
+                    <clipPath id={`roomclip-${room.id}`}>
+                      <rect x={b.x + 2} y={b.y + 2} width={b.w - 4} height={b.h - 4} rx="4" />
+                    </clipPath>
+                    <image
+                      href={art}
+                      x={b.x + 2}
+                      y={b.y + 2}
+                      width={b.w - 4}
+                      height={b.h - 4}
+                      preserveAspectRatio="xMidYMid slice"
+                      clipPath={`url(#roomclip-${room.id})`}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    <rect
+                      x={b.x + 2}
+                      y={b.y + 2}
+                      width={b.w - 4}
+                      height={b.h - 4}
+                      rx="4"
+                      fill="rgba(10,7,16,0.32)"
+                      clipPath={`url(#roomclip-${room.id})`}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  </>
+                )}
                 <rect x={b.x + 4} y={b.y + 4} width={b.w - 8} height={b.h - 8} rx="4" fill="none" stroke="rgba(231,198,106,0.2)" strokeWidth="1" />
                 {/* small thematic glyph, tucked top-left */}
                 <text x={b.x + 11} y={b.y + 15} textAnchor="middle" fontSize="11" style={{ pointerEvents: 'none' }}>

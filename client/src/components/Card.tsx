@@ -10,7 +10,7 @@ const TYPE_LABEL: Record<AnyCard['type'], string> = {
 };
 
 export function Card({ card }: { card: AnyCard }) {
-  const override = resolveOverride(card.id, card.type);
+  const override = resolveOverride(card.id, card.type, card.title);
   return (
     <div className={`card card--${card.type}`}>
       <div className="card__art">

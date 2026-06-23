@@ -15,12 +15,23 @@ const TYPE_FOLDER: Record<CardType, string> = {
   room: 'rooms',
 };
 
-/** Returns the URL of an override image for this card, or undefined to fall back to procedural art. */
-export function resolveOverride(cardId: string, type: CardType): string | undefined {
+/** Lower-case the title and collapse anything non-alphanumeric to single underscores, so
+ *  "Admiral Navy" -> "admiral_navy" and "Trophy Room" -> "trophy_room". */
+function slug(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+/**
+ * Returns the URL of an override image for this card, or undefined to fall back to procedural art.
+ * A file matches if it is named after the card id (e.g. `suspect-navy.png`) OR after the card's
+ * title (e.g. `admiral_navy.png`), so art can be dropped in using whichever name is handier.
+ */
+export function resolveOverride(cardId: string, type: CardType, title?: string): string | undefined {
   const folder = TYPE_FOLDER[type];
-  const needle = `/overrides/${folder}/${cardId}.`;
+  const needles = [`/overrides/${folder}/${cardId}.`];
+  if (title) needles.push(`/overrides/${folder}/${slug(title)}.`);
   for (const [path, url] of Object.entries(overrideUrls)) {
-    if (path.includes(needle)) return url;
+    if (needles.some((n) => path.includes(n))) return url;
   }
   return undefined;
 }

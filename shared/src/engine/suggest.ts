@@ -64,6 +64,15 @@ export function makeSuggestion(
   };
 
   const name = requirePlayer(s, suggesterId).name;
+  s.announcement = {
+    seq: (s.announcement?.seq ?? 0) + 1,
+    kind: 'suggestion',
+    byId: suggesterId,
+    byName: name,
+    suspectId,
+    weaponId,
+    roomId,
+  };
   log(
     s,
     `${name} suggests ${getCard(suspectId)?.title} with the ${getCard(weaponId)?.title} in the ${getCard(roomId)?.title}.`,

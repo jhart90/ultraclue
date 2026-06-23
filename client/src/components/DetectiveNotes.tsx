@@ -6,6 +6,12 @@ import './DetectiveNotes.css';
 const COLS = 8;
 const EMPTY_ROW = new Array(COLS).fill(0);
 
+// Columns are sorted alphabetically; suspects by their colour-based surname (the last word).
+const surname = (title: string) => title.trim().split(/\s+/).pop() ?? title;
+const SORTED_SUSPECTS = [...SUSPECTS].sort((a, b) => surname(a.title).localeCompare(surname(b.title)));
+const SORTED_WEAPONS = [...WEAPONS].sort((a, b) => a.title.localeCompare(b.title));
+const SORTED_ROOMS = [...ROOMS].sort((a, b) => a.title.localeCompare(b.title));
+
 type NotesState = Record<string, number[]>; // cardId -> 8 mark states
 
 function suspectColor(suspectId?: string): string {
@@ -110,9 +116,9 @@ export function DetectiveNotes({
           Click a cell to cycle through marks · one column per player · saved to this device
         </div>
         <div className="notes__body">
-          {renderColumn('Suspects', SUSPECTS)}
-          {renderColumn('Weapons', WEAPONS)}
-          {renderColumn('Rooms', ROOMS)}
+          {renderColumn('Suspects', SORTED_SUSPECTS)}
+          {renderColumn('Weapons', SORTED_WEAPONS)}
+          {renderColumn('Rooms', SORTED_ROOMS)}
         </div>
       </div>
     </div>

@@ -34,6 +34,17 @@ export function makeAccusation(
     s.envelope.weaponId === weaponId &&
     s.envelope.roomId === roomId;
 
+  s.announcement = {
+    seq: (s.announcement?.seq ?? 0) + 1,
+    kind: 'accusation',
+    byId: accuserId,
+    byName: accuser.name,
+    suspectId,
+    weaponId,
+    roomId,
+    correct,
+  };
+
   log(
     s,
     `${accuser.name} accuses ${getCard(suspectId)?.title} with the ${getCard(weaponId)?.title} in the ${getCard(roomId)?.title}!`,

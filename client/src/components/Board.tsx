@@ -80,6 +80,39 @@ function Staircase({ at }: { at: Coord }) {
   );
 }
 
+/** A room entrance: a wooden door indoors, or an iron gate out on the grounds. */
+function Door({ rt, dt, gate }: { rt: Coord; dt: Coord; gate: boolean }) {
+  const cxm = ((rt.x + dt.x) / 2) * TS + TS / 2;
+  const cym = ((rt.y + dt.y) / 2) * TS + TS / 2;
+  const vertWall = rt.x !== dt.x; // door sits on a vertical wall
+  const lng = TS * 0.66;
+  const thk = 6;
+  const w = vertWall ? thk : lng;
+  const h = vertWall ? lng : thk;
+  const bars = [0.28, 0.5, 0.72].map((f) =>
+    vertWall ? (
+      <line key={f} x1={cxm - w / 2} y1={cym - h / 2 + f * h} x2={cxm + w / 2} y2={cym - h / 2 + f * h} stroke="#aab0b6" strokeWidth="0.7" />
+    ) : (
+      <line key={f} x1={cxm - w / 2 + f * w} y1={cym - h / 2} x2={cxm - w / 2 + f * w} y2={cym + h / 2} stroke="#aab0b6" strokeWidth="0.7" />
+    ),
+  );
+  if (gate) {
+    return (
+      <g>
+        <rect x={cxm - w / 2} y={cym - h / 2} width={w} height={h} rx="1" fill="#33333b" stroke="#71757c" strokeWidth="1" />
+        {bars}
+      </g>
+    );
+  }
+  return (
+    <g>
+      <rect x={cxm - w / 2} y={cym - h / 2} width={w} height={h} rx="1.5" fill="#7a5230" stroke="#3a2616" strokeWidth="1" />
+      <rect x={cxm - w / 2 + 1.2} y={cym - h / 2 + 1.2} width={w - 2.4} height={h - 2.4} rx="1" fill="none" stroke="#9c6b40" strokeWidth="0.6" />
+      <circle cx={vertWall ? cxm + w / 4 : cxm + w / 4} cy={vertWall ? cym + h / 4 : cym + h / 4} r="1" fill="#e7c66a" />
+    </g>
+  );
+}
+
 export function Board({
   players,
   reachable,
@@ -242,22 +275,32 @@ export function Board({
             const theme = BOARD.sections.find((s) => s.id === room.sectionId)?.theme ?? 'ground-floor';
             const t = THEME[theme];
             const title = getCard(room.id)?.title ?? room.id;
+            const gate = theme === 'grounds' && room.id !== 'room-walk-in-closet';
+            // centred white name bubble
+            const cxr = b.x + b.w / 2;
+            const cyr = b.y + b.h / 2;
+            const fs = Math.max(6.5, Math.min(11, (b.w - 12) / (title.length * 0.62)));
+            const bubbleW = Math.min(b.w - 4, title.length * fs * 0.6 + 12);
+            const bubbleH = fs + 7;
             return (
               <g key={room.id}>
                 {/* one cohesive room space (no internal grid) with a soft inset */}
                 <rect x={b.x + 1} y={b.y + 1} width={b.w - 2} height={b.h - 2} rx="5" fill={t.floor} stroke="#e7c66a" strokeWidth="2" />
                 <rect x={b.x + 4} y={b.y + 4} width={b.w - 8} height={b.h - 8} rx="4" fill="none" stroke="rgba(231,198,106,0.2)" strokeWidth="1" />
-                {room.entrances.map((e, i) => {
-                  const mx = (e.roomTile.x + e.doorTile.x) / 2;
-                  const my = (e.roomTile.y + e.doorTile.y) / 2;
-                  return <rect key={i} x={mx * TS + 7} y={my * TS + 7} width={TS - 14} height={TS - 14} rx="2" fill="#e7c66a" />;
-                })}
-                <text x={b.x + b.w / 2} y={b.y + b.h / 2 - 2} textAnchor="middle" fontSize={Math.min(22, b.h * 0.45)} style={{ pointerEvents: 'none' }}>
-                  {EMOJI[room.id] ?? '🚪'}
+                {/* small thematic glyph, tucked top-left */}
+                <text x={b.x + 11} y={b.y + 15} textAnchor="middle" fontSize="11" style={{ pointerEvents: 'none' }}>
+                  {EMOJI[room.id] ?? ''}
                 </text>
-                <text x={b.x + b.w / 2} y={b.y + b.h - 5} textAnchor="middle" fontFamily="Georgia, serif" fontSize="8.5" fill="#f3ecdb" style={{ pointerEvents: 'none' }}>
-                  {title}
-                </text>
+                {room.entrances.map((e, i) => (
+                  <Door key={i} rt={e.roomTile} dt={e.doorTile} gate={gate} />
+                ))}
+                {/* room name, centred in a white bubble */}
+                <g style={{ pointerEvents: 'none' }}>
+                  <rect x={cxr - bubbleW / 2} y={cyr - bubbleH / 2} width={bubbleW} height={bubbleH} rx={bubbleH / 2} fill="#f4efe1" stroke="#2a2018" strokeWidth="1" />
+                  <text x={cxr} y={cyr + fs * 0.36} textAnchor="middle" fontFamily="Georgia, serif" fontWeight="700" fontSize={fs} fill="#1a120a">
+                    {title}
+                  </text>
+                </g>
               </g>
             );
           })}

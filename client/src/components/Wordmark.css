@@ -6,12 +6,18 @@
   filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.55));
 }
 .wordmark--sm {
+  display: inline-block;
   height: 52px;
   vertical-align: middle;
 }
 .wordmark--md {
+  display: block;
+  margin: 0 auto;
   height: 120px;
 }
 .wordmark--lg {
-  height: clamp(180px, 32vw, 340px);
+  display: block;
+  margin: 0 auto;
+  width: clamp(280px, 60vw, 560px);
+  height: auto;
 }

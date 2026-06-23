@@ -61,6 +61,18 @@ export interface LogEntry {
   text: string;
 }
 
+/** A suggestion or accusation just made — broadcast so every client can pop up the three cards. */
+export interface Announcement {
+  seq: number;
+  kind: 'suggestion' | 'accusation';
+  byId: string;
+  byName: string;
+  suspectId: string;
+  weaponId: string;
+  roomId: string;
+  correct?: boolean; // accusations only
+}
+
 export interface GameState {
   code: string;
   phase: Phase;
@@ -72,6 +84,7 @@ export interface GameState {
   /** The solution. SERVER-ONLY — only revealed in views once the game has ended. */
   envelope: Envelope;
   currentSuggestion?: Suggestion;
+  announcement?: Announcement;
   winnerId?: string;
   log: LogEntry[];
   nextLogId: number;
@@ -126,6 +139,7 @@ export interface GameView {
   /** The viewer's own hand. Empty for spectators / non-players. */
   yourHand: string[];
   currentSuggestion?: SuggestionView;
+  announcement?: Announcement;
   /** Only present once the game has ended. */
   envelope?: Envelope;
   winnerId?: string;

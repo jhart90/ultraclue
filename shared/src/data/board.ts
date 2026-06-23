@@ -205,6 +205,49 @@ function inRect(x: number, y: number, [rx, ry, rw, rh]: Rect): boolean {
   return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
 }
 
+/** Reorder so the middle element comes first (used to centre doors on each wall). */
+function middleOut<T>(arr: T[]): T[] {
+  if (arr.length <= 1) return arr;
+  const mid = Math.floor(arr.length / 2);
+  const res: T[] = [arr[mid]];
+  for (let off = 1; res.length < arr.length; off++) {
+    if (mid - off >= 0) res.push(arr[mid - off]);
+    if (mid + off < arr.length) res.push(arr[mid + off]);
+  }
+  return res;
+}
+
+/** Choose 2–5 doorways, centred on each wall and spread round-robin across the room's sides. */
+function pickEntrances(cands: { side: string; door: Doorway }[]): Doorway[] {
+  if (cands.length <= 2) return cands.map((c) => c.door);
+  const target = Math.min(5, Math.max(2, Math.round(cands.length / 4)));
+  const bySide = new Map<string, Doorway[]>();
+  for (const c of cands) {
+    const arr = bySide.get(c.side) ?? [];
+    arr.push(c.door);
+    bySide.set(c.side, arr);
+  }
+  const sideOrder = ['top', 'right', 'bottom', 'left'].filter((s) => bySide.has(s));
+  for (const s of sideOrder) bySide.set(s, middleOut(bySide.get(s)!));
+  const cursor = new Map(sideOrder.map((s) => [s, 0]));
+  const picked: Doorway[] = [];
+  while (picked.length < target) {
+    let advanced = false;
+    for (const s of sideOrder) {
+      if (picked.length >= target) break;
+      const arr = bySide.get(s)!;
+      const i = cursor.get(s)!;
+      if (i < arr.length) {
+        picked.push(arr[i]);
+        cursor.set(s, i + 1);
+        advanced = true;
+      }
+    }
+    if (!advanced) break;
+  }
+  return picked;
+}
+
 function buildBoard(): Board {
   // Stack sections vertically with a 1-row void gap between them.
   let cursorY = 0;
@@ -263,22 +306,24 @@ function buildBoard(): Board {
     });
   }
 
-  // Auto-doorways: every room edge tile orthogonally adjacent to a path tile becomes a doorway.
+  // Doorways: each room gets 2–5 entrances (not enterable from every side), centred and spread
+  // across its walls. (The Walk-in Closet keeps its single Master-Suite door, wired below.)
   for (const room of Object.values(rooms)) {
-    if (room.id === 'room-walk-in-closet') continue; // wired to the suite below
+    if (room.id === 'room-walk-in-closet') continue;
+    const candidates: { side: string; door: Doorway }[] = [];
     const seen = new Set<string>();
     for (const t of room.tiles) {
       for (const d of ORTHO) {
         const n = cellAt.get(coordKey({ x: t.x + d.x, y: t.y + d.y }));
-        if (n && n.type === 'path') {
-          const k = `${coordKey(t)}>${coordKey(n)}`;
-          if (!seen.has(k)) {
-            seen.add(k);
-            room.entrances.push({ roomId: room.id, roomTile: t, doorTile: { x: n.x, y: n.y } });
-          }
-        }
+        if (!n || n.type !== 'path') continue;
+        const k = `${coordKey(t)}>${coordKey(n)}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const side = d.y < 0 ? 'top' : d.y > 0 ? 'bottom' : d.x < 0 ? 'left' : 'right';
+        candidates.push({ side, door: { roomId: room.id, roomTile: { x: t.x, y: t.y }, doorTile: { x: n.x, y: n.y } } });
       }
     }
+    room.entrances = pickEntrances(candidates);
   }
 
   // Walk-in Closet: single door into an adjacent Master Suite tile (its only way in).

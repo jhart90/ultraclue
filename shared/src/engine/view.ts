@@ -52,6 +52,7 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     yourId: viewerId,
     yourHand: getPlayer(state, viewerId)?.hand ?? [],
     currentSuggestion,
+    announcement: state.announcement,
     envelope: state.phase === 'ended' ? state.envelope : undefined,
     winnerId: state.winnerId,
     log: state.log,

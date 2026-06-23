@@ -1,0 +1,68 @@
+.popup__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent, #c8a24a);
+  text-align: center;
+  margin-bottom: 0.6rem;
+  line-height: 1.25;
+}
+
+/* Big turn-status pop-up */
+.statpop {
+  position: relative;
+  min-width: min(440px, 92vw);
+  background: linear-gradient(180deg, #221b38, #181226);
+  border: 2px solid var(--accent, #c8a24a);
+  border-radius: 14px;
+  padding: 1.8rem 2rem;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  font-family: 'Georgia', serif;
+}
+.statpop__x {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.7rem;
+  background: none;
+  border: none;
+  color: var(--muted, #9a93b3);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.statpop__x:hover {
+  color: var(--ink, #ece8f5);
+}
+.statpop__dice {
+  display: flex;
+  justify-content: center;
+  transform: scale(1.6);
+  transform-origin: center;
+  margin: 0.6rem 0 1.4rem;
+}
+.statpop__line1 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--ink, #ece8f5);
+}
+.statpop__line2 {
+  font-size: 1.05rem;
+  color: var(--muted, #9a93b3);
+  margin-top: 0.2rem;
+}
+.statpop__btns {
+  display: flex;
+  justify-content: center;
+  gap: 0.7rem;
+  margin-top: 1.4rem;
+  flex-wrap: wrap;
+}
+.statpop__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 1.05rem;
+  padding: 0.6rem 1.2rem;
+}
+.statpop__icon {
+  font-size: 1.2rem;
+}

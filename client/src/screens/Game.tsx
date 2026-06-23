@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCard } from 'shared';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
@@ -8,6 +8,7 @@ import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
 import { DetectiveNotes } from '../components/DetectiveNotes';
 import { SelectModal, RevealPanel, EndScreen } from '../components/SuggestPanels';
+import { StatusModal, AnnouncementModal, RevealModal, type StatusButton } from '../components/GamePopups';
 import './Game.css';
 
 function suspectColor(suspectId?: string): string {
@@ -32,6 +33,62 @@ export function Game() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
   const [notesFront, setNotesFront] = useState(false); // notes floated above the suggest/accuse modal
+
+  // --- pop-up overlays (status / announcement / reveal) ---
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [annOpen, setAnnOpen] = useState(false);
+  const [revealOpen, setRevealOpen] = useState(false);
+  const annSeqRef = useRef(0);
+  const revealKeyRef = useRef('');
+  const statusSigRef = useRef('');
+
+  // Null-safe values the effects depend on (computed before the early return so hook order is stable).
+  const myTurnNow = !!game && game.turnOrder[game.activeIdx] === myId;
+  const meNow = game?.players.find((p) => p.id === myId);
+  const sgNow = game?.currentSuggestion;
+  const suggestionPendingNow = !!sgNow && !sgNow.resolved;
+  const iMustRevealNow = suggestionPendingNow && sgNow!.pendingResponderId === myId;
+
+  // New suggestion/accusation -> announce it to everyone (and clear any prior reveal pop-up).
+  useEffect(() => {
+    const a = game?.announcement;
+    if (a && a.seq !== annSeqRef.current) {
+      annSeqRef.current = a.seq;
+      setRevealOpen(false);
+      if (game?.phase === 'play') setAnnOpen(true);
+    }
+  }, [game?.announcement?.seq, game?.phase]);
+
+  // A card was just revealed -> show the face-down reveal pop-up (replacing the announcement).
+  useEffect(() => {
+    if (sgNow?.resolved && sgNow.anyRevealed && sgNow.responderId) {
+      const key = `${game?.announcement?.seq ?? 0}:${sgNow.responderId}`;
+      if (key !== revealKeyRef.current) {
+        revealKeyRef.current = key;
+        setAnnOpen(false);
+        setRevealOpen(true);
+      }
+    }
+  }, [sgNow?.resolved, sgNow?.anyRevealed, sgNow?.responderId, game?.announcement?.seq]);
+
+  // If I must disprove, the announcement pop-up gives way to the disprove panel.
+  useEffect(() => {
+    if (iMustRevealNow) setAnnOpen(false);
+  }, [iMustRevealNow]);
+
+  // Pop up the big status window whenever my actionable status changes (roll, room entry, etc.).
+  useEffect(() => {
+    if (!game || game.phase !== 'play' || !myTurnNow || suggestionPendingNow) {
+      statusSigRef.current = '';
+      setStatusOpen(false);
+      return;
+    }
+    const sig = `${game.turnPhase}|${game.lastRoll?.join('-') ?? ''}|${meNow?.inRoomId ?? ''}`;
+    if (sig !== statusSigRef.current) {
+      statusSigRef.current = sig;
+      setStatusOpen(true);
+    }
+  }, [game?.turnPhase, game?.lastRoll?.[0], game?.lastRoll?.[1], meNow?.inRoomId, myTurnNow, suggestionPendingNow, game?.phase]);
 
   if (!game) {
     return (
@@ -60,6 +117,46 @@ export function Game() {
     : null;
   const revealedToMe = sug?.resolved && sug.anyRevealed && sug.suggesterId === myId ? sug.revealedCardId : undefined;
   const revealedCard = revealedToMe ? getCard(revealedToMe) : undefined;
+
+  // Big status pop-up content for the active player.
+  const statusDesc: { dice?: [number, number]; lines: string[]; buttons: StatusButton[] } | null = (() => {
+    if (!myTurn || suggestionPending) return null;
+    if (game.turnPhase === 'awaitRoll') {
+      return {
+        lines: [`You are in the ${myRoom}.`, 'Roll & move, or skip to stay.'],
+        buttons: [
+          { label: 'Roll & Move', icon: '🎲', primary: true, onClick: () => (setStatusOpen(false), rollMove()) },
+          { label: 'Skip movement', icon: '⏭️', onClick: () => (setStatusOpen(false), skipMove()) },
+        ],
+      };
+    }
+    if (game.turnPhase === 'awaitMove' && game.lastRoll) {
+      return {
+        dice: game.lastRoll,
+        lines: [`You rolled ${game.lastRoll[0] + game.lastRoll[1]}.`, 'Click a highlighted square to move.'],
+        buttons: [{ label: 'Got it', icon: '👍', primary: true, onClick: () => setStatusOpen(false) }],
+      };
+    }
+    const buttons: StatusButton[] = [];
+    if (me?.inRoomId)
+      buttons.push({ label: 'Suggest', icon: '🔍', primary: true, onClick: () => (setStatusOpen(false), setModal('suggest')) });
+    buttons.push({ label: 'Accuse', icon: '🗡️', onClick: () => (setStatusOpen(false), setModal('accuse')) });
+    buttons.push({ label: 'End Turn', icon: '⏳', onClick: () => (setStatusOpen(false), endTurn()) });
+    return {
+      lines: me?.inRoomId
+        ? [`You are in the ${myRoom}.`, 'Suggest, accuse, or end your turn.']
+        : ['Move complete.', 'Accuse, or end your turn.'],
+      buttons,
+    };
+  })();
+
+  // Only one overlay shows at a time, by priority.
+  const showEnd = game.phase === 'ended';
+  const showDisprove = iMustReveal && !!sug;
+  const showReveal = revealOpen && !showDisprove && !showEnd && !modal;
+  const showAnn = annOpen && !!game.announcement && !showReveal && !showDisprove && !showEnd && !modal;
+  const showStatus =
+    statusOpen && !!statusDesc && !showAnn && !showReveal && !showDisprove && !showEnd && !modal && !iMustReveal;
 
   return (
     <div className="game">
@@ -207,7 +304,28 @@ export function Game() {
         </>
       )}
 
-      {iMustReveal && sug && (
+      {showStatus && statusDesc && (
+        <StatusModal
+          dice={statusDesc.dice}
+          lines={statusDesc.lines}
+          buttons={statusDesc.buttons}
+          onClose={() => setStatusOpen(false)}
+        />
+      )}
+
+      {showAnn && game.announcement && (
+        <AnnouncementModal announcement={game.announcement} onClose={() => setAnnOpen(false)} />
+      )}
+
+      {showReveal && sug && (
+        <RevealModal
+          responderName={game.players.find((p) => p.id === sug.responderId)?.name ?? 'A player'}
+          suggesterName={game.players.find((p) => p.id === sug.suggesterId)?.name ?? 'the suggester'}
+          onClose={() => setRevealOpen(false)}
+        />
+      )}
+
+      {showDisprove && sug && (
         <RevealPanel
           trio={[sug.suspectId, sug.weaponId, sug.roomId]}
           hand={game.yourHand}
@@ -216,7 +334,7 @@ export function Game() {
         />
       )}
 
-      {game.phase === 'ended' && <EndScreen game={game} myId={myId} onLeave={leave} />}
+      {showEnd && <EndScreen game={game} myId={myId} onLeave={leave} />}
     </div>
   );
 }

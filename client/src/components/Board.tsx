@@ -13,6 +13,8 @@ const BW = BOARD.width * TS;
 const BH = BOARD.height * TS;
 const MIN_SCALE = 0.45;
 const MAX_SCALE = 3;
+/** Walk-animation cadence: ms the pawn spends on each tile of its path. */
+export const WALK_STEP_MS = 300;
 
 const cx = (c: Coord) => c.x * TS + TS / 2;
 const cy = (c: Coord) => c.y * TS + TS / 2;
@@ -187,7 +189,7 @@ export function Board({
         return;
       }
       setAnim({ playerId: lastMove.playerId, tile: lastMove.path[i] });
-    }, 300);
+    }, WALK_STEP_MS);
     return () => clearInterval(timer);
   }, [lastMove]);
 

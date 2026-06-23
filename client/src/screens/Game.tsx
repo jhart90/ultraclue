@@ -3,7 +3,7 @@ import { getCard, shortcutDestForRoom } from 'shared';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
-import { Board } from '../components/Board';
+import { Board, WALK_STEP_MS } from '../components/Board';
 import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
 import { DetectiveNotes } from '../components/DetectiveNotes';
@@ -92,11 +92,22 @@ export function Game() {
       return;
     }
     const sig = `${game.turnPhase}|${game.lastRoll?.join('-') ?? ''}|${meNow?.inRoomId ?? ''}`;
-    if (sig !== statusSigRef.current) {
-      statusSigRef.current = sig;
+    if (sig === statusSigRef.current) return;
+    statusSigRef.current = sig;
+    // If my token just walked a path, wait for it to finish entering before popping the menu so the
+    // suspect/accuse/end-turn options don't appear while the piece is still mid-move.
+    const mv = game.lastMove;
+    const tilesToWalk = mv && mv.playerId === myId ? mv.path.length - 1 : 0;
+    if (tilesToWalk <= 0) {
       setStatusOpen(true);
+      return;
     }
-  }, [game?.turnPhase, game?.lastRoll?.[0], game?.lastRoll?.[1], meNow?.inRoomId, myTurnNow, suggestionPendingNow, game?.phase]);
+    setStatusOpen(false);
+    const t = setTimeout(() => setStatusOpen(true), tilesToWalk * WALK_STEP_MS + 80);
+    return () => clearTimeout(t);
+    // lastMove is intentionally omitted: it changes in lock-step with turnPhase/inRoomId (which are
+    // listed), and including the fresh object each tick would cancel the pending timeout.
+  }, [game?.turnPhase, game?.lastRoll?.[0], game?.lastRoll?.[1], meNow?.inRoomId, myTurnNow, suggestionPendingNow, game?.phase, myId]);
 
   if (!game) {
     return (

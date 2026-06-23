@@ -41,7 +41,7 @@ describe('board (2D themed sections)', () => {
       expect(layout, room.id).toBeTruthy();
       expect(layout.tiles.length, room.id).toBeGreaterThan(0);
       expect(isContiguous(layout.tiles), `${room.id} not contiguous`).toBe(true);
-      if (room.id === 'room-walk-in-closet') expect(layout.entrances).toHaveLength(1);
+      if (room.id === 'room-walk-in-closet' || room.id === 'room-bunker') expect(layout.entrances).toHaveLength(1);
       else {
         expect(layout.entrances.length, `${room.id} entrances`).toBeGreaterThanOrEqual(2);
         expect(layout.entrances.length, `${room.id} entrances`).toBeLessThanOrEqual(5);

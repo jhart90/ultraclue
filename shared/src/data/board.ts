@@ -131,15 +131,15 @@ const GROUND_FLOOR: SectionDef = {
   title: 'Ground Floor',
   w: ROOM_W,
   h: ROOM_H,
-  vbands: [8, 17],
+  vbands: [6, 13, 20],
   hbands: [5, 9, 13],
   // Top seam -> Grounds, left seam -> Upper, right seam -> Basement; only the bottom is an open edge.
   keep: { top: true, right: true, bottom: false, left: true },
   grid: [
-    ['room-theatre', 'room-ballroom', 'room-library'],
-    ['room-dining', 'ELEV', 'room-lounge'],
-    ['room-kitchen', 'room-parlour', 'room-drawing'],
-    ['room-pantry', 'ENV', 'room-billiard'],
+    ['room-veranda', 'room-theatre', 'room-ballroom', 'room-library'],
+    ['room-dining', 'ELEV', 'room-lounge', 'room-kitchen'],
+    ['room-parlour', 'room-drawing', 'room-billiard', 'room-pantry'],
+    ['', 'ENV', '', ''],
   ],
 };
 
@@ -157,7 +157,7 @@ const UPPER_FLOOR: SectionDef = {
     ['room-study', 'room-music', 'room-gallery'],
     ['room-boudoir', 'ELEV', 'room-smoking'],
     ['room-trophy', 'room-den', 'room-clock-tower'],
-    ['room-gymnasium', '', 'room-solarium'],
+    ['room-gymnasium', 'room-master-suite', 'room-solarium'],
   ],
 };
 
@@ -174,7 +174,7 @@ const BASEMENT: SectionDef = {
   grid: [
     ['room-wine-cellar', 'room-chapel', 'room-laboratory'],
     ['room-armory', 'ELEV', 'room-boiler'],
-    ['room-workshop', 'room-planetarium', 'room-bathhouse'],
+    ['room-workshop', 'room-planetarium', 'room-bunker'],
     ['room-sauna', 'CELLAR', ''],
   ],
 };
@@ -190,9 +190,9 @@ const GROUNDS: SectionDef = {
   // Only the bottom seam (-> Ground Floor) stays a hall; top, left and right are open edges.
   keep: { top: false, right: false, bottom: true, left: false },
   grid: [
-    ['room-gazebo', 'room-hedge-maze', 'room-greenhouse', 'room-stables'],
-    ['room-orchard', 'room-courtyard', 'room-master-suite', 'CELLAR'],
-    ['room-boat-house', 'room-veranda', 'room-cemetery', ''],
+    ['room-boat-house', 'room-hedge-maze', 'room-greenhouse', 'room-cemetery'],
+    ['room-gazebo', 'room-courtyard', 'room-stables', 'CELLAR'],
+    ['room-rose-garden', '', '', ''],
   ],
 };
 
@@ -218,6 +218,27 @@ const ROOM_SHORTCUTS: [string, string][] = [
 
 const CLOSET_ID = 'room-walk-in-closet';
 const MASTER_ID = 'room-master-suite';
+const BUNKER_ID = 'room-bunker';
+
+// Rooms made non-rectangular by cutting a notch out of one corner (the freed tiles become hall).
+// Each entry: room id + which corner + how big a bite, applied only where it stays safely connected.
+const ROOM_NOTCHES: { id: string; corner: 'tl' | 'tr' | 'bl' | 'br'; w: number; h: number }[] = [
+  { id: 'room-ballroom', corner: 'tl', w: 2, h: 2 },
+  { id: 'room-ballroom', corner: 'tr', w: 2, h: 2 },
+  { id: 'room-library', corner: 'bl', w: 2, h: 2 },
+  { id: 'room-lounge', corner: 'br', w: 2, h: 2 },
+  { id: 'room-kitchen', corner: 'bl', w: 2, h: 2 },
+  { id: 'room-dining', corner: 'tr', w: 2, h: 2 },
+  { id: 'room-study', corner: 'br', w: 2, h: 1 },
+  { id: 'room-gallery', corner: 'bl', w: 2, h: 2 },
+  { id: 'room-smoking', corner: 'tl', w: 2, h: 2 },
+  { id: 'room-laboratory', corner: 'bl', w: 2, h: 2 },
+  { id: 'room-workshop', corner: 'tr', w: 2, h: 2 },
+  { id: 'room-chapel', corner: 'br', w: 1, h: 2 },
+  { id: 'room-greenhouse', corner: 'br', w: 2, h: 2 },
+  { id: 'room-courtyard', corner: 'tl', w: 2, h: 2 },
+  { id: 'room-courtyard', corner: 'tr', w: 2, h: 2 },
+];
 
 /** Hall lines for one axis: the interior bands plus whichever of the two borders are kept. */
 function splitLines(size: number, bands: number[], keepLow: boolean, keepHigh: boolean): number[] {
@@ -354,10 +375,19 @@ function buildBoard(): Board {
   // Walk-in Closet: carve a 2x2 annex out of the Master Suite's far corner, joined by one door.
   carveCloset(cells, cellAt, rooms);
 
-  // Doorways: 2–5 per room, centred and spread; closet handled above.
+  // Give some rooms an irregular (L-shaped / notched) footprint instead of a plain rectangle.
+  for (const n of ROOM_NOTCHES) notchCorner(cells, cellAt, rooms[n.id], n.corner, n.w, n.h);
+
+  // Doorways: 2–5 per room (the Bunker gets a single door; the closet was handled above).
   for (const room of Object.values(rooms)) {
     if (room.id === CLOSET_ID) continue;
-    room.entrances = pickEntrances(collectCandidates(room, cellAt));
+    const cands = collectCandidates(room, cellAt);
+    if (room.id === BUNKER_ID) {
+      const doors = middleOut(cands.map((c) => c.door));
+      room.entrances = doors.length ? [doors[0]] : [];
+    } else {
+      room.entrances = pickEntrances(cands);
+    }
   }
 
   // Cellar stairs: free link between the Grounds landing and the Basement landing.
@@ -452,6 +482,55 @@ function pickEntrances(cands: { side: string; door: Doorway }[]): Doorway[] {
     if (!advanced) break;
   }
   return picked;
+}
+
+/** Bite a w×h block out of one corner of a room, freeing those tiles back to hall so the room
+ *  becomes L-shaped. Skips the cut unless it leaves a connected L AND the freed tiles touch an
+ *  existing hall (so we never strand a pocket or split a room). */
+function notchCorner(
+  cells: BoardCell[],
+  cellAt: Map<string, BoardCell>,
+  room: RoomLayout | undefined,
+  corner: 'tl' | 'tr' | 'bl' | 'br',
+  w: number,
+  h: number,
+): void {
+  if (!room) return;
+  const xs = room.tiles.map((t) => t.x);
+  const ys = room.tiles.map((t) => t.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  if (maxX - minX + 1 <= w || maxY - minY + 1 <= h) return; // too small — a cut would split it
+  const left = corner === 'tl' || corner === 'bl';
+  const top = corner === 'tl' || corner === 'tr';
+  const cx = left ? minX : maxX;
+  const cy = top ? minY : maxY;
+  const sx = left ? 1 : -1;
+  const sy = top ? 1 : -1;
+  // the freed tiles only join the network if a hall sits just beyond the corner
+  const extX = cellAt.get(coordKey({ x: cx - sx, y: cy }));
+  const extY = cellAt.get(coordKey({ x: cx, y: cy - sy }));
+  if (extX?.type !== 'path' && extY?.type !== 'path') return;
+  const block: Coord[] = [];
+  for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) block.push({ x: cx + sx * i, y: cy + sy * j });
+  if (!block.every((c) => cellAt.get(coordKey(c))?.roomId === room.id)) return; // bite must be all this room
+  const keys = new Set(block.map(coordKey));
+  for (const c of cells) {
+    if (keys.has(coordKey(c))) {
+      c.type = 'path';
+      c.roomId = undefined;
+    }
+  }
+  room.tiles = room.tiles.filter((t) => !keys.has(coordKey(t)));
+  // keep the label on an actual tile nearest the (new) centre, not floating in the notch
+  const nxs = room.tiles.map((t) => t.x), nys = room.tiles.map((t) => t.y);
+  const mcx = (Math.min(...nxs) + Math.max(...nxs)) / 2, mcy = (Math.min(...nys) + Math.max(...nys)) / 2;
+  let best = room.tiles[0], bestD = Infinity;
+  for (const t of room.tiles) {
+    const d = (t.x - mcx) ** 2 + (t.y - mcy) ** 2;
+    if (d < bestD) (bestD = d), (best = t);
+  }
+  room.label = { x: best.x, y: best.y };
+  room.weaponTile = { x: Math.max(...nxs), y: Math.min(...nys) };
 }
 
 /** Turn the far 2x2 corner of the Master Suite into the Walk-in Closet, joined by one inner door. */

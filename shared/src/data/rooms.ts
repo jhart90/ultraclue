@@ -22,7 +22,7 @@ export const ROOMS: RoomCard[] = [
   { id: 'room-boudoir', type: 'room', title: 'Boudoir', phrase: 'Powder, perfume, poison.' },
   { id: 'room-smoking', type: 'room', title: 'Smoking Room', phrase: 'Where deals turn to smoke.' },
   { id: 'room-trophy', type: 'room', title: 'Trophy Room', phrase: 'Mounted heads, buried truths.' },
-  { id: 'room-orchard', type: 'room', title: 'Orchard', phrase: 'The fruit is not the only thing that drops here.' },
+  { id: 'room-rose-garden', type: 'room', title: 'Rose Garden', phrase: 'Every bloom has a thorn, and every thorn a secret.' },
   { id: 'room-pantry', type: 'room', title: 'Pantry', phrase: 'Stocked with more than preserves.' },
   { id: 'room-armory', type: 'room', title: 'Armory', phrase: 'An arsenal of alibis.' },
   { id: 'room-solarium', type: 'room', title: 'Solarium', phrase: 'Bright room, dark dealings.' },
@@ -41,7 +41,7 @@ export const ROOMS: RoomCard[] = [
   { id: 'room-master-suite', type: 'room', title: 'Master Suite', phrase: 'The bed where plans were hatched.' },
   { id: 'room-greenhouse', type: 'room', title: 'Greenhouse', phrase: 'Things grow here that shouldn’t.' },
   { id: 'room-gazebo', type: 'room', title: 'Gazebo', phrase: 'Open on all sides, yet nobody saw a thing.' },
-  { id: 'room-bathhouse', type: 'room', title: 'Bathhouse', phrase: 'Steam hides more than skin.' },
+  { id: 'room-bunker', type: 'room', title: 'Bunker', phrase: 'One way in, and whatever happened stays sealed inside.' },
   { id: 'room-sauna', type: 'room', title: 'Sauna', phrase: 'The heat makes everyone sweat — guilty or not.' },
   { id: 'room-courtyard', type: 'room', title: 'Courtyard', phrase: 'Open air, closed motives.' },
 ];

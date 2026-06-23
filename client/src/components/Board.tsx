@@ -51,12 +51,12 @@ const EMOJI: Record<string, string> = {
   'room-ballroom': '💃', 'room-kitchen': '🍳', 'room-dining': '🍽️', 'room-lounge': '🛋️',
   'room-study': '📖', 'room-wine-cellar': '🍷', 'room-music': '🎹', 'room-gallery': '🖼️',
   'room-gymnasium': '🏋️', 'room-boat-house': '🚤', 'room-chapel': '⛪', 'room-boudoir': '💄',
-  'room-smoking': '🚬', 'room-trophy': '🏆', 'room-orchard': '🍎', 'room-pantry': '🥫',
+  'room-smoking': '🚬', 'room-trophy': '🏆', 'room-rose-garden': '🌹', 'room-pantry': '🥫',
   'room-armory': '⚔️', 'room-solarium': '☀️', 'room-parlour': '🫖', 'room-workshop': '🔧',
   'room-cemetery': '🪦', 'room-laboratory': '⚗️', 'room-boiler': '♨️', 'room-drawing': '✏️',
   'room-planetarium': '🪐', 'room-veranda': '🪑', 'room-den': '🦊', 'room-hedge-maze': '🌿',
   'room-stables': '🐴', 'room-clock-tower': '🕰️', 'room-master-suite': '🛏️', 'room-greenhouse': '🪴',
-  'room-gazebo': '⛲', 'room-bathhouse': '🛁', 'room-sauna': '🧖', 'room-courtyard': '⛲',
+  'room-gazebo': '⛲', 'room-bunker': '🪖', 'room-sauna': '🧖', 'room-courtyard': '⛲',
 };
 
 function roomBounds(room: RoomLayout) {
@@ -65,6 +65,22 @@ function roomBounds(room: RoomLayout) {
   const minX = Math.min(...xs);
   const minY = Math.min(...ys);
   return { x: minX * TS, y: minY * TS, w: (Math.max(...xs) - minX + 1) * TS, h: (Math.max(...ys) - minY + 1) * TS, minX, minY };
+}
+
+/** SVG path tracing only the outer edges of a room's tiles, so an L-shaped room gets a clean
+ *  border that follows its real footprint instead of a bounding rectangle. */
+function roomOutline(tiles: Coord[]): string {
+  const inRoom = new Set(tiles.map(coordKey));
+  const has = (x: number, y: number) => inRoom.has(`${x},${y}`);
+  const segs: string[] = [];
+  for (const tl of tiles) {
+    const x0 = tl.x * TS, y0 = tl.y * TS, x1 = (tl.x + 1) * TS, y1 = (tl.y + 1) * TS;
+    if (!has(tl.x, tl.y - 1)) segs.push(`M${x0} ${y0}L${x1} ${y0}`);
+    if (!has(tl.x, tl.y + 1)) segs.push(`M${x0} ${y1}L${x1} ${y1}`);
+    if (!has(tl.x - 1, tl.y)) segs.push(`M${x0} ${y0}L${x0} ${y1}`);
+    if (!has(tl.x + 1, tl.y)) segs.push(`M${x1} ${y0}L${x1} ${y1}`);
+  }
+  return segs.join('');
 }
 
 type TipFn = (t: { x: number; y: number; text: string } | null) => void;
@@ -370,54 +386,61 @@ export function Board({
             const title = getCard(room.id)?.title ?? room.id;
             const art = resolveOverride(room.id, 'room', title);
             const gate = theme === 'grounds' && room.id !== 'room-walk-in-closet';
-            // centred white name bubble
-            const cxr = b.x + b.w / 2;
-            const cyr = b.y + b.h / 2;
+            // A room whose tiles fill its whole bounding box is a plain rectangle; otherwise it has
+            // a notch and must be drawn from its actual tiles so the L-shape shows.
+            const isRect = room.tiles.length === (b.w / TS) * (b.h / TS);
+            // name bubble: centred for rectangles, on the label tile for L-shapes
+            const cxr = isRect ? b.x + b.w / 2 : room.label.x * TS + TS / 2;
+            const cyr = isRect ? b.y + b.h / 2 : room.label.y * TS + TS / 2;
             const fs = Math.max(6.5, Math.min(11, (b.w - 12) / (title.length * 0.62)));
             const bubbleW = Math.min(b.w - 4, title.length * fs * 0.6 + 12);
             const bubbleH = fs + 7;
+            const glyph = [...room.tiles].sort((p, q) => p.y - q.y || p.x - q.x)[0];
             return (
               <g key={room.id}>
-                {/* one cohesive room space (no internal grid) with a soft inset */}
-                <rect x={b.x + 1} y={b.y + 1} width={b.w - 2} height={b.h - 2} rx="5" fill={t.floor} stroke="#e7c66a" strokeWidth="2" />
-                {/* override art (if supplied) fills the room, clipped to its rounded bounds; a soft
-                    scrim keeps the white name bubble and glyph legible over busy images */}
-                {art && (
+                {isRect ? (
                   <>
-                    <clipPath id={`roomclip-${room.id}`}>
-                      <rect x={b.x + 2} y={b.y + 2} width={b.w - 4} height={b.h - 4} rx="4" />
-                    </clipPath>
-                    <image
-                      href={art}
-                      x={b.x + 2}
-                      y={b.y + 2}
-                      width={b.w - 4}
-                      height={b.h - 4}
-                      preserveAspectRatio="xMidYMid slice"
-                      clipPath={`url(#roomclip-${room.id})`}
-                      style={{ pointerEvents: 'none' }}
-                    />
-                    <rect
-                      x={b.x + 2}
-                      y={b.y + 2}
-                      width={b.w - 4}
-                      height={b.h - 4}
-                      rx="4"
-                      fill="rgba(10,7,16,0.32)"
-                      clipPath={`url(#roomclip-${room.id})`}
-                      style={{ pointerEvents: 'none' }}
-                    />
+                    {/* one cohesive room space (no internal grid) with a soft inset */}
+                    <rect x={b.x + 1} y={b.y + 1} width={b.w - 2} height={b.h - 2} rx="5" fill={t.floor} stroke="#e7c66a" strokeWidth="2" />
+                    {/* override art (if supplied) fills the room, clipped to its rounded bounds; a soft
+                        scrim keeps the white name bubble and glyph legible over busy images */}
+                    {art && (
+                      <>
+                        <clipPath id={`roomclip-${room.id}`}>
+                          <rect x={b.x + 2} y={b.y + 2} width={b.w - 4} height={b.h - 4} rx="4" />
+                        </clipPath>
+                        <image
+                          href={art}
+                          x={b.x + 2}
+                          y={b.y + 2}
+                          width={b.w - 4}
+                          height={b.h - 4}
+                          preserveAspectRatio="xMidYMid slice"
+                          clipPath={`url(#roomclip-${room.id})`}
+                          style={{ pointerEvents: 'none' }}
+                        />
+                        <rect x={b.x + 2} y={b.y + 2} width={b.w - 4} height={b.h - 4} rx="4" fill="rgba(10,7,16,0.32)" clipPath={`url(#roomclip-${room.id})`} style={{ pointerEvents: 'none' }} />
+                      </>
+                    )}
+                    <rect x={b.x + 4} y={b.y + 4} width={b.w - 8} height={b.h - 8} rx="4" fill="none" stroke="rgba(231,198,106,0.2)" strokeWidth="1" />
+                  </>
+                ) : (
+                  <>
+                    {/* notched room: fill each tile, then trace just the outer edge */}
+                    {room.tiles.map((tl) => (
+                      <rect key={`${tl.x}-${tl.y}`} x={tl.x * TS - 0.3} y={tl.y * TS - 0.3} width={TS + 0.6} height={TS + 0.6} fill={t.floor} />
+                    ))}
+                    <path d={roomOutline(room.tiles)} fill="none" stroke="#e7c66a" strokeWidth="2" strokeLinejoin="round" />
                   </>
                 )}
-                <rect x={b.x + 4} y={b.y + 4} width={b.w - 8} height={b.h - 8} rx="4" fill="none" stroke="rgba(231,198,106,0.2)" strokeWidth="1" />
-                {/* small thematic glyph, tucked top-left */}
-                <text x={b.x + 11} y={b.y + 15} textAnchor="middle" fontSize="11" style={{ pointerEvents: 'none' }}>
+                {/* small thematic glyph, tucked into the room's top-left tile */}
+                <text x={glyph.x * TS + 11} y={glyph.y * TS + 15} textAnchor="middle" fontSize="11" style={{ pointerEvents: 'none' }}>
                   {EMOJI[room.id] ?? ''}
                 </text>
                 {room.entrances.map((e, i) => (
                   <Door key={i} rt={e.roomTile} dt={e.doorTile} gate={gate} />
                 ))}
-                {/* room name, centred in a white bubble */}
+                {/* room name, in a white bubble */}
                 <g style={{ pointerEvents: 'none' }}>
                   <rect x={cxr - bubbleW / 2} y={cyr - bubbleH / 2} width={bubbleW} height={bubbleH} rx={bubbleH / 2} fill="#f4efe1" stroke="#2a2018" strokeWidth="1" />
                   <text x={cxr} y={cyr + fs * 0.36} textAnchor="middle" fontFamily="Georgia, serif" fontWeight="700" fontSize={fs} fill="#1a120a">

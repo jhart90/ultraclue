@@ -171,6 +171,18 @@
   align-items: center;
   text-align: center;
 }
+/* The card row scrolls if it can't all fit, so the Reveal button below is always reachable. */
+.sp--reveal .sp__cards,
+.sp--end .sp__cards {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: 100%;
+  overflow-y: auto;
+  align-content: flex-start;
+}
+.sp--reveal .sp__revealbtn {
+  flex: 0 0 auto;
+}
 .sp__endtitle {
   font-size: 2rem;
   font-weight: 700;
@@ -184,5 +196,29 @@
   }
   .sp__list {
     max-height: 30vh;
+  }
+  /* Shrink the disprove/reveal cards so all the options and the Reveal button fit on a phone. */
+  .sp--reveal .card,
+  .sp--end .card {
+    width: 132px;
+  }
+  .sp--reveal .card__art,
+  .sp--end .card__art {
+    height: 96px;
+  }
+  .sp--reveal .sp__cards,
+  .sp--end .sp__cards {
+    gap: 0.5rem;
+  }
+  .sp__title {
+    font-size: 1.2rem;
+  }
+  .sp__hint {
+    margin-bottom: 0.4rem;
+  }
+  .sp__revealbtn {
+    margin-top: 0.4rem;
+    font-size: 1rem;
+    padding: 0.5rem 1.4rem;
   }
 }

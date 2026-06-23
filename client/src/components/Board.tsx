@@ -142,8 +142,13 @@ export function Board({
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ scale: 0.8, tx: 0, ty: 0 });
+  const viewRef = useRef(view);
+  viewRef.current = view; // always the latest committed view, for use inside gesture handlers
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
   const drag = useRef<{ x: number; y: number; tx: number; ty: number; moved: boolean } | null>(null);
+  // Active touch/mouse pointers on the board, for two-finger pinch-to-zoom (iOS Safari et al.).
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinch = useRef<{ dist: number } | null>(null);
 
   // Walk-animation: when a new path arrives, step the moving pawn through it at 0.3s / tile.
   const [anim, setAnim] = useState<{ playerId: string; tile: Coord } | null>(null);
@@ -201,6 +206,17 @@ export function Board({
     return () => el.removeEventListener('wheel', onWheel);
   }, [zoomAt]);
 
+  // iOS Safari fires non-standard gesture* events for pinch and will zoom the whole page unless we
+  // suppress them; we handle pinch ourselves via pointer events.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const prevent = (e: Event) => e.preventDefault();
+    const evs = ['gesturestart', 'gesturechange', 'gestureend'];
+    evs.forEach((n) => el.addEventListener(n, prevent as EventListener, { passive: false }));
+    return () => evs.forEach((n) => el.removeEventListener(n, prevent as EventListener));
+  }, []);
+
   // Up/Down arrow keys zoom toward centre.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -216,12 +232,41 @@ export function Board({
     return () => window.removeEventListener('keydown', onKey);
   }, [zoomAt]);
 
+  const startDragFrom = (x: number, y: number) => {
+    drag.current = { x, y, tx: viewRef.current.tx, ty: viewRef.current.ty, moved: false };
+  };
   const onPointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).dataset?.move) return; // clicking a move target, not panning
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty, moved: false };
+    try {
+      viewportRef.current?.setPointerCapture(e.pointerId);
+    } catch {
+      /* pointer already gone — safe to ignore */
+    }
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size >= 2) {
+      // second finger down -> start a pinch and stop panning
+      const [a, b] = [...pointers.current.values()];
+      pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y) };
+      drag.current = null;
+    } else {
+      startDragFrom(e.clientX, e.clientY);
+    }
   };
   const onPointerMove = (e: React.PointerEvent) => {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // Two-finger pinch: zoom by the change in finger distance, centred on their midpoint.
+    if (pinch.current && pointers.current.size >= 2) {
+      const [a, b] = [...pointers.current.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinch.current.dist > 0 && dist > 0) {
+        const rect = viewportRef.current?.getBoundingClientRect();
+        zoomAt(dist / pinch.current.dist, (a.x + b.x) / 2 - (rect?.left ?? 0), (a.y + b.y) / 2 - (rect?.top ?? 0));
+      }
+      pinch.current.dist = dist;
+      return;
+    }
+
     const d = drag.current; // capture locally — the setView updater runs at commit time, by which
     if (!d) return; //          point a pointerup may have nulled drag.current.
     const dx = e.clientX - d.x;
@@ -229,7 +274,17 @@ export function Board({
     if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true;
     setView((v) => ({ ...v, tx: d.tx + dx, ty: d.ty + dy }));
   };
-  const onPointerUp = () => (drag.current = null);
+  const onPointerUp = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    if (pointers.current.size === 0) {
+      drag.current = null;
+    } else if (pointers.current.size === 1) {
+      // a finger lifted after a pinch — resume panning from the one that remains, no jump
+      const [p] = [...pointers.current.values()];
+      startDragFrom(p.x, p.y);
+    }
+  };
 
   return (
     <div

@@ -115,6 +115,9 @@ interface SectionDef {
   vbands: number[]; // interior hall columns
   hbands: number[]; // interior hall rows
   grid: string[][]; // [rowRegion][colRegion]
+  // Which borders stay a hall. A kept border is the seam shared with the neighbouring section
+  // (needed for cross-floor connectivity); a dropped border lets the rooms abut the board edge.
+  keep: { top: boolean; right: boolean; bottom: boolean; left: boolean };
 }
 
 const ROOM_W = 26;
@@ -130,6 +133,8 @@ const GROUND_FLOOR: SectionDef = {
   h: ROOM_H,
   vbands: [8, 17],
   hbands: [5, 9, 13],
+  // Top seam -> Grounds, left seam -> Upper, right seam -> Basement; only the bottom is an open edge.
+  keep: { top: true, right: true, bottom: false, left: true },
   grid: [
     ['room-theatre', 'room-ballroom', 'room-library'],
     ['room-dining', 'ELEV', 'room-lounge'],
@@ -146,6 +151,8 @@ const UPPER_FLOOR: SectionDef = {
   h: ROOM_H,
   vbands: [7, 14],
   hbands: [5, 9, 13],
+  // Only the right seam (-> Ground Floor) stays a hall; top, left and bottom are open edges.
+  keep: { top: false, right: true, bottom: false, left: false },
   grid: [
     ['room-study', 'room-music', 'room-gallery'],
     ['room-boudoir', 'ELEV', 'room-smoking'],
@@ -162,6 +169,8 @@ const BASEMENT: SectionDef = {
   h: ROOM_H,
   vbands: [7, 14],
   hbands: [5, 9, 13],
+  // Only the left seam (-> Ground Floor) stays a hall; top, right and bottom are open edges.
+  keep: { top: false, right: false, bottom: false, left: true },
   grid: [
     ['room-wine-cellar', 'room-chapel', 'room-laboratory'],
     ['room-armory', 'ELEV', 'room-boiler'],
@@ -178,6 +187,8 @@ const GROUNDS: SectionDef = {
   h: GROUNDS_H,
   vbands: [6, 13, 20],
   hbands: [6, 13],
+  // Only the bottom seam (-> Ground Floor) stays a hall; top, left and right are open edges.
+  keep: { top: false, right: false, bottom: true, left: false },
   grid: [
     ['room-gazebo', 'room-hedge-maze', 'room-greenhouse', 'room-stables'],
     ['room-orchard', 'room-courtyard', 'room-master-suite', 'CELLAR'],
@@ -208,19 +219,28 @@ const ROOM_SHORTCUTS: [string, string][] = [
 const CLOSET_ID = 'room-walk-in-closet';
 const MASTER_ID = 'room-master-suite';
 
-/** Path columns/rows for a section: the border plus the interior bands. */
-function pathLines(size: number, bands: number[]): number[] {
-  return [...new Set([0, size - 1, ...bands])].sort((a, b) => a - b);
+/** Hall lines for one axis: the interior bands plus whichever of the two borders are kept. */
+function splitLines(size: number, bands: number[], keepLow: boolean, keepHigh: boolean): number[] {
+  return [...new Set([...bands, ...(keepLow ? [0] : []), ...(keepHigh ? [size - 1] : [])])].sort((a, b) => a - b);
 }
 
-/** The interior region rectangles between path lines, as [start, end] inclusive pairs. */
-function regions(lines: number[]): [number, number][] {
+/** Maximal runs of non-hall indices in [0, size-1], as [start, end] inclusive pairs. A run that
+ *  touches a dropped border extends all the way to the board edge (0 or size-1). */
+function regionsOver(size: number, lines: number[]): [number, number][] {
+  const hall = new Set(lines);
   const out: [number, number][] = [];
-  for (let i = 0; i < lines.length - 1; i++) {
-    const start = lines[i] + 1;
-    const end = lines[i + 1] - 1;
-    if (end >= start) out.push([start, end]);
+  let start = -1;
+  for (let i = 0; i < size; i++) {
+    if (hall.has(i)) {
+      if (start >= 0) {
+        out.push([start, i - 1]);
+        start = -1;
+      }
+    } else if (start < 0) {
+      start = i;
+    }
   }
+  if (start >= 0) out.push([start, size - 1]);
   return out;
 }
 
@@ -241,10 +261,10 @@ function buildBoard(): Board {
   for (const def of SECTION_DEFS) {
     const origin = ORIGIN[def.id];
     sections.push({ id: def.id, theme: def.theme, title: def.title, origin, width: def.w, height: def.h });
-    const cols = pathLines(def.w, def.vbands);
-    const rows = pathLines(def.h, def.hbands);
-    const colRegions = regions(cols);
-    const rowRegions = regions(rows);
+    const cols = splitLines(def.w, def.vbands, def.keep.left, def.keep.right);
+    const rows = splitLines(def.h, def.hbands, def.keep.top, def.keep.bottom);
+    const colRegions = regionsOver(def.w, cols);
+    const rowRegions = regionsOver(def.h, rows);
     const isPathCol = new Set(cols);
     const isPathRow = new Set(rows);
 

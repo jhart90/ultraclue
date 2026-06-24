@@ -16,7 +16,7 @@ const MAX_SCALE = 3;
 /** Walk-animation cadence: ms the pawn spends on each tile of its path. */
 export const WALK_STEP_MS = 300;
 /** Zoom level the camera locks to while following another player's move. */
-const FOLLOW_SCALE = 0.8;
+const FOLLOW_SCALE = 1.6;
 
 const cx = (c: Coord) => c.x * TS + TS / 2;
 const cy = (c: Coord) => c.y * TS + TS / 2;

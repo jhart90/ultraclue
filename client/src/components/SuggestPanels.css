@@ -19,7 +19,10 @@
 
 .sp__backdrop {
   position: fixed;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: var(--pad, 0);
+  right: var(--map-right, 0); /* stop before the chat log — pop-ups centre on the map */
   background: rgba(8, 6, 12, 0.82);
   z-index: 80;
   display: flex;
@@ -34,7 +37,7 @@
 }
 
 .sp {
-  width: min(900px, 96vw);
+  width: min(900px, 100%); /* 100% = the map area (backdrop), so it never reaches the chat */
   max-height: 92vh;
   display: flex;
   flex-direction: column;
@@ -173,7 +176,7 @@
 .sp--reveal,
 .sp--end {
   width: auto;
-  max-width: 96vw;
+  max-width: 100%;
   align-items: center;
   text-align: center;
 }

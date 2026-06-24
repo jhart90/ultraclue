@@ -10,7 +10,8 @@
 /* Big turn-status pop-up */
 .statpop {
   position: relative;
-  min-width: min(440px, 92vw);
+  min-width: min(440px, 100%);
+  max-width: 100%;
   background: linear-gradient(180deg, #221b38, #181226);
   border: 2px solid var(--accent, #c8a24a);
   border-radius: 14px;

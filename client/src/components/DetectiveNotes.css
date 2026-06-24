@@ -3,18 +3,18 @@
    Only one folder is open at a time. */
 .dock__panel {
   position: fixed;
-  left: 50%;
   bottom: 0;
-  width: min(1480px, 99vw);
+  left: var(--pad, 0);
+  right: var(--map-right, 0); /* spans the map area only — never over the chat log */
   height: 95vh;
   z-index: 250;
   display: flex;
-  transform: translateX(-50%) translateY(100%); /* closed: fully below the screen */
+  transform: translateY(100%); /* closed: fully below the screen */
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   pointer-events: none;
 }
 .dock__panel--open {
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
   pointer-events: auto;
 }
 
@@ -44,11 +44,12 @@
 /* persistent manila tab bar at the bottom of the screen */
 .dock__tabs {
   position: fixed;
-  left: 50%;
   bottom: 0;
-  transform: translateX(-50%);
+  left: var(--pad, 0);
+  right: var(--map-right, 0); /* tabs sit within the map area, centred — never over the chat */
   z-index: 252;
   display: flex;
+  justify-content: center;
   gap: 0.5rem;
   align-items: flex-end;
   pointer-events: none;

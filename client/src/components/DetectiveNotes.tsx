@@ -31,7 +31,15 @@ function loadNotes(key: string): NotesState {
 // The private notes sheet (lives inside the bottom-dock manila folder): three 40-row columns
 // (Suspects / Weapons / Rooms), each row with 8 clickable cells — one per seat. Marks persist to
 // localStorage per room, so a refresh keeps your deductions.
-export function DetectiveNotes({ roomCode, players }: { roomCode: string; players: PlayerView[] }) {
+export function DetectiveNotes({
+  roomCode,
+  players,
+  onClose,
+}: {
+  roomCode: string;
+  players: PlayerView[];
+  onClose?: () => void;
+}) {
   const storageKey = `ultraclue-notes-${roomCode}`;
   const [notes, setNotes] = useState<NotesState>(() => loadNotes(storageKey));
 
@@ -95,9 +103,9 @@ export function DetectiveNotes({ roomCode, players }: { roomCode: string; player
 
   return (
     <>
-      <div className="dnotes__hint">
-        Click a cell to cycle through marks · one column per player · saved to this device
-      </div>
+      <button className="dnotes__bar" onClick={onClose} title="Close Detective Notes">
+        Detective Notes <span className="dnotes__barclose">▾ click to close</span>
+      </button>
       <div className="notes__body">
         {renderColumn('Suspects', SORTED_SUSPECTS)}
         {renderColumn('Weapons', SORTED_WEAPONS)}

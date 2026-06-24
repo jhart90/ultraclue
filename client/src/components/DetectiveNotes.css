@@ -77,15 +77,31 @@
   transform: translateY(-2px);
 }
 
-.dnotes__hint {
+/* Clickable header bar — clicking it closes the Detective Notes folder back down to its tab. */
+.dnotes__bar {
   flex-shrink: 0;
+  width: 100%;
   text-align: center;
   color: #4a3a18;
-  font-size: 0.75rem;
-  padding: 0.4rem;
-  font-style: italic;
+  font-family: 'Georgia', serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  padding: 0.5rem;
   background: linear-gradient(180deg, #d8c082, #cdb472);
+  border: none;
   border-bottom: 2px solid #b1934b;
+  cursor: pointer;
+}
+.dnotes__bar:hover {
+  background: linear-gradient(180deg, #e3ce93, #d6bf80);
+}
+.dnotes__barclose {
+  font-weight: 400;
+  font-style: italic;
+  font-size: 0.78rem;
+  color: #6b5526;
+  margin-left: 0.4rem;
 }
 
 .notes__body {

@@ -355,7 +355,7 @@ export function Game() {
       </div>
       <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
         <div className="dock__folder dock__folder--notes">
-          <DetectiveNotes roomCode={game.code} players={orderedPlayers} />
+          <DetectiveNotes roomCode={game.code} players={orderedPlayers} onClose={() => setDock(null)} />
         </div>
       </div>
       <div className="dock__tabs">

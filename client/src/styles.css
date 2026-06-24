@@ -20,15 +20,20 @@ body,
   margin: 0;
 }
 
-body {
-  /* Tileable mahogany wood backdrop shared by every screen, with a soft dark vignette layered
-     on top for depth and to keep light text legible over the grain. */
+html {
+  /* Tileable mahogany backdrop on the root element so it covers the whole canvas — including any
+     content scrolled past the first viewport (e.g. the card gallery), with no seam. Fixed
+     attachment pins the texture and its soft vignette to the viewport so they never shift. */
   background-color: #1a1009;
   background-image:
     radial-gradient(circle at 50% 0%, rgba(38, 22, 12, 0.2), rgba(9, 5, 3, 0.6)),
     url(../../assets/mahogany.png);
   background-repeat: no-repeat, repeat;
   background-size: cover, 760px auto;
+  background-attachment: fixed, fixed;
+}
+
+body {
   color: var(--ink);
   font-family: 'Georgia', 'Times New Roman', serif;
 }

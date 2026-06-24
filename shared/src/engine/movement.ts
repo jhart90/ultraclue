@@ -44,10 +44,10 @@ function buildMoveGraph(board: Board): { graph: Map<string, string[]>; cellMap: 
   ];
 
   for (const c of board.cells) {
-    if (c.type === 'room') continue; // rooms join only via doorways
+    if (c.type === 'room' || c.type === 'fountain') continue; // rooms join only via doorways; the fountain is a wall
     for (const d of ORTHO) {
       const n = cellMap.get(coordKey({ x: c.x + d.x, y: c.y + d.y }));
-      if (!n || n.type === 'room') continue;
+      if (!n || n.type === 'room' || n.type === 'fountain') continue;
       link(nodeOf(cellMap, c), nodeOf(cellMap, n)); // hall<->hall and hall<->elevator entries
     }
   }

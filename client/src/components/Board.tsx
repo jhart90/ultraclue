@@ -255,8 +255,10 @@ export function Board({
   };
   const onPointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).dataset?.move) return; // clicking a move target, not panning
+    // Capture to the clicked child (not the viewport): capturing to the viewport itself makes the
+    // browser fire pointerleave on it, which would cancel the very drag we're starting.
     try {
-      viewportRef.current?.setPointerCapture(e.pointerId);
+      (e.target as Element).setPointerCapture?.(e.pointerId);
     } catch {
       /* pointer already gone — safe to ignore */
     }
@@ -344,6 +346,27 @@ export function Board({
             const t = THEME[(BOARD.sections.find((s) => s.id === c.sectionId)?.theme) ?? 'ground-floor'];
             return <rect key={`p${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={t.path} stroke="rgba(0,0,0,0.18)" strokeWidth="0.5" />;
           })}
+
+          {/* central fountain — an impassable obstacle in the Grounds */}
+          {BOARD.fountain.length > 0 &&
+            (() => {
+              const xs = BOARD.fountain.map((t) => t.x);
+              const ys = BOARD.fountain.map((t) => t.y);
+              const x = Math.min(...xs) * TS;
+              const y = Math.min(...ys) * TS;
+              const w = (Math.max(...xs) - Math.min(...xs) + 1) * TS;
+              const h = (Math.max(...ys) - Math.min(...ys) + 1) * TS;
+              return (
+                <g style={{ pointerEvents: 'none' }}>
+                  <rect x={x} y={y} width={w} height={h} rx={6} fill="#35525f" stroke="#9fd6e6" strokeWidth="2" />
+                  <rect x={x + TS * 0.7} y={y + TS * 0.7} width={w - TS * 1.4} height={h - TS * 1.4} rx={5} fill="#2a6f8c" stroke="#bfeaf5" strokeWidth="1.5" />
+                  <circle cx={x + w / 2} cy={y + h / 2} r={TS * 1.05} fill="#7fbcd6" stroke="#eaf8ff" strokeWidth="1.5" />
+                  <text x={x + w / 2} y={y + h / 2 + TS * 0.5} textAnchor="middle" fontSize={TS * 1.3}>
+                    ⛲
+                  </text>
+                </g>
+              );
+            })()}
 
           {/* elevators — one per indoor floor */}
           {BOARD.elevators.map((e) => {

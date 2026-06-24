@@ -144,6 +144,28 @@ export function RevealPanel({
   );
 }
 
+/** Shown to a responder who holds none of the three suggested cards: they acknowledge before play
+ *  moves on to the next player. */
+export function NoEvidencePanel({ trio, onPass }: { trio: string[]; onPass: () => void }) {
+  return (
+    <div className="sp__backdrop">
+      <div className="sp sp--reveal">
+        <div className="sp__title">Disprove the suggestion</div>
+        <div className="sp__cards">
+          {trio.map((c) => {
+            const card = getCard(c);
+            return card ? <Card key={c} card={card} /> : null;
+          })}
+        </div>
+        <div className="sp__hint sp__noevidence">You have no evidence to disprove this suggestion.</div>
+        <button className="btn btn--primary sp__revealbtn" onClick={onPass}>
+          Reveal nothing
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Game-over overlay: winner + the revealed envelope. */
 export function EndScreen({ game, myId, onLeave }: { game: GameView; myId: string; onLeave: () => void }) {
   const winner = game.players.find((p) => p.id === game.winnerId);

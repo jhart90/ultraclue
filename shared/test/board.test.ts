@@ -62,6 +62,23 @@ describe('board (2D themed sections)', () => {
     expect(BOARD.rooms['room-elevator']).toBeUndefined();
   });
 
+  it('has a 5x5 fountain obstacle in the Grounds that pieces cannot enter', () => {
+    expect(BOARD.fountain).toHaveLength(25);
+    const xs = BOARD.fountain.map((t) => t.x);
+    const ys = BOARD.fountain.map((t) => t.y);
+    expect(Math.max(...xs) - Math.min(...xs)).toBe(4); // a contiguous 5-wide
+    expect(Math.max(...ys) - Math.min(...ys)).toBe(4); // x 5-tall block
+    const adj = buildAdjacency(BOARD, false);
+    const starts = new Set(BOARD.starts.map((s) => coordKey(s.tile)));
+    for (const t of BOARD.fountain) {
+      const c = cellAt(t);
+      expect(c?.type, coordKey(t)).toBe('fountain');
+      expect(c?.sectionId).toBe('grounds');
+      expect(adj.get(coordKey(t)) ?? [], `fountain ${coordKey(t)} is walkable`).toHaveLength(0);
+      expect(starts.has(coordKey(t)), `start on fountain ${coordKey(t)}`).toBe(false);
+    }
+  });
+
   it('links the Grounds and Basement via cellar stairs', () => {
     const a = cellAt(BOARD.cellarLink.a);
     const b = cellAt(BOARD.cellarLink.b);

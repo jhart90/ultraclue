@@ -18,6 +18,7 @@ import {
   skipMovement,
   makeSuggestion,
   respondToSuggestion,
+  passSuggestion,
   autoRevealCard,
   makeAccusation,
   endTurn,
@@ -43,6 +44,7 @@ import {
 import {
   type Room,
   addChat,
+  mirrorLog,
   createRoom,
   findRoomByOccupant,
   joinRoom,
@@ -137,7 +139,9 @@ function progress(room: Room): void {
   const g = room.game;
   if (!g) return;
   recordReveals(room); // bots remember what their suggestions surfaced
+  mirrorLog(room); // fold new game events into the chat feed
   broadcastGame(room);
+  emitChat(room);
   if (g.phase !== 'play') return;
 
   const sg = g.currentSuggestion;
@@ -196,7 +200,9 @@ function scheduleBots(room: Room): void {
         }
       }
       room.game = s;
+      mirrorLog(room);
       broadcastGame(room);
+      emitChat(room);
     } catch {
       /* fall through to the decision phase */
     }
@@ -314,7 +320,7 @@ io.on('connection', (socket) => {
       const { room } = joinRoom(p?.code ?? '', clientId, p?.name ?? '');
       socket.join(room.code);
       cancelCleanup(room.code);
-      addChat(room, 'System', `${nameOf(room, clientId)} joined the game.`);
+      addChat(room, 'System', `${nameOf(room, clientId)} joined the game.`, true);
       emitLobby(room);
       emitChat(room);
     } catch (err) {
@@ -333,7 +339,7 @@ io.on('connection', (socket) => {
     socket.join(room.code);
     cancelCleanup(room.code);
     reconnectOccupant(clientId);
-    addChat(room, 'System', `${nameOf(room, clientId)} reconnected.`);
+    addChat(room, 'System', `${nameOf(room, clientId)} reconnected.`, true);
     emitLobby(room);
     emitChat(room);
     if (room.game) socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: viewFor(room.game, clientId) });
@@ -375,6 +381,7 @@ io.on('connection', (socket) => {
       botMem.delete(room.code); // fresh deductions for a new game
       startGameInRoom(room, cid(socket));
       emitLobby(room); // phase is now 'play'
+      mirrorLog(room); // seed the chat with the opening game-log lines
       emitChat(room); // so the in-game chat panel carries the lobby history
       broadcastGame(room); // each human their own tailored view
       scheduleBots(room); // in case the first player is a bot
@@ -403,6 +410,9 @@ io.on('connection', (socket) => {
   );
   socket.on(SOCKET_EVENTS.REVEAL_CARD, (p: RevealCardPayload) =>
     withGame(socket, (_room, g) => respondToSuggestion(g, cid(socket), p.cardId, RNG)),
+  );
+  socket.on(SOCKET_EVENTS.PASS_SUGGESTION, () =>
+    withGame(socket, (_room, g) => passSuggestion(g, cid(socket), RNG)),
   );
   socket.on(SOCKET_EVENTS.MAKE_ACCUSATION, (p: MakeAccusationPayload) =>
     withGame(socket, (_room, g) => {
@@ -439,7 +449,7 @@ io.on('connection', (socket) => {
     if ([...socketClient.values()].includes(clientId)) return; // another tab still open
     const room = disconnectOccupant(clientId);
     if (!room) return;
-    addChat(room, 'System', `${nameOf(room, clientId)} disconnected — reconnecting…`);
+    addChat(room, 'System', `${nameOf(room, clientId)} disconnected — reconnecting…`, true);
     emitLobby(room);
     emitChat(room);
     if (room.game) {

@@ -81,9 +81,10 @@ export function makeSuggestion(
 }
 
 /**
- * Walk the query queue: players with no matching card pass automatically; stop at the first
- * player who holds a match (awaiting their reveal choice). If the queue empties with no match,
- * the suggestion resolves disproven-by-no-one and the turn ends.
+ * Walk the query queue, stopping at the next player who has to respond: anyone holding a matching
+ * card (they must reveal one), or a human holding none (they must acknowledge "Reveal nothing", so
+ * play visibly pauses on them). Only bots with no match pass automatically. If the queue empties
+ * with no reveal, the suggestion resolves disproven-by-no-one and the turn ends.
  */
 export function progressSuggestion(state: GameState, rng: RNG): GameState {
   const s = clone(state);
@@ -93,14 +94,15 @@ export function progressSuggestion(state: GameState, rng: RNG): GameState {
   while (sg.queue.length > 0) {
     const pid = sg.queue[0];
     const player = requirePlayer(s, pid);
-    if (matchingCards(s, pid, sg).length === 0) {
-      sg.passes.push(pid);
-      sg.queue.shift();
-      log(s, `${player.name} cannot disprove it.`);
-    } else {
-      sg.pendingResponderId = pid;
+    const hasMatch = matchingCards(s, pid, sg).length > 0;
+    if (hasMatch || !player.isBot) {
+      sg.pendingResponderId = pid; // wait for their reveal (or, for a card-less human, their "pass")
       return s;
     }
+    // a bot with nothing to show passes automatically
+    sg.passes.push(pid);
+    sg.queue.shift();
+    log(s, `${player.name} cannot disprove it.`);
   }
 
   sg.resolved = true;
@@ -108,6 +110,21 @@ export function progressSuggestion(state: GameState, rng: RNG): GameState {
   log(s, 'No one could disprove the suggestion.');
   concludeTurn(s, rng);
   return s;
+}
+
+/** The pending player has no matching card and acknowledges it ("Reveal nothing"); play advances. */
+export function passSuggestion(state: GameState, playerId: string, rng: RNG): GameState {
+  const s = clone(state);
+  const sg = s.currentSuggestion;
+  if (!sg || sg.resolved) throw new Error('No suggestion awaiting a response.');
+  if (sg.pendingResponderId !== playerId) throw new Error('It is not your turn to respond.');
+  if (matchingCards(s, playerId, sg).length > 0) throw new Error('You must reveal a matching card.');
+
+  sg.passes.push(playerId);
+  sg.queue.shift();
+  sg.pendingResponderId = undefined;
+  log(s, `${requirePlayer(s, playerId).name} cannot disprove it.`);
+  return progressSuggestion(s, rng);
 }
 
 /** The pending player reveals one matching card to the suggester; the turn then ends immediately. */

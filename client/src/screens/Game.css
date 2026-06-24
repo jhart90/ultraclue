@@ -50,8 +50,9 @@
 
 .game__board {
   display: grid;
-  /* board row keeps a real minimum so it never collapses when the page height is auto (narrow widths) */
-  grid-template-rows: auto auto minmax(380px, 1fr) auto;
+  /* roster, controls, then the board — which now claims the space the Case Log used to take.
+     The board row keeps a real minimum so it never collapses when the page height is auto. */
+  grid-template-rows: auto auto minmax(460px, 1fr);
   gap: 0.6rem;
   min-height: 0;
 }

@@ -163,6 +163,12 @@
   font-size: 1.1rem;
   padding: 0.6rem 1.8rem;
 }
+.sp__noevidence {
+  font-style: normal;
+  font-size: 1rem;
+  color: #e8e2f2;
+  margin: 0.1rem 0 0.5rem;
+}
 
 .sp--reveal,
 .sp--end {

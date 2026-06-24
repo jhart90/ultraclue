@@ -3,6 +3,7 @@ import {
   startGame,
   makeSuggestion,
   respondToSuggestion,
+  passSuggestion,
   makeAccusation,
   viewFor,
   makeRng,
@@ -77,8 +78,9 @@ describe('setup / dealing', () => {
 });
 
 describe('suggestions', () => {
-  it('passes players with no match and stops at the first who can disprove, then ends the turn on reveal', () => {
+  it('auto-passes bots with no match and stops at the first who can disprove, then ends the turn on reveal', () => {
     const st = baseState();
+    st.players[1].isBot = true; // a bot with no match passes automatically
     st.players[1].hand = ['weapon-dagger']; // p2: no match
     st.players[2].hand = ['weapon-candlestick']; // p3: holds the suggested weapon
 
@@ -97,6 +99,7 @@ describe('suggestions', () => {
   it('resolves with no reveal when nobody can disprove, and advances the turn', () => {
     const st = baseState();
     st.players.forEach((p) => (p.hand = ['weapon-dagger'])); // none in the suggested trio
+    st.players[1].isBot = st.players[2].isBot = true; // bots pass automatically
     const s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
     expect(s.currentSuggestion?.resolved).toBe(true);
     expect(s.currentSuggestion?.anyRevealed).toBe(false);
@@ -104,8 +107,29 @@ describe('suggestions', () => {
     expect(s.turnOrder[s.activeIdx]).toBe('p2');
   });
 
+  it('pauses on a card-less human until they pass "Reveal nothing", then moves on', () => {
+    const st = baseState();
+    st.players[1].hand = ['weapon-dagger']; // p2: human, no match -> must acknowledge
+    st.players[2].hand = ['weapon-candlestick']; // p3: can disprove
+    let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    expect(s.currentSuggestion?.pendingResponderId).toBe('p2'); // stops on p2 even with no match
+    expect(s.currentSuggestion?.passes).toEqual([]);
+    expect(() => respondToSuggestion(s, 'p2', 'weapon-candlestick', makeRng(1))).toThrow(); // can't reveal a card they lack
+    s = passSuggestion(s, 'p2', makeRng(1));
+    expect(s.currentSuggestion?.passes).toEqual(['p2']);
+    expect(s.currentSuggestion?.pendingResponderId).toBe('p3'); // now advanced to the next responder
+  });
+
+  it('forbids passing when you do hold a matching card', () => {
+    const st = baseState();
+    st.players[1].hand = ['weapon-candlestick']; // p2 can disprove -> may not "reveal nothing"
+    const s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    expect(() => passSuggestion(s, 'p2', makeRng(1))).toThrow();
+  });
+
   it('rejects revealing a non-matching card', () => {
     const st = baseState();
+    st.players[1].isBot = true;
     st.players[1].hand = [];
     st.players[2].hand = ['weapon-candlestick', 'weapon-dagger'];
     const s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
@@ -197,6 +221,7 @@ describe('per-player view (hidden-information boundary)', () => {
 
   it('reveals a disproving card to the suggester and the responder, but no one else', () => {
     const st = baseState();
+    st.players[1].isBot = true;
     st.players[1].hand = [];
     st.players[2].hand = ['weapon-candlestick'];
     let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));

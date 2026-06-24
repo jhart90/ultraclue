@@ -22,6 +22,7 @@ export interface Room {
   phase: RoomPhase;
   game?: GameState;
   nextChatId: number;
+  mirroredLogId: number; // highest game-log id already copied into the chat stream
 }
 
 const rooms = new Map<string, Room>();
@@ -50,6 +51,7 @@ export function createRoom(hostId: string, hostName: string): Room {
     chat: [],
     phase: 'lobby',
     nextChatId: 1,
+    mirroredLogId: 0,
   };
   rooms.set(room.code, room);
   return room;
@@ -114,11 +116,24 @@ export function pickSuspect(room: Room, id: string, suspectId: string): void {
   slot.occupant.suspectId = suspectId;
 }
 
-export function addChat(room: Room, fromName: string, text: string): void {
+export function addChat(room: Room, fromName: string, text: string, system = false): void {
   const clean = text.trim().slice(0, 300);
   if (!clean) return;
-  room.chat.push({ id: room.nextChatId++, from: fromName, text: clean });
-  if (room.chat.length > 200) room.chat.shift();
+  room.chat.push({ id: room.nextChatId++, from: fromName, text: clean, system });
+  if (room.chat.length > 500) room.chat.shift();
+}
+
+/** Copy any new game-log entries into the chat as system narration, so the chat is the single
+ *  chronological feed of game events interspersed with player messages. */
+export function mirrorLog(room: Room): void {
+  if (!room.game) return;
+  for (const entry of room.game.log) {
+    if (entry.id > room.mirroredLogId) {
+      room.chat.push({ id: room.nextChatId++, from: '', text: entry.text, system: true });
+      room.mirroredLogId = entry.id;
+    }
+  }
+  while (room.chat.length > 500) room.chat.shift();
 }
 
 /** Mark a participant disconnected. In-game their player is handed to a bot until they return. */

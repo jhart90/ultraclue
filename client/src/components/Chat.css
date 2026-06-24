@@ -38,6 +38,11 @@
   margin-bottom: 0.3rem;
   word-break: break-word;
 }
+.chat__msg--sys {
+  color: #9aa2b5;
+  font-style: italic;
+  font-size: 0.84rem;
+}
 
 .chat__from {
   color: var(--accent, #c8a24a);

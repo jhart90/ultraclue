@@ -7,7 +7,7 @@ import { Board, WALK_STEP_MS } from '../components/Board';
 import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
 import { DetectiveNotes } from '../components/DetectiveNotes';
-import { SelectModal, RevealPanel, EndScreen } from '../components/SuggestPanels';
+import { SelectModal, RevealPanel, NoEvidencePanel, EndScreen } from '../components/SuggestPanels';
 import { StatusModal, AnnouncementModal, RevealModal, type StatusButton } from '../components/GamePopups';
 import './Game.css';
 
@@ -36,6 +36,7 @@ export function Game() {
   const skipMove = useStore((s) => s.skipMove);
   const suggest = useStore((s) => s.suggest);
   const revealCard = useStore((s) => s.revealCard);
+  const passSuggestion = useStore((s) => s.passSuggestion);
   const accuse = useStore((s) => s.accuse);
   const endTurn = useStore((s) => s.endTurn);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -132,7 +133,11 @@ export function Game() {
 
   const sug = game.currentSuggestion;
   const suggestionPending = !!sug && !sug.resolved;
-  const iMustReveal = suggestionPending && sug!.pendingResponderId === myId;
+  const iAmResponder = suggestionPending && sug!.pendingResponderId === myId;
+  // The suggested cards I actually hold (if any). With none, I acknowledge "Reveal nothing".
+  const myMatches = sug ? [sug.suspectId, sug.weaponId, sug.roomId].filter((c) => game.yourHand.includes(c)) : [];
+  const iMustReveal = iAmResponder && myMatches.length > 0;
+  const iMustPass = iAmResponder && myMatches.length === 0;
   const pendingName = sug?.pendingResponderId
     ? game.players.find((p) => p.id === sug.pendingResponderId)?.name
     : null;
@@ -174,10 +179,11 @@ export function Game() {
   // Only one overlay shows at a time, by priority.
   const showEnd = game.phase === 'ended';
   const showDisprove = iMustReveal && !!sug;
-  const showReveal = revealOpen && !showDisprove && !showEnd && !modal;
-  const showAnn = annOpen && !!game.announcement && !showReveal && !showDisprove && !showEnd && !modal;
+  const showNoEvidence = iMustPass && !!sug;
+  const showReveal = revealOpen && !showDisprove && !showNoEvidence && !showEnd && !modal;
+  const showAnn = annOpen && !!game.announcement && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal;
   const showStatus =
-    statusOpen && !!statusDesc && !showAnn && !showReveal && !showDisprove && !showEnd && !modal && !iMustReveal;
+    statusOpen && !!statusDesc && !showAnn && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal && !iAmResponder;
 
   return (
     <div className="game">
@@ -272,14 +278,6 @@ export function Game() {
             canMove={myTurn && game.turnPhase === 'awaitMove' && !suggestionPending}
             onMoveTo={moveTo}
           />
-          <div className="game__log">
-            <div className="game__logtitle">Case Log</div>
-            {game.log.map((l) => (
-              <div key={l.id} className="game__logline">
-                {l.text}
-              </div>
-            ))}
-          </div>
         </div>
 
         <aside className="game__chat">
@@ -359,6 +357,10 @@ export function Game() {
           suggesterName={game.players.find((p) => p.id === sug.suggesterId)?.name ?? 'the suggester'}
           onReveal={(c) => revealCard(c)}
         />
+      )}
+
+      {showNoEvidence && sug && (
+        <NoEvidencePanel trio={[sug.suspectId, sug.weaponId, sug.roomId]} onPass={() => passSuggestion()} />
       )}
 
       {myTurn && game.turnPhase === 'awaitElevator' && game.elevatorFloors && (

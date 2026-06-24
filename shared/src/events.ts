@@ -28,6 +28,7 @@ export const SOCKET_EVENTS = {
   SKIP_MOVE: 'skipMove',
   MAKE_SUGGESTION: 'makeSuggestion',
   REVEAL_CARD: 'revealCard',
+  PASS_SUGGESTION: 'passSuggestion', // a card-less responder acknowledges "Reveal nothing"
   MAKE_ACCUSATION: 'makeAccusation',
   END_TURN: 'endTurn',
 

@@ -25,7 +25,7 @@ export interface Coord {
 
 export type SectionTheme = 'grounds' | 'ground-floor' | 'upper-floor' | 'basement';
 export type FloorId = 'ground-floor' | 'upper-floor' | 'basement';
-export type CellType = 'room' | 'path' | 'elevator';
+export type CellType = 'room' | 'path' | 'elevator' | 'fountain';
 
 export interface BoardCell {
   x: number;
@@ -91,6 +91,8 @@ export interface Board {
   elevators: ElevatorInfo[];
   /** Cellar stairs: a free link between a Grounds tile and a Basement tile. */
   cellarLink: { a: Coord; b: Coord };
+  /** The 5x5 fountain block in the centre of the Grounds — an obstacle pieces must walk around. */
+  fountain: Coord[];
 }
 
 export const coordKey = (c: Coord): string => `${c.x},${c.y}`;
@@ -189,10 +191,11 @@ const GROUNDS: SectionDef = {
   hbands: [6, 13],
   // Only the bottom seam (-> Ground Floor) stays a hall; top, left and right are open edges.
   keep: { top: false, right: false, bottom: true, left: false },
+  // The centre is left open as a plaza for the 5x5 fountain (carved in after the grid is built).
   grid: [
     ['room-boat-house', 'room-hedge-maze', 'room-greenhouse', 'room-cemetery'],
-    ['room-gazebo', 'room-courtyard', 'room-stables', 'CELLAR'],
-    ['room-rose-garden', '', '', ''],
+    ['room-gazebo', '', '', 'CELLAR'],
+    ['room-rose-garden', 'room-courtyard', 'room-stables', ''],
   ],
 };
 
@@ -378,6 +381,9 @@ function buildBoard(): Board {
   // Give some rooms an irregular (L-shaped / notched) footprint instead of a plain rectangle.
   for (const n of ROOM_NOTCHES) notchCorner(cells, cellAt, rooms[n.id], n.corner, n.w, n.h);
 
+  // A 5x5 fountain in the centre of the Grounds: an obstacle pieces must walk around.
+  const fountain = carveFountain(cells, cellAt);
+
   // Doorways: 2–5 per room (the Bunker gets a single door; the closet was handled above).
   for (const room of Object.values(rooms)) {
     if (room.id === CLOSET_ID) continue;
@@ -420,7 +426,25 @@ function buildBoard(): Board {
   const width = Math.max(...cells.map((c) => c.x)) + 1;
   const height = Math.max(...cells.map((c) => c.y)) + 1;
 
-  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, elevators, cellarLink };
+  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, elevators, cellarLink, fountain };
+}
+
+/** Convert the central 5x5 block of the Grounds (currently open plaza) into fountain obstacle cells. */
+function carveFountain(cells: BoardCell[], cellAt: Map<string, BoardCell>): Coord[] {
+  const g = ORIGIN['grounds'];
+  const cx = g.x + Math.floor(ROOM_W / 2);
+  const cy = g.y + Math.floor(GROUNDS_H / 2);
+  const tiles: Coord[] = [];
+  for (let dx = -2; dx <= 2; dx++) {
+    for (let dy = -2; dy <= 2; dy++) {
+      const c = cellAt.get(coordKey({ x: cx + dx, y: cy + dy }));
+      if (c && c.type === 'path') {
+        c.type = 'fountain';
+        tiles.push({ x: c.x, y: c.y });
+      }
+    }
+  }
+  return tiles;
 }
 
 function collectCandidates(

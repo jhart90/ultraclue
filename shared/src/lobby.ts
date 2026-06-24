@@ -5,8 +5,9 @@ import type { SlotStatus } from './game';
 
 export interface ChatMsg {
   id: number;
-  from: string; // display name
+  from: string; // display name (ignored for system narration)
   text: string;
+  system?: boolean; // game-log narration / room notices, rendered without a "name:" prefix
 }
 
 export interface SlotOccupant {

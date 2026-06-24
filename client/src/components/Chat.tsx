@@ -15,14 +15,17 @@ export function Chat({ messages, onSend }: { messages: ChatMsg[]; onSend: (text:
       <div className="chat__header">Chat</div>
       <div className="chat__log">
         {messages.length === 0 && <div className="chat__empty">No messages yet. Say hello!</div>}
-        {messages.map((m) => (
-          <div className="chat__msg" key={m.id}>
-            <span className={m.from === 'System' ? 'chat__from chat__from--sys' : 'chat__from'}>
-              {m.from}:
-            </span>{' '}
-            {m.text}
-          </div>
-        ))}
+        {messages.map((m) =>
+          m.system ? (
+            <div className="chat__msg chat__msg--sys" key={m.id}>
+              {m.text}
+            </div>
+          ) : (
+            <div className="chat__msg" key={m.id}>
+              <span className="chat__from">{m.from}:</span> {m.text}
+            </div>
+          ),
+        )}
         <div ref={endRef} />
       </div>
       <form

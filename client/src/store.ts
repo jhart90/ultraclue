@@ -70,6 +70,7 @@ interface StoreState {
   skipMove: () => void;
   suggest: (suspectId: string, weaponId: string) => void;
   revealCard: (cardId: string) => void;
+  passSuggestion: () => void;
   accuse: (suspectId: string, weaponId: string, roomId: string) => void;
   endTurn: () => void;
   leave: () => void;
@@ -97,6 +98,7 @@ export const useStore = create<StoreState>((set) => ({
   skipMove: () => socket.emit(SOCKET_EVENTS.SKIP_MOVE),
   suggest: (suspectId, weaponId) => socket.emit(SOCKET_EVENTS.MAKE_SUGGESTION, { suspectId, weaponId }),
   revealCard: (cardId) => socket.emit(SOCKET_EVENTS.REVEAL_CARD, { cardId }),
+  passSuggestion: () => socket.emit(SOCKET_EVENTS.PASS_SUGGESTION),
   accuse: (suspectId, weaponId, roomId) => socket.emit(SOCKET_EVENTS.MAKE_ACCUSATION, { suspectId, weaponId, roomId }),
   endTurn: () => socket.emit(SOCKET_EVENTS.END_TURN),
   leave: () => {

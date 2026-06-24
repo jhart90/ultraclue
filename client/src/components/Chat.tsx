@@ -18,7 +18,10 @@ export function Chat({ messages, onSend }: { messages: ChatMsg[]; onSend: (text:
         {messages.length === 0 && <div className="chat__empty">No messages yet. Say hello!</div>}
         {messages.map((m) =>
           m.system ? (
-            <div className="chat__msg chat__msg--sys" key={m.id}>
+            <div
+              className={`chat__msg chat__msg--sys${/\b(suggests|accuses)\b/.test(m.text) ? ' chat__msg--cased' : ''}`}
+              key={m.id}
+            >
               {highlightChat(m.text)}
             </div>
           ) : (

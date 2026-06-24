@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChatMsg } from 'shared';
+import { highlightChat } from '../util/highlightChat';
 import './Chat.css';
 
 export function Chat({ messages, onSend }: { messages: ChatMsg[]; onSend: (text: string) => void }) {
@@ -18,11 +19,11 @@ export function Chat({ messages, onSend }: { messages: ChatMsg[]; onSend: (text:
         {messages.map((m) =>
           m.system ? (
             <div className="chat__msg chat__msg--sys" key={m.id}>
-              {m.text}
+              {highlightChat(m.text)}
             </div>
           ) : (
             <div className="chat__msg" key={m.id}>
-              <span className="chat__from">{m.from}:</span> {m.text}
+              <span className="chat__from">{highlightChat(m.from)}:</span> {highlightChat(m.text)}
             </div>
           ),
         )}

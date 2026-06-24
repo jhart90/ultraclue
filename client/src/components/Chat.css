@@ -44,6 +44,11 @@
   font-size: 0.84rem;
 }
 
+/* Auto-highlighted card names (suspects get an inline colour; weapons/rooms are just bold). */
+.chat__card {
+  font-weight: 700;
+}
+
 .chat__from {
   color: var(--accent, #c8a24a);
   font-weight: 700;

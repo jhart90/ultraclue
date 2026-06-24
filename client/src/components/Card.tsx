@@ -13,7 +13,7 @@ export function Card({ card }: { card: AnyCard }) {
   const override = resolveOverride(card.id, card.type, card.title);
   return (
     <div className={`card card--${card.type}`}>
-      <div className="card__art">
+      <div className={`card__art${override ? ' card__art--img' : ''}`}>
         {override ? (
           <img src={override} alt={card.title} className="card__override" />
         ) : (

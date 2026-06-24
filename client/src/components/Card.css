@@ -20,18 +20,21 @@
   border-top-right-radius: 10px;
   overflow: hidden; /* keep art inside the rounded top — no square corners poking past the frame */
 }
+/* A real override image sizes the art box to the image's full height (the procedural SVG keeps the
+   fixed 150px). So the whole picture shows down to its last pixel — only the rounded top corners
+   clip it, exactly as before — and the card simply grows taller to make room. */
+.card__art--img {
+  height: auto;
+}
 
 .card__override {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-
-/* Anchor portrait and weapon art to the top edge so a head or weapon tip is never cropped, while
-   the card itself keeps clean rounded corners. */
-.card--suspect .card__override,
-.card--weapon .card__override {
-  object-position: top;
+.card__art--img .card__override {
+  height: auto;
 }
 
 .card__body {

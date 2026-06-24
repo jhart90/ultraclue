@@ -176,32 +176,50 @@ export function mirrorLog(room: Room): void {
   while (room.chat.length > 500) room.chat.shift();
 }
 
-/** Mark a participant disconnected. In-game their player is handed to a bot until they return. */
-export function disconnectOccupant(id: string): Room | undefined {
+/** Mark a participant disconnected. The seat stays human and the game waits for them — only an
+ *  explicit leave (botTakeover) or the host hands the seat to a bot. */
+export function disconnectOccupant(id: string, botTakeover = false): Room | undefined {
   const room = findRoomByOccupant(id);
   if (!room) return undefined;
   const occ = room.slots.find((s) => s.occupant?.id === id)?.occupant;
-  if (occ) occ.connected = false;
+  if (occ) {
+    occ.connected = false;
+    if (botTakeover) occ.isBot = true;
+  }
   const gp = room.game?.players.find((p) => p.id === id);
   if (gp && !gp.eliminated) {
     gp.connected = false;
-    gp.isBot = true; // bot takeover so the table never stalls
+    if (botTakeover) gp.isBot = true;
   }
   return room;
 }
 
-/** Re-attach a returning participant to their seat (restoring human control in-game). */
+/** Re-attach a returning participant to their seat. A seat the host already replaced with a bot
+ *  stays a bot (isBot is left untouched). */
 export function reconnectOccupant(id: string): Room | undefined {
   const room = findRoomByOccupant(id);
   if (!room) return undefined;
   const occ = room.slots.find((s) => s.occupant?.id === id)?.occupant;
   if (occ) occ.connected = true;
   const gp = room.game?.players.find((p) => p.id === id);
-  if (gp) {
-    gp.connected = true;
-    gp.isBot = false;
-  }
+  if (gp) gp.connected = true;
   return room;
+}
+
+/** Host action: replace a human player with a bot so a stalled table can continue. */
+export function bootPlayer(room: Room, requesterId: string, targetId: string): void {
+  if (room.hostId !== requesterId) throw new Error('Only the host can replace a player.');
+  if (targetId === room.hostId) throw new Error('The host cannot be replaced.');
+  const occ = room.slots.find((s) => s.occupant?.id === targetId)?.occupant;
+  if (!occ) throw new Error('That player is not in the game.');
+  if (occ.isBot) throw new Error('That seat is already a bot.');
+  occ.isBot = true;
+  occ.connected = true;
+  const gp = room.game?.players.find((p) => p.id === targetId);
+  if (gp && !gp.eliminated) {
+    gp.isBot = true;
+    gp.connected = true;
+  }
 }
 
 /** True if at least one human occupant is still connected. */

@@ -31,6 +31,7 @@ export const SOCKET_EVENTS = {
   PASS_SUGGESTION: 'passSuggestion', // a card-less responder acknowledges "Reveal nothing"
   MAKE_ACCUSATION: 'makeAccusation',
   END_TURN: 'endTurn',
+  BOOT_PLAYER: 'bootPlayer', // host replaces a human player with a bot
 
   // --- server -> client ---
   YOU_ARE: 'youAre',
@@ -105,6 +106,10 @@ export interface MakeAccusationPayload {
   suspectId: string;
   weaponId: string;
   roomId: string;
+}
+export interface BootPlayerPayload {
+  /** Game player id of the human seat to replace with a bot. */
+  targetId: string;
 }
 export interface ErrorPayload {
   message: string;

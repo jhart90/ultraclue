@@ -40,6 +40,8 @@ export function Game() {
   const passSuggestion = useStore((s) => s.passSuggestion);
   const accuse = useStore((s) => s.accuse);
   const endTurn = useStore((s) => s.endTurn);
+  const bootPlayer = useStore((s) => s.bootPlayer);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
   const [dock, setDock] = useState<null | 'map' | 'notes'>(null); // bottom dock: Manor Map / Detective Notes
   const [mapMounted, setMapMounted] = useState(false); // mount the (heavy) second board only once opened
@@ -164,8 +166,16 @@ export function Game() {
   const myShortcutDest = me?.inRoomId ? shortcutDestForRoom(me.inRoomId) : undefined;
   const myShortcutName = myShortcutDest ? getCard(myShortcutDest)?.title : undefined;
 
+  const iAmHost = game.players.find((p) => p.id === myId)?.isHost ?? false;
   const sug = game.currentSuggestion;
   const suggestionPending = !!sug && !sug.resolved;
+  // The human the table is currently waiting on, if they've dropped: the pending disprover during a
+  // suggestion, otherwise the active player. Their seat isn't auto-botted — the game just waits.
+  const blockingPlayer = (() => {
+    const id = suggestionPending ? sug?.pendingResponderId : activeId;
+    const p = id ? game.players.find((pl) => pl.id === id) : undefined;
+    return p && !p.isBot && !p.connected ? p : null;
+  })();
   const iAmResponder = suggestionPending && sug!.pendingResponderId === myId;
   // The suggested cards I actually hold (if any). With none, I acknowledge "Reveal nothing".
   const myMatches = sug ? [sug.suspectId, sug.weaponId, sug.roomId].filter((c) => game.yourHand.includes(c)) : [];
@@ -443,6 +453,56 @@ export function Game() {
       )}
 
       {showEnd && <EndScreen game={game} myId={myId} onLeave={leave} />}
+
+      {/* The table waits indefinitely for a dropped human; the host can replace them with a bot. */}
+      {blockingPlayer && (
+        <div className="game__waiting">
+          <span>⏳ Waiting for {blockingPlayer.name} to reconnect…</span>
+          {iAmHost && (
+            <button className="btn game__waitingboot" onClick={() => bootPlayer(blockingPlayer.id)}>
+              Replace with bot
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Settings wheel (lower-left): the host can replace any human seat with a bot. */}
+      <button
+        className="game__gear"
+        title="Settings"
+        aria-label="Settings"
+        onClick={() => setSettingsOpen((o) => !o)}
+      >
+        ⚙
+      </button>
+      {settingsOpen && (
+        <>
+          <div className="game__settingsback" onClick={() => setSettingsOpen(false)} />
+          <div className="game__settings">
+            <div className="game__settingshead">Players</div>
+            {orderedPlayers.map((p) => {
+              const status = p.isBot ? 'Bot' : p.isHost ? 'Host' : p.connected ? 'Online' : 'Disconnected';
+              const off = !p.isBot && !p.connected;
+              return (
+                <div className="game__setrow" key={p.id}>
+                  <span className="game__setsw" style={{ background: suspectColor(p.suspectId) }} />
+                  <span className="game__setname">
+                    {p.name}
+                    {p.id === myId ? ' (you)' : ''}
+                  </span>
+                  <span className={`game__setstatus${off ? ' game__setstatus--off' : ''}`}>{status}</span>
+                  {iAmHost && !p.isBot && !p.isHost && (
+                    <button className="game__setboot" onClick={() => bootPlayer(p.id)}>
+                      Replace with bot
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            {!iAmHost && <div className="game__setnote">Only the host can replace players.</div>}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -73,6 +73,7 @@ interface StoreState {
   passSuggestion: () => void;
   accuse: (suspectId: string, weaponId: string, roomId: string) => void;
   endTurn: () => void;
+  bootPlayer: (targetId: string) => void;
   leave: () => void;
   clearError: () => void;
 }
@@ -101,6 +102,7 @@ export const useStore = create<StoreState>((set) => ({
   passSuggestion: () => socket.emit(SOCKET_EVENTS.PASS_SUGGESTION),
   accuse: (suspectId, weaponId, roomId) => socket.emit(SOCKET_EVENTS.MAKE_ACCUSATION, { suspectId, weaponId, roomId }),
   endTurn: () => socket.emit(SOCKET_EVENTS.END_TURN),
+  bootPlayer: (targetId) => socket.emit(SOCKET_EVENTS.BOOT_PLAYER, { targetId }),
   leave: () => {
     socket.emit(SOCKET_EVENTS.LEAVE);
     clearRoom();

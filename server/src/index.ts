@@ -40,6 +40,7 @@ import {
   type PickSuspectPayload,
   type SetSlotPayload,
   type RejoinPayload,
+  type BootPlayerPayload,
 } from 'shared';
 import {
   type Room,
@@ -57,6 +58,7 @@ import {
   hasConnectedHuman,
   deleteRoom,
   setSlot,
+  bootPlayer,
   startGameInRoom,
   toLobbyView,
 } from './rooms';
@@ -443,16 +445,33 @@ io.on('connection', (socket) => {
     }),
   );
 
+  socket.on(SOCKET_EVENTS.BOOT_PLAYER, (p: BootPlayerPayload) => {
+    const room = findRoomByOccupant(cid(socket));
+    if (!room) return;
+    try {
+      const name = room.game?.players.find((pl) => pl.id === p.targetId)?.name ?? nameOf(room, p.targetId);
+      bootPlayer(room, cid(socket), p.targetId);
+      addChat(room, 'System', `The host replaced ${name} with a bot.`, true);
+      emitLobby(room);
+      if (room.game) progress(room); // resume play — the bot acts if it's that seat's turn / owed reveal
+      else emitChat(room);
+    } catch (err) {
+      emitError(socket, (err as Error).message);
+    }
+  });
+
   socket.on(SOCKET_EVENTS.LEAVE, () => {
     const clientId = cid(socket);
     socketClient.delete(socket.id);
     const inGame = findRoomByOccupant(clientId)?.game;
     if (inGame) {
-      // leaving mid-game: hand the seat to a bot so the others can finish
-      const room = disconnectOccupant(clientId);
+      // leaving mid-game is intentional, so hand the seat to a bot so the others can finish
+      const room = disconnectOccupant(clientId, true);
       if (room) {
+        addChat(room, 'System', `${nameOf(room, clientId)} left — a bot is finishing their game.`, true);
         emitLobby(room);
         broadcastGame(room);
+        emitChat(room);
         scheduleBots(room);
         scheduleCleanupIfEmpty(room);
       }
@@ -468,14 +487,14 @@ io.on('connection', (socket) => {
     socketClient.delete(socket.id);
     if (!clientId) return;
     if ([...socketClient.values()].includes(clientId)) return; // another tab still open
-    const room = disconnectOccupant(clientId);
+    const room = disconnectOccupant(clientId); // stays human — the table waits for them to return
     if (!room) return;
-    addChat(room, 'System', `${nameOf(room, clientId)} disconnected — reconnecting…`, true);
+    addChat(room, 'System', `${nameOf(room, clientId)} disconnected — the game waits for them to return.`, true);
     emitLobby(room);
     emitChat(room);
     if (room.game) {
       broadcastGame(room);
-      scheduleBots(room); // bot may need to take the dropped player's turn
+      scheduleBots(room); // resume any *other* bot whose turn it is; the dropped human is not botted
     }
     scheduleCleanupIfEmpty(room);
   });

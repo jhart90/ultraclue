@@ -7,6 +7,22 @@
   --accent: #c8a24a;
   --green: #4caf50;
   --red: #e0556b;
+  /* Display font for all screen + pop-up headers and titles. Renders wherever the font is
+     installed; add the font file + an @font-face below to serve it to every visitor. */
+  --font-display: 'Chantilly Serial Heavy', 'Georgia', 'Times New Roman', serif;
+}
+
+/* All header / title text across screens and pop-up windows. */
+h1,
+h2,
+h3,
+.game__title,
+.game__turn,
+.sp__title,
+.sp__endtitle,
+.popup__title,
+.statpop__line1 {
+  font-family: var(--font-display);
 }
 
 * {

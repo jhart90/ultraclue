@@ -40,6 +40,7 @@ export function Game() {
   const accuse = useStore((s) => s.accuse);
   const endTurn = useStore((s) => s.endTurn);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
+  const [dock, setDock] = useState<null | 'map' | 'notes'>(null); // bottom dock: Manor Map / Detective Notes
 
   // --- pop-up overlays (status / announcement / reveal) ---
   const [statusOpen, setStatusOpen] = useState(false);
@@ -316,8 +317,38 @@ export function Game() {
         </div>
       </div>
 
-      {/* Detective Notes folder: always pinned to the bottom, slides up over everything when opened. */}
-      <DetectiveNotes roomCode={game.code} players={orderedPlayers} />
+      {/* Bottom dock — Manor Map + Detective Notes folders. Only one opens at a time; the open one
+          slides up over everything (above every pop-up), and the tabs stay reachable at the bottom. */}
+      <div className={`dock__panel${dock === 'map' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'map'}>
+        <div className="dock__folder">
+          <Board
+            players={orderedPlayers}
+            weaponLocations={game.weaponLocations}
+            lastMove={game.lastMove}
+            canMove={false}
+            keyboardZoom={false}
+          />
+        </div>
+      </div>
+      <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
+        <div className="dock__folder dock__folder--notes">
+          <DetectiveNotes roomCode={game.code} players={orderedPlayers} />
+        </div>
+      </div>
+      <div className="dock__tabs">
+        <button
+          className={`dock__tab${dock === 'map' ? ' dock__tab--active' : ''}`}
+          onClick={() => setDock((d) => (d === 'map' ? null : 'map'))}
+        >
+          🗺️ Manor Map
+        </button>
+        <button
+          className={`dock__tab${dock === 'notes' ? ' dock__tab--active' : ''}`}
+          onClick={() => setDock((d) => (d === 'notes' ? null : 'notes'))}
+        >
+          📓 Detective Notes
+        </button>
+      </div>
 
       {modal && me && (
         <SelectModal

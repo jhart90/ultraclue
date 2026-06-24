@@ -150,6 +150,7 @@ export function Board({
   weaponLocations,
   canMove,
   onMoveTo,
+  keyboardZoom = true,
 }: {
   players: PlayerView[];
   reachable?: Coord[];
@@ -157,6 +158,8 @@ export function Board({
   weaponLocations?: Record<string, string>;
   canMove?: boolean;
   onMoveTo?: (tile: Coord) => void;
+  /** Whether this board responds to ↑/↓ keys (off for the secondary map so listeners don't double up). */
+  keyboardZoom?: boolean;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ scale: 0.8, tx: 0, ty: 0 });
@@ -237,6 +240,7 @@ export function Board({
 
   // Up/Down arrow keys zoom toward centre.
   useEffect(() => {
+    if (!keyboardZoom) return;
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -248,7 +252,7 @@ export function Board({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [zoomAt]);
+  }, [zoomAt, keyboardZoom]);
 
   const startDragFrom = (x: number, y: number) => {
     drag.current = { x, y, tx: viewRef.current.tx, ty: viewRef.current.ty, moved: false };

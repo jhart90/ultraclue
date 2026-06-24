@@ -28,12 +28,10 @@ function loadNotes(key: string): NotesState {
   }
 }
 
-// A private notes sheet that lives in a manila folder pinned to the bottom of the screen: only its
-// tab shows until clicked, then the folder slides up over everything (even open pop-ups) so the
-// player can jot or reference deductions at any time. Three 40-row columns (Suspects / Weapons /
-// Rooms), each row with 8 clickable cells — one per seat. Marks persist to localStorage per room.
+// The private notes sheet (lives inside the bottom-dock manila folder): three 40-row columns
+// (Suspects / Weapons / Rooms), each row with 8 clickable cells — one per seat. Marks persist to
+// localStorage per room, so a refresh keeps your deductions.
 export function DetectiveNotes({ roomCode, players }: { roomCode: string; players: PlayerView[] }) {
-  const [open, setOpen] = useState(false);
   const storageKey = `ultraclue-notes-${roomCode}`;
   const [notes, setNotes] = useState<NotesState>(() => loadNotes(storageKey));
 
@@ -88,21 +86,15 @@ export function DetectiveNotes({ roomCode, players }: { roomCode: string; player
   );
 
   return (
-    <div className={`dnotes${open ? ' dnotes--open' : ''}`}>
-      {/* the manila-folder tab — always visible, click to slide the folder up or back down */}
-      <button className="dnotes__tab" onClick={() => setOpen((o) => !o)} title="Detective Notes">
-        📓 Detective Notes
-      </button>
-      <div className="dnotes__folder">
-        <div className="dnotes__hint">
-          Click a cell to cycle through marks · one column per player · saved to this device
-        </div>
-        <div className="notes__body">
-          {renderColumn('Suspects', SORTED_SUSPECTS)}
-          {renderColumn('Weapons', SORTED_WEAPONS)}
-          {renderColumn('Rooms', SORTED_ROOMS)}
-        </div>
+    <>
+      <div className="dnotes__hint">
+        Click a cell to cycle through marks · one column per player · saved to this device
       </div>
-    </div>
+      <div className="notes__body">
+        {renderColumn('Suspects', SORTED_SUSPECTS)}
+        {renderColumn('Weapons', SORTED_WEAPONS)}
+        {renderColumn('Rooms', SORTED_ROOMS)}
+      </div>
+    </>
   );
 }

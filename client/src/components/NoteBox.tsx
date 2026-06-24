@@ -50,12 +50,23 @@ function Shape({ state }: { state: number }) {
 export const NoteBox = memo(function NoteBox({
   state,
   onClick,
+  onReset,
 }: {
   state: number;
   onClick: () => void;
+  /** Right-click clears the cell back to blank (next left-click fills it again). */
+  onReset: () => void;
 }) {
   return (
-    <button className="notebox" onClick={onClick} aria-label={`note mark state ${state}`}>
+    <button
+      className="notebox"
+      onClick={onClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onReset();
+      }}
+      aria-label={`note mark state ${state}`}
+    >
       <svg viewBox="0 0 20 20" width="100%" height="100%">
         <Shape state={state} />
       </svg>

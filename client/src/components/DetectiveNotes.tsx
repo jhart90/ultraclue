@@ -46,6 +46,14 @@ export function DetectiveNotes({ roomCode, players }: { roomCode: string; player
       return { ...prev, [cardId]: row };
     });
 
+  // Right-click clears a cell straight back to blank.
+  const reset = (cardId: string, col: number) =>
+    setNotes((prev) => {
+      const row = prev[cardId] ? [...prev[cardId]] : new Array(COLS).fill(0);
+      row[col] = 0;
+      return { ...prev, [cardId]: row };
+    });
+
   const columnPlayers: (PlayerView | undefined)[] = Array.from({ length: COLS }, (_, i) => players[i]);
 
   const renderColumn = (title: string, cards: AnyCard[]) => (
@@ -76,7 +84,7 @@ export function DetectiveNotes({ roomCode, players }: { roomCode: string; player
             </div>
             <div className="notes__boxes">
               {Array.from({ length: COLS }, (_, col) => (
-                <NoteBox key={col} state={row[col] ?? 0} onClick={() => cycle(card.id, col)} />
+                <NoteBox key={col} state={row[col] ?? 0} onClick={() => cycle(card.id, col)} onReset={() => reset(card.id, col)} />
               ))}
             </div>
           </div>

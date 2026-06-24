@@ -36,9 +36,34 @@ function pawnWorldPos(tile: Coord): { px: number; py: number } {
   return { px: cx(tile), py: cy(tile) };
 }
 
-function Pawn({ px, py, color, r = TS / 2 - 5, eliminated }: { px: number; py: number; color: string; r?: number; eliminated?: boolean }) {
+function Pawn({
+  px,
+  py,
+  color,
+  r = TS / 2 - 5,
+  eliminated,
+  label,
+  onTip,
+}: {
+  px: number;
+  py: number;
+  color: string;
+  r?: number;
+  eliminated?: boolean;
+  label?: string;
+  onTip?: TipFn;
+}) {
+  const hover =
+    label && onTip
+      ? {
+          style: { cursor: 'help' as const },
+          onMouseEnter: (e: React.MouseEvent) => onTip({ x: e.clientX, y: e.clientY, text: label }),
+          onMouseMove: (e: React.MouseEvent) => onTip({ x: e.clientX, y: e.clientY, text: label }),
+          onMouseLeave: () => onTip(null),
+        }
+      : {};
   return (
-    <g opacity={eliminated ? 0.3 : 1}>
+    <g opacity={eliminated ? 0.3 : 1} {...hover}>
       <ellipse cx={px} cy={py + 5} rx={r} ry={2.5} fill="rgba(0,0,0,0.45)" />
       <circle cx={px} cy={py - 1} r={r} fill={color} stroke="#0f0d18" strokeWidth="1.5" />
       <circle cx={px - 2} cy={py - 3} r={Math.max(1.5, r * 0.28)} fill="rgba(255,255,255,0.6)" />
@@ -690,7 +715,17 @@ export function Board({
               <>
                 {free.map((p) => {
                   const { px, py } = anim?.playerId === p.id ? pawnWorldPos(anim.tile) : { px: cx(p.position), py: cy(p.position) };
-                  return <Pawn key={p.id} px={px} py={py} color={suspectColor(p.suspectId)} eliminated={p.eliminated} />;
+                  return (
+                    <Pawn
+                      key={p.id}
+                      px={px}
+                      py={py}
+                      color={suspectColor(p.suspectId)}
+                      eliminated={p.eliminated}
+                      label={getCard(p.suspectId)?.title}
+                      onTip={setTip}
+                    />
+                  );
                 })}
                 {[...inRoom.entries()].flatMap(([rid, occ]) => {
                   const b = roomBounds(BOARD.rooms[rid]);
@@ -705,6 +740,8 @@ export function Board({
                       r={r}
                       color={suspectColor(p.suspectId)}
                       eliminated={p.eliminated}
+                      label={getCard(p.suspectId)?.title}
+                      onTip={setTip}
                     />
                   ));
                 })}

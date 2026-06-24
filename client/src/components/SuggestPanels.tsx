@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { SUSPECTS, WEAPONS, ROOMS, getCard, type GameView } from 'shared';
+import { getCard, type GameView } from 'shared';
+import { SORTED_SUSPECTS, SORTED_WEAPONS, SORTED_ROOMS } from '../util/cardSort';
 import { Card } from './Card';
 import './SuggestPanels.css';
 
@@ -33,7 +34,7 @@ export function SelectModal({
           <div className="sp__col">
             <h4>Suspect</h4>
             <div className="sp__list">
-              {SUSPECTS.map((s) => (
+              {SORTED_SUSPECTS.map((s) => (
                 <button
                   key={s.id}
                   className={`sp__chip${suspectId === s.id ? ' sp__chip--on' : ''}`}
@@ -48,7 +49,7 @@ export function SelectModal({
           <div className="sp__col">
             <h4>Weapon</h4>
             <div className="sp__list">
-              {WEAPONS.map((w) => (
+              {SORTED_WEAPONS.map((w) => (
                 <button
                   key={w.id}
                   className={`sp__chip${weaponId === w.id ? ' sp__chip--on' : ''}`}
@@ -68,7 +69,7 @@ export function SelectModal({
               </div>
             ) : (
               <div className="sp__list">
-                {ROOMS.map((r) => (
+                {SORTED_ROOMS.map((r) => (
                   <button
                     key={r.id}
                     className={`sp__chip${roomId === r.id ? ' sp__chip--on' : ''}`}

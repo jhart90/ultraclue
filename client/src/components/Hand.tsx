@@ -1,36 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { getCard, type AnyCard } from 'shared';
 import { CardArt } from '../render/cardArt';
 import { Card } from './Card';
+import { compareCards } from '../util/cardSort';
 import './Hand.css';
 
-// The player's private hand: a draggable strip of cards they can reorder, plus a click-to-open
-// "flip-through" viewer with prev/next. Order is local-only (cosmetic) and reconciles if the dealt
-// hand changes later (e.g. redistribution after an elimination in M7).
+// The player's private hand: a tidy shelf sorted by type (suspect, weapon, room) then alphabetically
+// (suspects by surname), plus a click-to-open "flip-through" viewer with prev/next.
 export function Hand({ cardIds }: { cardIds: string[] }) {
-  const [order, setOrder] = useState<string[]>(cardIds);
   const [focused, setFocused] = useState<number | null>(null);
-  const dragFrom = useRef<number | null>(null);
 
-  useEffect(() => {
-    setOrder((prev) => {
-      const incoming = new Set(cardIds);
-      const kept = prev.filter((id) => incoming.has(id));
-      const added = cardIds.filter((id) => !kept.includes(id));
-      return [...kept, ...added];
-    });
-  }, [cardIds]);
-
-  const cards = order.map((id) => getCard(id)).filter((c): c is AnyCard => !!c);
-
-  const move = (from: number, to: number) =>
-    setOrder((prev) => {
-      if (from === to) return prev;
-      const next = [...prev];
-      const [m] = next.splice(from, 1);
-      next.splice(to, 0, m);
-      return next;
-    });
+  const cards = cardIds
+    .map((id) => getCard(id))
+    .filter((c): c is AnyCard => !!c)
+    .sort(compareCards);
 
   return (
     <div className="hand">
@@ -39,15 +22,8 @@ export function Hand({ cardIds }: { cardIds: string[] }) {
           <div
             key={card.id}
             className={`hand__card hand__card--${card.type}`}
-            draggable
-            onDragStart={() => (dragFrom.current = i)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => {
-              if (dragFrom.current != null) move(dragFrom.current, i);
-              dragFrom.current = null;
-            }}
             onClick={() => setFocused(i)}
-            title={`${card.title} — click to enlarge, drag to reorder`}
+            title={`${card.title} — click to enlarge`}
           >
             <div className="hand__thumb">
               <CardArt card={card} />

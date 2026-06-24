@@ -29,6 +29,15 @@
   min-height: 0;
 }
 
+/* On mobile the chat would otherwise grow with the whole conversation; cap it to roughly the
+   16 most recent lines and let the rest scroll (it stays pinned to the newest line). */
+@media (max-width: 820px) {
+  .chat__log {
+    flex: none;
+    max-height: calc(0.9rem * 1.4 * 16 + 1.2rem);
+  }
+}
+
 .chat__empty {
   color: var(--muted, #9a93b3);
   font-style: italic;

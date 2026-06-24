@@ -95,6 +95,8 @@ export interface GameState {
   turnPhase: TurnPhase;
   /** The two dice of the current movement, once rolled. */
   lastRoll?: [number, number];
+  /** Increments on every dice roll, so clients can detect a fresh roll even if the values repeat. */
+  rollSeq?: number;
   /** The path most recently walked, for clients to animate. */
   lastMove?: { playerId: string; path: Coord[] };
   /** Set while a player is choosing an elevator floor (steps left to continue moving after). */
@@ -151,6 +153,7 @@ export interface GameView {
   // ---- movement ----
   turnPhase: TurnPhase;
   lastRoll?: [number, number];
+  rollSeq?: number;
   lastMove?: { playerId: string; path: Coord[] };
   /** Tiles the active player may move to this turn (for highlighting). */
   reachable?: Coord[];

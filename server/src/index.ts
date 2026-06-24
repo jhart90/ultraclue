@@ -45,6 +45,8 @@ import {
   type Room,
   addChat,
   mirrorLog,
+  setThinking,
+  clearThinking,
   createRoom,
   findRoomByOccupant,
   joinRoom,
@@ -81,8 +83,9 @@ function emitChat(room: Room): void {
 
 const RNG = makeRng(Math.floor(Math.random() * 0x7fffffff) + 1);
 
-// Pace every bot action ~5s apart so human players can read pop-ups and digest each move.
-const BOT_DELAY = 5000;
+// Pace every bot action ~10s apart so human players can read pop-ups and digest each move. While a
+// bot is on the clock the chat shows a transient "<bot> is thinking…" line.
+const BOT_DELAY = 10000;
 
 // Per-room bot memory: cards each bot has seen revealed, and rooms it has already suggested in.
 const botMem = new Map<string, { reveals: Map<string, Set<string>>; visited: Map<string, Set<string>> }>();
@@ -155,8 +158,14 @@ function progress(room: Room): void {
 
 /** A bot that must disprove a suggestion reveals a matching card after a short beat. */
 function scheduleBotReveal(room: Room, botId: string): void {
+  const g = room.game;
+  if (g) {
+    setThinking(room, getPlayer(g, botId)?.name ?? 'Someone');
+    emitChat(room);
+  }
   setTimeout(() => {
     const s = room.game;
+    clearThinking(room);
     if (!s || s.phase !== 'play') return;
     const sg = s.currentSuggestion;
     if (!sg || sg.resolved || sg.pendingResponderId !== botId) return;
@@ -177,10 +186,16 @@ function scheduleBots(room: Room): void {
   if (!cur || !cur.isBot || cur.eliminated) return;
 
   // --- movement phase ---
+  setThinking(room, cur.name);
+  emitChat(room);
   setTimeout(() => {
+    clearThinking(room);
     let s = room.game;
     // re-check isBot: a dropped player may have reconnected and reclaimed human control.
-    if (!s || s.phase !== 'play' || currentPlayerId(s) !== cur.id || !getPlayer(s, cur.id)?.isBot) return;
+    if (!s || s.phase !== 'play' || currentPlayerId(s) !== cur.id || !getPlayer(s, cur.id)?.isBot) {
+      emitChat(room);
+      return;
+    }
     try {
       const ruled = ruledOutFor(s, cur.id, room);
       for (let step = 0; step < 4; step++) {
@@ -208,9 +223,15 @@ function scheduleBots(room: Room): void {
     }
 
     // --- decision phase: accuse if certain, else suggest from a room, else end ---
+    setThinking(room, cur.name);
+    emitChat(room);
     setTimeout(() => {
+      clearThinking(room);
       let s2 = room.game;
-      if (!s2 || s2.phase !== 'play' || currentPlayerId(s2) !== cur.id || !getPlayer(s2, cur.id)?.isBot) return;
+      if (!s2 || s2.phase !== 'play' || currentPlayerId(s2) !== cur.id || !getPlayer(s2, cur.id)?.isBot) {
+        emitChat(room);
+        return;
+      }
       try {
         const ruled = ruledOutFor(s2, cur.id, room);
         const me = getPlayer(s2, cur.id);

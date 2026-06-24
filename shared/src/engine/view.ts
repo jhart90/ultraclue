@@ -60,6 +60,7 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     weaponLocations: state.weaponLocations,
     turnPhase: state.turnPhase,
     lastRoll: state.lastRoll,
+    rollSeq: state.rollSeq,
     lastMove: state.lastMove,
     reachable: activeReachable(state),
     elevatorFloors:

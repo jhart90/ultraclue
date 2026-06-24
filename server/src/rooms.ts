@@ -23,6 +23,7 @@ export interface Room {
   game?: GameState;
   nextChatId: number;
   mirroredLogId: number; // highest game-log id already copied into the chat stream
+  thinkingId?: number; // id of the transient "<bot> is thinking…" chat line, if one is showing
 }
 
 const rooms = new Map<string, Room>();
@@ -143,6 +144,23 @@ export function addChat(room: Room, fromName: string, text: string, system = fal
   if (!clean) return;
   room.chat.push({ id: room.nextChatId++, from: fromName, text: clean, system });
   if (room.chat.length > 500) room.chat.shift();
+}
+
+/** Show a transient italic "<name> is thinking…" line while a bot deliberates. Replaces any
+ *  previous thinking line (only one shows at a time). */
+export function setThinking(room: Room, name: string): void {
+  clearThinking(room);
+  const id = room.nextChatId++;
+  room.thinkingId = id;
+  room.chat.push({ id, from: '', text: `${name} is thinking…`, system: true });
+}
+
+/** Remove the transient thinking line (called right before a bot's real move is narrated). */
+export function clearThinking(room: Room): void {
+  if (room.thinkingId == null) return;
+  const i = room.chat.findIndex((m) => m.id === room.thinkingId);
+  if (i !== -1) room.chat.splice(i, 1);
+  room.thinkingId = undefined;
 }
 
 /** Copy any new game-log entries into the chat as system narration, so the chat is the single

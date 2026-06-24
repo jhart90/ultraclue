@@ -9,6 +9,7 @@ import { Wordmark } from '../components/Wordmark';
 import { DetectiveNotes } from '../components/DetectiveNotes';
 import { SelectModal, RevealPanel, NoEvidencePanel, EndScreen } from '../components/SuggestPanels';
 import { StatusModal, AnnouncementModal, AccusationFlow, RevealModal, type StatusButton } from '../components/GamePopups';
+import { playDiceRoll } from '../util/sound';
 import './Game.css';
 
 function suspectColor(suspectId?: string): string {
@@ -58,6 +59,7 @@ export function Game() {
   const annSeqRef = useRef(0);
   const revealKeyRef = useRef('');
   const statusSigRef = useRef('');
+  const rollSeqRef = useRef(0);
 
   // Null-safe values the effects depend on (computed before the early return so hook order is stable).
   const myTurnNow = !!game && game.turnOrder[game.activeIdx] === myId;
@@ -108,6 +110,13 @@ export function Game() {
   useEffect(() => {
     if (iMustRevealNow) setAnnOpen(false);
   }, [iMustRevealNow]);
+
+  // Play the dice sound on every roll (mine or a bot's). rollSeq bumps even when values repeat.
+  useEffect(() => {
+    const rs = game?.rollSeq ?? 0;
+    if (rs > rollSeqRef.current) playDiceRoll();
+    rollSeqRef.current = rs;
+  }, [game?.rollSeq]);
 
   // Pop up the big status window whenever my actionable status changes (roll, room entry, etc.).
   useEffect(() => {

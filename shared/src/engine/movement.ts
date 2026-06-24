@@ -43,11 +43,12 @@ function buildMoveGraph(board: Board): { graph: Map<string, string[]>; cellMap: 
     { x: 0, y: -1 },
   ];
 
+  const isWall = (t: BoardCell['type']) => t === 'room' || t === 'fountain' || t === 'obstacle';
   for (const c of board.cells) {
-    if (c.type === 'room' || c.type === 'fountain') continue; // rooms join only via doorways; the fountain is a wall
+    if (isWall(c.type)) continue; // rooms join only via doorways; fountain & obstacles are walls
     for (const d of ORTHO) {
       const n = cellMap.get(coordKey({ x: c.x + d.x, y: c.y + d.y }));
-      if (!n || n.type === 'room' || n.type === 'fountain') continue;
+      if (!n || isWall(n.type)) continue;
       link(nodeOf(cellMap, c), nodeOf(cellMap, n)); // hall<->hall and hall<->elevator entries
     }
   }

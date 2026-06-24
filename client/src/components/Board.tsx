@@ -351,6 +351,22 @@ export function Board({
             return <rect key={`p${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={t.path} stroke="rgba(0,0,0,0.18)" strokeWidth="0.5" />;
           })}
 
+          {/* obstacles — impassable blocks (basement foundations, grounds hedges) pieces walk around */}
+          {(() => {
+            const obstacles = BOARD.cells.filter((c) => c.type === 'obstacle');
+            if (!obstacles.length) return null;
+            return (
+              <g style={{ pointerEvents: 'none' }}>
+                {obstacles.map((c) => {
+                  const theme = BOARD.sections.find((s) => s.id === c.sectionId)?.theme;
+                  const fill = theme === 'grounds' ? '#2f4a30' : '#322c3a';
+                  return <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={fill} />;
+                })}
+                <path d={roomOutline(obstacles)} fill="none" stroke="#5a5266" strokeWidth="2" strokeLinejoin="round" />
+              </g>
+            );
+          })()}
+
           {/* central fountain — an impassable obstacle in the Grounds */}
           {BOARD.fountain.length > 0 &&
             (() => {

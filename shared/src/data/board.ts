@@ -25,7 +25,7 @@ export interface Coord {
 
 export type SectionTheme = 'grounds' | 'ground-floor' | 'upper-floor' | 'basement';
 export type FloorId = 'ground-floor' | 'upper-floor' | 'basement';
-export type CellType = 'room' | 'path' | 'elevator' | 'fountain';
+export type CellType = 'room' | 'path' | 'elevator' | 'fountain' | 'obstacle';
 
 export interface BoardCell {
   x: number;
@@ -134,14 +134,14 @@ const GROUND_FLOOR: SectionDef = {
   w: ROOM_W,
   h: ROOM_H,
   vbands: [6, 13, 20],
-  hbands: [5, 9, 13],
+  hbands: [6, 12],
   // Top seam -> Grounds, left seam -> Upper, right seam -> Basement; only the bottom is an open edge.
   keep: { top: true, right: true, bottom: false, left: true },
+  // Every cell is a room or the elevator — no open rows. The envelope sits on a corridor tile.
   grid: [
     ['room-veranda', 'room-theatre', 'room-ballroom', 'room-library'],
     ['room-dining', 'ELEV', 'room-lounge', 'room-kitchen'],
     ['room-parlour', 'room-drawing', 'room-billiard', 'room-pantry'],
-    ['', 'ENV', '', ''],
   ],
 };
 
@@ -173,11 +173,12 @@ const BASEMENT: SectionDef = {
   hbands: [5, 9, 13],
   // Only the left seam (-> Ground Floor) stays a hall; top, right and bottom are open edges.
   keep: { top: false, right: false, bottom: false, left: true },
+  // Two foundation blocks fill the leftover cells so there's no open plaza; cellar landing on a corridor.
   grid: [
     ['room-wine-cellar', 'room-chapel', 'room-laboratory'],
     ['room-armory', 'ELEV', 'room-boiler'],
     ['room-workshop', 'room-planetarium', 'room-bunker'],
-    ['room-sauna', 'CELLAR', ''],
+    ['room-sauna', 'OBST', 'OBST'],
   ],
 };
 
@@ -187,15 +188,15 @@ const GROUNDS: SectionDef = {
   title: 'The Grounds',
   w: ROOM_W,
   h: GROUNDS_H,
-  vbands: [6, 13, 20],
+  // Wide centre column holds the fountain + courtyard side by side, one tile apart (CTYARD).
+  vbands: [7, 19],
   hbands: [6, 13],
   // Only the bottom seam (-> Ground Floor) stays a hall; top, left and right are open edges.
   keep: { top: false, right: false, bottom: true, left: false },
-  // The centre is left open as a plaza for the 5x5 fountain (carved in after the grid is built).
   grid: [
-    ['room-boat-house', 'room-hedge-maze', 'room-greenhouse', 'room-cemetery'],
-    ['room-gazebo', '', '', 'CELLAR'],
-    ['room-rose-garden', 'room-courtyard', 'room-stables', ''],
+    ['room-boat-house', 'room-hedge-maze', 'room-cemetery'],
+    ['room-gazebo', 'CTYARD', 'room-stables'],
+    ['room-rose-garden', 'room-greenhouse', 'OBST'],
   ],
 };
 
@@ -239,8 +240,6 @@ const ROOM_NOTCHES: { id: string; corner: 'tl' | 'tr' | 'bl' | 'br'; w: number; 
   { id: 'room-workshop', corner: 'tr', w: 2, h: 2 },
   { id: 'room-chapel', corner: 'br', w: 1, h: 2 },
   { id: 'room-greenhouse', corner: 'br', w: 2, h: 2 },
-  { id: 'room-courtyard', corner: 'tl', w: 2, h: 2 },
-  { id: 'room-courtyard', corner: 'tr', w: 2, h: 2 },
 ];
 
 /** Hall lines for one axis: the interior bands plus whichever of the two borders are kept. */
@@ -275,7 +274,7 @@ function buildBoard(): Board {
   const rooms: Record<string, RoomLayout> = {};
   const elevators: ElevatorInfo[] = [];
   let envelope: Coord = { x: 0, y: 0 };
-  const cellarTiles: Record<string, Coord> = {}; // sectionId -> a cellar landing tile
+  const fountainTiles: Coord[] = [];
 
   const put = (cell: BoardCell) => {
     cells.push(cell);
@@ -320,22 +319,25 @@ function buildBoard(): Board {
               ? { x: gx, y: gy, type: 'elevator', elevatorFloor: def.id as FloorId, sectionId: def.id }
               : { x: gx, y: gy, type: 'path', sectionId: def.id },
           );
-        } else if (token === 'CELLAR') {
-          const [rs, re] = rowRegions[ri];
-          const [cs, ce] = colRegions[ci];
-          const lx0 = Math.floor((cs + ce) / 2);
-          const ly0 = Math.floor((rs + re) / 2);
-          const isCellar = (lx === lx0 || lx === lx0 + 1) && ly === ly0;
-          const cell: BoardCell = { x: gx, y: gy, type: 'path', sectionId: def.id, cellar: isCellar };
-          put(cell);
-          if (isCellar && lx === lx0) cellarTiles[def.id] = { x: gx, y: gy };
-        } else if (token === 'ENV') {
-          const [rs, re] = rowRegions[ri];
-          const [cs, ce] = colRegions[ci];
-          const cx2 = Math.floor((cs + ce) / 2);
-          const cy2 = Math.floor((rs + re) / 2);
-          put({ x: gx, y: gy, type: 'path', sectionId: def.id });
-          if (lx === cx2 && ly === cy2) envelope = { x: gx, y: gy };
+        } else if (token === 'CTYARD') {
+          // The grounds centrepiece: a 5x5 fountain and a 5x5 Courtyard side by side, one tile apart.
+          const [rs] = rowRegions[ri];
+          const [cs] = colRegions[ci];
+          const ft = rs; // feature rows: 5 tall, anchored to the top of the region
+          const inRows = ly >= ft && ly <= ft + 4;
+          const fountCol = lx >= cs && lx <= cs + 4;
+          const yardCol = lx >= cs + 6 && lx <= cs + 10;
+          if (inRows && fountCol) {
+            put({ x: gx, y: gy, type: 'fountain', sectionId: def.id });
+            fountainTiles.push({ x: gx, y: gy });
+          } else if (inRows && yardCol) {
+            put({ x: gx, y: gy, type: 'room', roomId: 'room-courtyard', sectionId: def.id });
+            (roomTiles['room-courtyard'] ??= []).push({ x: gx, y: gy });
+          } else {
+            put({ x: gx, y: gy, type: 'path', sectionId: def.id }); // the 1-tile gap + margins
+          }
+        } else if (token === 'OBST') {
+          put({ x: gx, y: gy, type: 'obstacle', sectionId: def.id });
         } else {
           put({ x: gx, y: gy, type: 'path', sectionId: def.id });
         }
@@ -381,8 +383,8 @@ function buildBoard(): Board {
   // Give some rooms an irregular (L-shaped / notched) footprint instead of a plain rectangle.
   for (const n of ROOM_NOTCHES) notchCorner(cells, cellAt, rooms[n.id], n.corner, n.w, n.h);
 
-  // A 5x5 fountain in the centre of the Grounds: an obstacle pieces must walk around.
-  const fountain = carveFountain(cells, cellAt);
+  // The 5x5 fountain in the centre of the Grounds (built inline with the Courtyard via CTYARD).
+  const fountain = fountainTiles;
 
   // Doorways: 2–5 per room (the Bunker gets a single door; the closet was handled above).
   for (const room of Object.values(rooms)) {
@@ -396,8 +398,24 @@ function buildBoard(): Board {
     }
   }
 
-  // Cellar stairs: free link between the Grounds landing and the Basement landing.
-  const cellarLink = { a: cellarTiles['grounds'], b: cellarTiles['basement'] };
+  // Pick a corridor tile in a section (by local coords), falling back to any of its path cells.
+  const corridorTile = (sectionId: string, lx: number, ly: number): Coord => {
+    const sec = sections.find((s) => s.id === sectionId)!;
+    const t = { x: sec.origin.x + lx, y: sec.origin.y + ly };
+    if (cellAt.get(coordKey(t))?.type === 'path') return t;
+    const c = cells.find((cc) => cc.sectionId === sectionId && cc.type === 'path');
+    return c ? { x: c.x, y: c.y } : t;
+  };
+
+  // The envelope sits on a Ground-Floor corridor crossing (no dedicated open room for it).
+  envelope = corridorTile('ground-floor', 13, 12);
+
+  // Cellar stairs: free link between a Grounds corridor landing and a Basement corridor landing.
+  const cellarLink = { a: corridorTile('grounds', 19, 13), b: corridorTile('basement', 0, 9) };
+  for (const t of [cellarLink.a, cellarLink.b]) {
+    const c = cellAt.get(coordKey(t));
+    if (c) c.cellar = true;
+  }
 
   // Start tiles: 40 path cells spread across the board, in suspect turn order.
   const pathCells = cells.filter((c) => c.type === 'path' && !c.cellar);
@@ -430,23 +448,6 @@ function buildBoard(): Board {
 }
 
 /** Convert the central 5x5 block of the Grounds (currently open plaza) into fountain obstacle cells. */
-function carveFountain(cells: BoardCell[], cellAt: Map<string, BoardCell>): Coord[] {
-  const g = ORIGIN['grounds'];
-  const cx = g.x + Math.floor(ROOM_W / 2);
-  const cy = g.y + Math.floor(GROUNDS_H / 2);
-  const tiles: Coord[] = [];
-  for (let dx = -2; dx <= 2; dx++) {
-    for (let dy = -2; dy <= 2; dy++) {
-      const c = cellAt.get(coordKey({ x: cx + dx, y: cy + dy }));
-      if (c && c.type === 'path') {
-        c.type = 'fountain';
-        tiles.push({ x: c.x, y: c.y });
-      }
-    }
-  }
-  return tiles;
-}
-
 function collectCandidates(
   room: RoomLayout,
   cellAt: Map<string, BoardCell>,

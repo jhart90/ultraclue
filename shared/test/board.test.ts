@@ -79,6 +79,23 @@ describe('board (2D themed sections)', () => {
     }
   });
 
+  it('has no open hall block wider than 3 tiles in both directions (no plazas)', () => {
+    const W = BOARD.width;
+    const H = BOARD.height;
+    const open: boolean[][] = Array.from({ length: H }, () => new Array(W).fill(false));
+    for (const c of BOARD.cells) if (c.type === 'path') open[c.y][c.x] = true;
+    // No 4x4 all-open block => every empty rectangle is at most 3 wide in one direction.
+    let worst: string | null = null;
+    for (let y = 0; y <= H - 4 && !worst; y++) {
+      for (let x = 0; x <= W - 4 && !worst; x++) {
+        let all = true;
+        for (let dy = 0; dy < 4 && all; dy++) for (let dx = 0; dx < 4; dx++) if (!open[y + dy][x + dx]) all = false;
+        if (all) worst = `${x},${y}`;
+      }
+    }
+    expect(worst, `4x4 open hall block at ${worst}`).toBeNull();
+  });
+
   it('links the Grounds and Basement via cellar stairs', () => {
     const a = cellAt(BOARD.cellarLink.a);
     const b = cellAt(BOARD.cellarLink.b);

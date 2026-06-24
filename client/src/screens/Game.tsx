@@ -42,6 +42,8 @@ export function Game() {
   const accuse = useStore((s) => s.accuse);
   const endTurn = useStore((s) => s.endTurn);
   const bootPlayer = useStore((s) => s.bootPlayer);
+  const saveGame = useStore((s) => s.saveGame);
+  const savedAt = useStore((s) => s.savedAt);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
   const [dock, setDock] = useState<null | 'map' | 'notes'>(null); // bottom dock: Manor Map / Detective Notes
@@ -506,6 +508,16 @@ export function Game() {
               );
             })}
             {!iAmHost && <div className="game__setnote">Only the host can replace players.</div>}
+
+            <div className="game__settinghead2">Save</div>
+            <button className="btn game__savebtn" onClick={saveGame}>
+              💾 Save game
+            </button>
+            <div className="game__setnote">
+              {savedAt
+                ? `Saved to this browser at ${new Date(savedAt).toLocaleTimeString()}. It also auto-saves every round.`
+                : 'Stored in this browser; auto-saves after every full round. Load it from the title screen.'}
+            </div>
           </div>
         </>
       )}

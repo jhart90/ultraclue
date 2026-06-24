@@ -27,12 +27,15 @@ export function activePlayers(state: GameState): Player[] {
   return state.players.filter((p) => !p.eliminated);
 }
 
-/** Advance activeIdx to the next non-eliminated player in turn order. */
+/** Advance activeIdx to the next non-eliminated player in turn order. Bumps `round` whenever the
+ *  turn wraps past the end of the order (i.e. everyone has had a turn). */
 export function advanceTurn(state: GameState): void {
   const n = state.turnOrder.length;
   for (let k = 1; k <= n; k++) {
-    const idx = (state.activeIdx + k) % n;
+    const raw = state.activeIdx + k;
+    const idx = raw % n;
     if (!requirePlayer(state, state.turnOrder[idx]).eliminated) {
+      if (raw >= n) state.round = (state.round ?? 0) + 1; // wrapped → a full round has completed
       state.activeIdx = idx;
       return;
     }

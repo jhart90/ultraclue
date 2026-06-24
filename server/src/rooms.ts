@@ -263,6 +263,89 @@ export function toLobbyView(room: Room): LobbyView {
   };
 }
 
+// ---- save / load ----------------------------------------------------------------------------
+
+/** A plain, JSON-serializable snapshot of everything needed to resume a room. */
+export function serializeRoom(room: Room): unknown {
+  return structuredClone({
+    v: 1,
+    code: room.code,
+    hostId: room.hostId,
+    slots: room.slots,
+    chat: room.chat,
+    phase: room.phase,
+    game: room.game,
+    nextChatId: room.nextChatId,
+    mirroredLogId: room.mirroredLogId,
+  });
+}
+
+/** Rewrite every reference to a player id within a snapshot (slots + game state). */
+function remapId(saved: Room, oldId: string, newId: string): void {
+  if (oldId === newId) return;
+  for (const slot of saved.slots) if (slot.occupant?.id === oldId) slot.occupant.id = newId;
+  if (saved.hostId === oldId) saved.hostId = newId;
+  const g = saved.game;
+  if (!g) return;
+  g.turnOrder = g.turnOrder.map((id) => (id === oldId ? newId : id));
+  for (const p of g.players) if (p.id === oldId) p.id = newId;
+  if (g.winnerId === oldId) g.winnerId = newId;
+  const sg = g.currentSuggestion;
+  if (sg) {
+    if (sg.suggesterId === oldId) sg.suggesterId = newId;
+    if (sg.pendingResponderId === oldId) sg.pendingResponderId = newId;
+    if (sg.responderId === oldId) sg.responderId = newId;
+    sg.queue = sg.queue.map((id) => (id === oldId ? newId : id));
+    sg.passes = sg.passes.map((id) => (id === oldId ? newId : id));
+  }
+}
+
+/** Restore a saved snapshot as a fresh room. The loader takes over the original host's seat; every
+ *  other human becomes a connected bot so the table can run until they (optionally) rejoin. */
+export function loadRoom(blob: unknown, loaderId: string, loaderName: string): Room {
+  const saved = structuredClone(blob) as Partial<Room> & { game?: GameState };
+  if (!saved || typeof saved !== 'object' || !saved.game || !Array.isArray(saved.slots)) {
+    throw new Error('That save file is not a valid game.');
+  }
+  const room: Room = {
+    code: genCode(),
+    hostId: saved.hostId ?? '',
+    slots: saved.slots,
+    chat: saved.chat ?? [],
+    phase: 'play',
+    game: saved.game,
+    nextChatId: saved.nextChatId ?? 1,
+    mirroredLogId: saved.mirroredLogId ?? 0,
+  };
+  room.game!.code = room.code;
+
+  const oldHost = room.hostId;
+  // If the loader's id already names a *different* player, move that one aside so we don't collide.
+  const collides = room.game!.players.some((p) => p.id === loaderId) || room.slots.some((s) => s.occupant?.id === loaderId);
+  if (collides && loaderId !== oldHost) remapId(room, loaderId, `loadbot-${room.code}`);
+  // The loader inherits the original host's seat.
+  remapId(room, oldHost, loaderId);
+  room.hostId = loaderId;
+
+  for (const slot of room.slots) {
+    if (!slot.occupant) continue;
+    const isLoader = slot.occupant.id === loaderId;
+    slot.occupant.connected = true;
+    slot.occupant.isBot = !isLoader;
+    if (isLoader && loaderName) slot.occupant.name = loaderName;
+  }
+  for (const p of room.game!.players) {
+    const isLoader = p.id === loaderId;
+    p.connected = true;
+    p.isBot = !isLoader;
+    p.isHost = isLoader;
+    if (isLoader && loaderName) p.name = loaderName;
+  }
+
+  rooms.set(room.code, room);
+  return room;
+}
+
 /** Build the engine GameState from the lobby roster, assigning suspects to anyone without one. */
 export function startGameInRoom(room: Room, requesterId: string): GameState {
   if (room.hostId !== requesterId) throw new Error('Only the host can start the game.');

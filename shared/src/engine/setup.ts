@@ -59,6 +59,7 @@ export function startGame(code: string, lobbyPlayers: Player[], rng: RNG): GameS
     players,
     turnOrder: turnOrderOf(players),
     activeIdx: 0,
+    round: 0,
     envelope,
     log: [],
     nextLogId: 1,

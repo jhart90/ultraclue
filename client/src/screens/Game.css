@@ -331,6 +331,19 @@
   font-style: italic;
   margin-top: 0.4rem;
 }
+.game__settinghead2 {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent, #c8a24a);
+  margin: 0.8rem 0 0.4rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.6rem;
+}
+.game__savebtn {
+  width: 100%;
+  justify-content: center;
+}
 
 /* Banner shown while the table is waiting on a dropped human */
 .game__waiting {

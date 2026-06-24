@@ -82,6 +82,8 @@ export interface GameState {
   turnOrder: string[];
   /** Index into turnOrder of the current player. */
   activeIdx: number;
+  /** Completed full rounds (bumps each time the turn wraps back to the first player). */
+  round?: number;
   /** The solution. SERVER-ONLY — only revealed in views once the game has ended. */
   envelope: Envelope;
   currentSuggestion?: Suggestion;

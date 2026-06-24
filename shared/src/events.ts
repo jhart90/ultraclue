@@ -32,6 +32,8 @@ export const SOCKET_EVENTS = {
   MAKE_ACCUSATION: 'makeAccusation',
   END_TURN: 'endTurn',
   BOOT_PLAYER: 'bootPlayer', // host replaces a human player with a bot
+  SAVE_GAME: 'saveGame', // request a fresh save snapshot of the current game
+  LOAD_GAME: 'loadGame', // restore a previously saved game (from the title screen)
 
   // --- server -> client ---
   YOU_ARE: 'youAre',
@@ -39,6 +41,7 @@ export const SOCKET_EVENTS = {
   CHAT: 'chat', // broadcast of the full chat list; works in both lobby and in-game
   GAME_STARTED: 'gameStarted',
   REJOIN_FAILED: 'rejoinFailed', // the saved seat is gone; client should reset to the title
+  SAVE_GAME_DATA: 'saveGameData', // a snapshot to stash in browser storage (manual save / auto-save)
   ERROR: 'errorMsg',
 } as const;
 
@@ -110,6 +113,24 @@ export interface MakeAccusationPayload {
 export interface BootPlayerPayload {
   /** Game player id of the human seat to replace with a bot. */
   targetId: string;
+}
+
+/** A saved-game snapshot. `blob` is an opaque serialized room (handled only by the server); the
+ *  metadata is shown on the title screen's Load button. */
+export interface SavedGameMeta {
+  savedAt: number;
+  round: number;
+  players: number;
+  auto: boolean;
+}
+export interface SaveGameDataPayload {
+  meta: SavedGameMeta;
+  blob: unknown;
+}
+export interface LoadGamePayload {
+  blob: unknown;
+  clientId: string;
+  name?: string;
 }
 export interface ErrorPayload {
   message: string;

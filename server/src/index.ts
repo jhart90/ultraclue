@@ -41,6 +41,8 @@ import {
   type SetSlotPayload,
   type RejoinPayload,
   type BootPlayerPayload,
+  type LoadGamePayload,
+  type SaveGameDataPayload,
 } from 'shared';
 import {
   type Room,
@@ -59,6 +61,8 @@ import {
   deleteRoom,
   setSlot,
   bootPlayer,
+  serializeRoom,
+  loadRoom,
   startGameInRoom,
   toLobbyView,
 } from './rooms';
@@ -81,6 +85,30 @@ function emitLobby(room: Room): void {
 
 function emitChat(room: Room): void {
   io.to(room.code).emit(SOCKET_EVENTS.CHAT, { chat: room.chat });
+}
+
+// Last round number we auto-saved per room, so we save once per completed round.
+const autoSaveRound = new Map<string, number>();
+function buildSave(room: Room, auto: boolean): SaveGameDataPayload {
+  return {
+    meta: {
+      savedAt: Date.now(),
+      round: room.game?.round ?? 0,
+      players: room.slots.filter((s) => s.occupant).length,
+      auto,
+    },
+    blob: serializeRoom(room),
+  };
+}
+/** Auto-save (to every human's browser) once per completed round of play. */
+function maybeAutoSave(room: Room): void {
+  const g = room.game;
+  if (!g || g.phase !== 'play') return;
+  const round = g.round ?? 0;
+  if (round > (autoSaveRound.get(room.code) ?? 0)) {
+    autoSaveRound.set(room.code, round);
+    io.to(room.code).emit(SOCKET_EVENTS.SAVE_GAME_DATA, buildSave(room, true));
+  }
 }
 
 const RNG = makeRng(Math.floor(Math.random() * 0x7fffffff) + 1);
@@ -147,6 +175,7 @@ function progress(room: Room): void {
   mirrorLog(room); // fold new game events into the chat feed
   broadcastGame(room);
   emitChat(room);
+  maybeAutoSave(room); // snapshot to browsers after each completed round
   if (g.phase !== 'play') return;
 
   const sg = g.currentSuggestion;
@@ -455,6 +484,29 @@ io.on('connection', (socket) => {
       emitLobby(room);
       if (room.game) progress(room); // resume play — the bot acts if it's that seat's turn / owed reveal
       else emitChat(room);
+    } catch (err) {
+      emitError(socket, (err as Error).message);
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.SAVE_GAME, () => {
+    const room = findRoomByOccupant(cid(socket));
+    if (!room?.game) return;
+    socket.emit(SOCKET_EVENTS.SAVE_GAME_DATA, buildSave(room, false));
+  });
+
+  socket.on(SOCKET_EVENTS.LOAD_GAME, (p: LoadGamePayload) => {
+    try {
+      const clientId = p?.clientId || socket.id;
+      register(clientId);
+      const room = loadRoom(p.blob, clientId, p?.name ?? '');
+      botMem.delete(room.code); // fresh bot deductions for the resumed game
+      autoSaveRound.set(room.code, room.game?.round ?? 0);
+      socket.join(room.code);
+      cancelCleanup(room.code);
+      addChat(room, 'System', `${nameOf(room, clientId)} loaded a saved game.`, true);
+      emitLobby(room);
+      progress(room); // broadcast the resumed view and let any up-next bot act
     } catch (err) {
       emitError(socket, (err as Error).message);
     }

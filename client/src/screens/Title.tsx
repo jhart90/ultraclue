@@ -23,6 +23,8 @@ export function Title() {
   const error = useStore((s) => s.error);
   const createGame = useStore((s) => s.createGame);
   const joinGame = useStore((s) => s.joinGame);
+  const loadGame = useStore((s) => s.loadGame);
+  const savedMeta = useStore((s) => s.savedMeta);
   const goto = useStore((s) => s.goto);
 
   const [mode, setMode] = useState<Mode>('menu');
@@ -47,6 +49,11 @@ export function Title() {
           <button className="btn" disabled={!connected} onClick={() => setMode('join')}>
             Join Game
           </button>
+          {savedMeta && (
+            <button className="btn" disabled={!connected} onClick={loadGame} title={`Round ${savedMeta.round} · ${savedMeta.players} players`}>
+              Load Game{savedMeta.round ? ` · round ${savedMeta.round}` : ''}
+            </button>
+          )}
           <button className="btn btn--ghost" onClick={() => goto('gallery')}>
             Browse the Cards
           </button>

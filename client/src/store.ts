@@ -11,6 +11,8 @@ import {
   type ChatBroadcastPayload,
   type GameStartedPayload,
   type ErrorPayload,
+  type SavedGameMeta,
+  type SaveGameDataPayload,
 } from 'shared';
 import { socket } from './socket';
 
@@ -46,6 +48,24 @@ const clearRoom = () => {
   }
 };
 
+// A single saved-game slot lives in browser storage (manual save + per-round auto-save).
+const SAVE_KEY = 'ultraclue-savegame';
+function readSave(): { meta: SavedGameMeta; blob: unknown } | null {
+  try {
+    const s = localStorage.getItem(SAVE_KEY);
+    return s ? (JSON.parse(s) as { meta: SavedGameMeta; blob: unknown }) : null;
+  } catch {
+    return null;
+  }
+}
+function writeSave(payload: { meta: SavedGameMeta; blob: unknown }): void {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+  } catch {
+    /* storage full / unavailable — ignore */
+  }
+}
+
 interface StoreState {
   connected: boolean;
   myId: string;
@@ -54,6 +74,10 @@ interface StoreState {
   game?: GameView;
   chat: ChatMsg[];
   error?: string;
+  /** Metadata for the saved game in browser storage, if any (drives the title's Load button). */
+  savedMeta?: SavedGameMeta;
+  /** Bumps when a save lands, so the in-game menu can flash a brief "Saved" confirmation. */
+  savedAt?: number;
 
   // actions
   goto: (screen: Screen) => void;
@@ -74,6 +98,8 @@ interface StoreState {
   accuse: (suspectId: string, weaponId: string, roomId: string) => void;
   endTurn: () => void;
   bootPlayer: (targetId: string) => void;
+  saveGame: () => void;
+  loadGame: () => void;
   leave: () => void;
   clearError: () => void;
 }
@@ -83,6 +109,7 @@ export const useStore = create<StoreState>((set) => ({
   myId: CLIENT_ID,
   screen: 'title',
   chat: [],
+  savedMeta: readSave()?.meta,
 
   goto: (screen) => set({ screen }),
   createGame: (name) => socket.emit(SOCKET_EVENTS.CREATE_GAME, { name, clientId: CLIENT_ID }),
@@ -103,6 +130,11 @@ export const useStore = create<StoreState>((set) => ({
   accuse: (suspectId, weaponId, roomId) => socket.emit(SOCKET_EVENTS.MAKE_ACCUSATION, { suspectId, weaponId, roomId }),
   endTurn: () => socket.emit(SOCKET_EVENTS.END_TURN),
   bootPlayer: (targetId) => socket.emit(SOCKET_EVENTS.BOOT_PLAYER, { targetId }),
+  saveGame: () => socket.emit(SOCKET_EVENTS.SAVE_GAME),
+  loadGame: () => {
+    const s = readSave();
+    if (s) socket.emit(SOCKET_EVENTS.LOAD_GAME, { blob: s.blob, clientId: CLIENT_ID });
+  },
   leave: () => {
     socket.emit(SOCKET_EVENTS.LEAVE);
     clearRoom();
@@ -148,6 +180,12 @@ socket.on(SOCKET_EVENTS.GAME_STARTED, (p: GameStartedPayload) => {
 socket.on(SOCKET_EVENTS.REJOIN_FAILED, () => {
   clearRoom();
   useStore.setState({ screen: 'title', lobby: undefined, game: undefined, chat: [] });
+});
+
+// A save snapshot arrived (manual save or per-round auto-save) — stash it in browser storage.
+socket.on(SOCKET_EVENTS.SAVE_GAME_DATA, (p: SaveGameDataPayload) => {
+  writeSave({ meta: p.meta, blob: p.blob });
+  useStore.setState({ savedMeta: p.meta, savedAt: p.meta.savedAt });
 });
 
 socket.on(SOCKET_EVENTS.ERROR, (p: ErrorPayload) => useStore.setState({ error: p.message }));

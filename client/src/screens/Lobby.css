@@ -145,13 +145,37 @@
   border: 1px solid rgba(200, 162, 74, 0.5);
   color: var(--ink, #ece8f5);
   border-radius: 6px;
+  /* roughly twice the previous height */
+  min-height: 3.4rem;
   padding: 0.35rem;
   cursor: pointer;
   font-family: 'Georgia', serif;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
 }
 .seat__pick:hover {
   border-color: var(--accent);
+}
+
+/* Chosen-character art shown above the "Change character" button on your own seat. */
+.seat__portrait {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #14111f;
+  border: 1px solid rgba(200, 162, 74, 0.2);
+}
+.seat__portrait img,
+.seat__portrait svg {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .seat__empty {
@@ -168,18 +192,23 @@
   color: #5a4750;
 }
 
+/* Stacked Open / Closed / Bot controls that fill nearly all of an unfilled seat's height. */
 .seat__ctrls {
   display: flex;
-  gap: 0.25rem;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  min-height: 0;
 }
 .seat__ctrl {
   flex: 1;
   background: #14111f;
   border: 1px solid rgba(200, 162, 74, 0.25);
   color: var(--muted, #9a93b3);
-  border-radius: 5px;
+  border-radius: 6px;
   padding: 0.25rem;
-  font-size: 0.7rem;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
   cursor: pointer;
   font-family: 'Georgia', serif;
 }
@@ -188,10 +217,23 @@
   color: var(--ink);
 }
 .seat__ctrl--on {
-  background: var(--accent, #c8a24a);
-  color: #1a1622;
   font-weight: 700;
-  border-color: var(--accent);
+}
+/* Selected-state themes: open = green, closed = red, bot = light blue. */
+.seat__ctrl--open.seat__ctrl--on {
+  background: #2f9e54;
+  border-color: #43c172;
+  color: #08210f;
+}
+.seat__ctrl--closed.seat__ctrl--on {
+  background: #c2435a;
+  border-color: #e0556b;
+  color: #fff;
+}
+.seat__ctrl--bot.seat__ctrl--on {
+  background: #5bb8e6;
+  border-color: #84cff0;
+  color: #06243a;
 }
 
 .lobby__error {

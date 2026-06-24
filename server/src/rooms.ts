@@ -41,9 +41,24 @@ function emptySlots(): Slot[] {
   return Array.from({ length: MAX_PLAYERS }, (_, i) => ({ index: i, status: 'open' as SlotStatus }));
 }
 
+/** Pick a random suspect not already claimed by an occupant, so each new arrival gets a default
+ *  character on the spot (there's no "choose" step — only "change"). Returns undefined if every
+ *  suspect is taken (impossible with ≤MAX_PLAYERS seats and 40 suspects). */
+function randomFreeSuspect(slots: Slot[]): string | undefined {
+  const taken = new Set(slots.map((s) => s.occupant?.suspectId).filter((x): x is string => !!x));
+  const free = SUSPECTS.filter((s) => !taken.has(s.id));
+  return free.length ? free[Math.floor(Math.random() * free.length)].id : undefined;
+}
+
 export function createRoom(hostId: string, hostName: string): Room {
   const slots = emptySlots();
-  slots[0].occupant = { id: hostId, name: hostName.trim() || 'Host', isBot: false, connected: true };
+  slots[0].occupant = {
+    id: hostId,
+    name: hostName.trim() || 'Host',
+    isBot: false,
+    connected: true,
+    suspectId: randomFreeSuspect(slots),
+  };
   const room: Room = {
     code: genCode(),
     hostId,
@@ -74,7 +89,13 @@ export function joinRoom(code: string, id: string, name: string): { room: Room; 
   if (room.phase !== 'lobby') throw new Error('That game has already started.');
   const slot = room.slots.find((s) => s.status === 'open' && !s.occupant);
   if (!slot) throw new Error('That game is full.');
-  slot.occupant = { id, name: name.trim() || 'Player', isBot: false, connected: true };
+  slot.occupant = {
+    id,
+    name: name.trim() || 'Player',
+    isBot: false,
+    connected: true,
+    suspectId: randomFreeSuspect(room.slots),
+  };
   return { room, index: slot.index };
 }
 
@@ -96,6 +117,7 @@ export function setSlot(room: Room, requesterId: string, index: number, status: 
       name: `Computer ${index + 1}`,
       isBot: true,
       connected: true,
+      suspectId: randomFreeSuspect(room.slots),
     };
   } else {
     // 'open' or 'closed' — both clear any bot occupant.

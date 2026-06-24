@@ -3,7 +3,21 @@ import { getCard, MIN_PLAYERS, type Slot, type SlotStatus } from 'shared';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
+import { CardArt } from '../render/cardArt';
+import { resolveOverride } from '../render/overrides';
 import './Lobby.css';
+
+/** The chosen character's art (override image if present, else the procedural crest). */
+function SuspectPortrait({ suspectId }: { suspectId: string }) {
+  const card = getCard(suspectId);
+  if (!card || card.type !== 'suspect') return null;
+  const override = resolveOverride(card.id, 'suspect', card.title);
+  return (
+    <div className="seat__portrait">
+      {override ? <img src={override} alt={card.title} /> : <CardArt card={card} />}
+    </div>
+  );
+}
 
 function suspectColor(suspectId?: string): string {
   if (!suspectId) return '#555';
@@ -38,14 +52,17 @@ export function Lobby() {
       .map((s) => s.occupant!.suspectId as string),
   );
 
-  const statusBtn = (slot: Slot, status: SlotStatus, label: string) => (
-    <button
-      className={`seat__ctrl${slot.status === status && !(status === 'open' && slot.occupant) ? ' seat__ctrl--on' : ''}`}
-      onClick={() => setSlot(slot.index, status)}
-    >
-      {label}
-    </button>
-  );
+  const statusBtn = (slot: Slot, status: SlotStatus, label: string) => {
+    const on = slot.status === status && !(status === 'open' && slot.occupant);
+    return (
+      <button
+        className={`seat__ctrl seat__ctrl--${status}${on ? ' seat__ctrl--on' : ''}`}
+        onClick={() => setSlot(slot.index, status)}
+      >
+        {label}
+      </button>
+    );
+  };
 
   return (
     <div className="lobby">
@@ -70,6 +87,7 @@ export function Lobby() {
             const occ = slot.occupant;
             const isMe = occ?.id === myId;
             const isHostSeat = occ?.id === lobby.hostId;
+            const showCtrls = amHost && !(occ && !occ.isBot) && slot.index !== 0;
             return (
               <div className={`seat${occ ? ' seat--filled' : ''}`} key={slot.index}>
                 <div className="seat__num">Seat {slot.index + 1}</div>
@@ -86,22 +104,27 @@ export function Lobby() {
                       {isMe && <span className="tag tag--you">YOU</span>}
                       {!occ.connected && <span className="tag tag--off">OFFLINE</span>}
                     </div>
+                    {isMe && mySuspectId && <SuspectPortrait suspectId={mySuspectId} />}
                     <div className="seat__char">
                       {occ.suspectId ? getCard(occ.suspectId)?.title : <em>choosing…</em>}
                     </div>
                     {isMe && (
                       <button className="seat__pick" onClick={() => setPicking(true)}>
-                        {mySuspectId ? 'Change character' : 'Choose character'}
+                        Change character
                       </button>
                     )}
                   </>
                 ) : (
-                  <div className={`seat__empty seat__empty--${slot.status}`}>
-                    {slot.status === 'open' ? 'OPEN' : 'CLOSED'}
-                  </div>
+                  /* When the host owns the controls they fill the seat, so the big OPEN/CLOSED
+                     label is dropped; other viewers still see the seat's state as text. */
+                  !showCtrls && (
+                    <div className={`seat__empty seat__empty--${slot.status}`}>
+                      {slot.status === 'open' ? 'OPEN' : 'CLOSED'}
+                    </div>
+                  )
                 )}
 
-                {amHost && !(occ && !occ.isBot) && slot.index !== 0 && (
+                {showCtrls && (
                   <div className="seat__ctrls">
                     {statusBtn(slot, 'open', 'Open')}
                     {statusBtn(slot, 'closed', 'Closed')}

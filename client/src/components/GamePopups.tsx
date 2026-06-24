@@ -177,7 +177,9 @@ export function RevealModal({
     <div className="sp__backdrop" onClick={onClose}>
       <div className="sp sp--end" onClick={(e) => e.stopPropagation()}>
         <div className="popup__title">
-          {highlightChat(`${responderName} has shown a card to ${suggesterName}, disproving the suggestion.`)}
+          {highlightChat(`${responderName} has shown a card to ${suggesterName},`)}
+          <br />
+          {highlightChat('disproving the suggestion.')}
         </div>
         <div className="sp__cards">{revealedCard ? <Card card={revealedCard} /> : <CardBack />}</div>
         <button className="btn btn--primary" onClick={onClose}>

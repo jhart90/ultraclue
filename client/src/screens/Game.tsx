@@ -41,6 +41,7 @@ export function Game() {
   const endTurn = useStore((s) => s.endTurn);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
   const [dock, setDock] = useState<null | 'map' | 'notes'>(null); // bottom dock: Manor Map / Detective Notes
+  const [mapMounted, setMapMounted] = useState(false); // mount the (heavy) second board only once opened
 
   // --- pop-up overlays (status / announcement / reveal) ---
   const [statusOpen, setStatusOpen] = useState(false);
@@ -321,13 +322,15 @@ export function Game() {
           slides up over everything (above every pop-up), and the tabs stay reachable at the bottom. */}
       <div className={`dock__panel${dock === 'map' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'map'}>
         <div className="dock__folder">
-          <Board
-            players={orderedPlayers}
-            weaponLocations={game.weaponLocations}
-            lastMove={game.lastMove}
-            canMove={false}
-            keyboardZoom={false}
-          />
+          {mapMounted && (
+            <Board
+              players={orderedPlayers}
+              weaponLocations={game.weaponLocations}
+              lastMove={game.lastMove}
+              canMove={false}
+              keyboardZoom={false}
+            />
+          )}
         </div>
       </div>
       <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
@@ -338,7 +341,10 @@ export function Game() {
       <div className="dock__tabs">
         <button
           className={`dock__tab${dock === 'map' ? ' dock__tab--active' : ''}`}
-          onClick={() => setDock((d) => (d === 'map' ? null : 'map'))}
+          onClick={() => {
+            setMapMounted(true);
+            setDock((d) => (d === 'map' ? null : 'map'));
+          }}
         >
           🗺️ Manor Map
         </button>

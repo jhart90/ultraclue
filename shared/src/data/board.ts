@@ -133,15 +133,18 @@ const GROUND_FLOOR: SectionDef = {
   title: 'Ground Floor',
   w: ROOM_W,
   h: ROOM_H,
-  vbands: [6, 13, 20],
-  hbands: [6, 12],
+  // Bands chosen so the elevator (col1 [8-13], row1 [6-8]) lands at the SAME local spot as the
+  // Upper Floor and Basement, so the lift is in the same place on every floor.
+  vbands: [7, 14, 20],
+  hbands: [5, 10],
   // Top seam -> Grounds, left seam -> Upper, right seam -> Basement; only the bottom is an open edge.
   keep: { top: true, right: true, bottom: false, left: true },
-  // Every cell is a room or the elevator — no open rows. The envelope sits on a corridor tile.
+  // Ballroom spans its old cell + the Library's (merged after the grid); Library moves to the old
+  // Pantry slot; Pantry moved to the Basement. The envelope sits on a corridor tile.
   grid: [
-    ['room-veranda', 'room-theatre', 'room-ballroom', 'room-library'],
+    ['room-veranda', 'room-theatre', 'room-ballroom', 'room-ballroom'],
     ['room-dining', 'ELEV', 'room-lounge', 'room-kitchen'],
-    ['room-parlour', 'room-drawing', 'room-billiard', 'room-pantry'],
+    ['room-parlour', 'room-drawing', 'room-billiard', 'room-library'],
   ],
 };
 
@@ -155,11 +158,12 @@ const UPPER_FLOOR: SectionDef = {
   hbands: [5, 9, 13],
   // Only the right seam (-> Ground Floor) stays a hall; top, left and bottom are open edges.
   keep: { top: false, right: true, bottom: false, left: false },
+  // Master Suite spans its old cell + the Gymnasium's + the band between (merged after the grid).
   grid: [
     ['room-study', 'room-music', 'room-gallery'],
     ['room-boudoir', 'ELEV', 'room-smoking'],
     ['room-trophy', 'room-den', 'room-clock-tower'],
-    ['room-gymnasium', 'room-master-suite', 'room-solarium'],
+    ['room-master-suite', 'room-master-suite', 'room-solarium'],
   ],
 };
 
@@ -173,12 +177,12 @@ const BASEMENT: SectionDef = {
   hbands: [5, 9, 13],
   // Only the left seam (-> Ground Floor) stays a hall; top, right and bottom are open edges.
   keep: { top: false, right: false, bottom: false, left: true },
-  // Two foundation blocks fill the leftover cells so there's no open plaza; cellar landing on a corridor.
+  // The two leftover slots now hold the relocated Gymnasium and Pantry; cellar landing on a corridor.
   grid: [
     ['room-wine-cellar', 'room-chapel', 'room-laboratory'],
     ['room-armory', 'ELEV', 'room-boiler'],
     ['room-workshop', 'room-planetarium', 'room-bunker'],
-    ['room-sauna', 'OBST', 'OBST'],
+    ['room-sauna', 'room-gymnasium', 'room-pantry'],
   ],
 };
 
@@ -223,6 +227,8 @@ const ROOM_SHORTCUTS: [string, string][] = [
 const CLOSET_ID = 'room-walk-in-closet';
 const MASTER_ID = 'room-master-suite';
 const BUNKER_ID = 'room-bunker';
+// Rooms authored across two adjacent grid cells; the band between is merged in so they're one room.
+const SPANNED_ROOMS = ['room-master-suite', 'room-ballroom'];
 
 // Rooms made non-rectangular by cutting a notch out of one corner (the freed tiles become hall).
 // Each entry: room id + which corner + how big a bite, applied only where it stays safely connected.
@@ -377,6 +383,9 @@ function buildBoard(): Board {
     }
   }
 
+  // Rooms placed across two cells absorb the band between them so they're one contiguous space.
+  for (const id of SPANNED_ROOMS) fillSpan(cells, cellAt, rooms[id]);
+
   // Walk-in Closet: carve a 2x2 annex out of the Master Suite's far corner, joined by one door.
   carveCloset(cells, cellAt, rooms);
 
@@ -408,7 +417,7 @@ function buildBoard(): Board {
   };
 
   // The envelope sits on a Ground-Floor corridor crossing (no dedicated open room for it).
-  envelope = corridorTile('ground-floor', 13, 12);
+  envelope = corridorTile('ground-floor', 14, 10);
 
   // Cellar stairs: free link between a Grounds corridor landing and a Basement corridor landing.
   const cellarLink = { a: corridorTile('grounds', 19, 13), b: corridorTile('basement', 0, 9) };
@@ -556,6 +565,28 @@ function notchCorner(
   }
   room.label = { x: best.x, y: best.y };
   room.weaponTile = { x: Math.max(...nxs), y: Math.min(...nys) };
+}
+
+/** Merge the 1-tile band that sits between a two-cell room's halves into the room, making it one
+ *  contiguous space. (A band tile flanked by the same room on opposite sides becomes that room.) */
+function fillSpan(cells: BoardCell[], cellAt: Map<string, BoardCell>, room: RoomLayout | undefined): void {
+  if (!room) return;
+  const mine = (c?: BoardCell) => c?.type === 'room' && c.roomId === room.id;
+  const added: Coord[] = [];
+  for (const c of cells) {
+    if (c.type !== 'path') continue;
+    const flankedX = mine(cellAt.get(coordKey({ x: c.x - 1, y: c.y }))) && mine(cellAt.get(coordKey({ x: c.x + 1, y: c.y })));
+    const flankedY = mine(cellAt.get(coordKey({ x: c.x, y: c.y - 1 }))) && mine(cellAt.get(coordKey({ x: c.x, y: c.y + 1 })));
+    if (flankedX || flankedY) {
+      c.type = 'room';
+      c.roomId = room.id;
+      added.push({ x: c.x, y: c.y });
+    }
+  }
+  room.tiles.push(...added);
+  const xs = room.tiles.map((t) => t.x), ys = room.tiles.map((t) => t.y);
+  room.label = { x: Math.round((Math.min(...xs) + Math.max(...xs)) / 2), y: Math.round((Math.min(...ys) + Math.max(...ys)) / 2) };
+  room.weaponTile = { x: Math.max(...xs), y: Math.max(...ys) };
 }
 
 /** Turn the far 2x2 corner of the Master Suite into the Walk-in Closet, joined by one inner door. */

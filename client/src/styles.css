@@ -7,9 +7,16 @@
   --accent: #c8a24a;
   --green: #4caf50;
   --red: #e0556b;
-  /* Display font for all screen + pop-up headers and titles. Renders wherever the font is
-     installed; add the font file + an @font-face below to serve it to every visitor. */
+  /* Display font for all screen + pop-up headers and titles (served via the @font-face below). */
   --font-display: 'Chantilly Serial Heavy', 'Georgia', 'Times New Roman', serif;
+}
+
+@font-face {
+  font-family: 'Chantilly Serial Heavy';
+  src: url(../../assets/fonts/chantilly-serial-heavy.woff2) format('woff2');
+  font-weight: 100 900; /* one heavy face covers every requested weight (no faux bold) */
+  font-style: normal;
+  font-display: swap;
 }
 
 /* All header / title text across screens and pop-up windows. */

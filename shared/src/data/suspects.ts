@@ -27,7 +27,7 @@ export const SUSPECTS: SuspectCard[] = [
   { id: 'suspect-maroon', type: 'suspect', title: 'Mayor Maroon', color: '#7B1E3A', turnOrder: 22, phrase: 'Runs the town, and buries its secrets.' },
   { id: 'suspect-ivory', type: 'suspect', title: 'Inspector Ivory', color: '#E8DEC2', turnOrder: 23, phrase: 'Investigates everyone — politely, relentlessly.' },
   { id: 'suspect-charcoal', type: 'suspect', title: 'Chancellor Charcoal', color: '#3A3D42', turnOrder: 24, phrase: 'Smudges every record he touches.' },
-  { id: 'suspect-magenta', type: 'suspect', title: 'Madame Magenta', color: '#C42D8E', turnOrder: 25, phrase: 'Dressed to kill, and not just figuratively.' },
+  { id: 'suspect-magenta', type: 'suspect', title: 'Miss Magenta', color: '#C42D8E', turnOrder: 25, phrase: 'Dressed to kill, and not just figuratively.' },
   { id: 'suspect-sienna', type: 'suspect', title: 'Señor Sienna', color: '#A0522D', turnOrder: 26, phrase: 'Earthy charm, buried motives.' },
   { id: 'suspect-onyx', type: 'suspect', title: 'Duke Onyx', color: '#22232A', turnOrder: 27, phrase: 'Black-hearted and proud of it.' },
   { id: 'suspect-hazel', type: 'suspect', title: 'Headmistress Hazel', color: '#A8895C', turnOrder: 28, phrase: 'Watches with eyes that miss nothing.' },

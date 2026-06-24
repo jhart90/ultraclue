@@ -34,10 +34,14 @@ function loadNotes(key: string): NotesState {
 export function DetectiveNotes({
   roomCode,
   players,
+  selfId,
+  hand,
   onClose,
 }: {
   roomCode: string;
   players: PlayerView[];
+  selfId?: string;
+  hand?: string[];
   onClose?: () => void;
 }) {
   const storageKey = `ultraclue-notes-${roomCode}`;
@@ -46,6 +50,24 @@ export function DetectiveNotes({
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(notes));
   }, [notes, storageKey]);
+
+  // Once per game, pre-fill the marks for the cards in your own hand, in your own column.
+  useEffect(() => {
+    const myCol = players.findIndex((p) => p.id === selfId);
+    if (myCol < 0 || !hand?.length) return;
+    const seededKey = `${storageKey}-seeded`;
+    if (localStorage.getItem(seededKey)) return;
+    localStorage.setItem(seededKey, '1');
+    setNotes((prev) => {
+      const next = { ...prev };
+      for (const cardId of hand) {
+        const row = next[cardId] ? [...next[cardId]] : new Array(COLS).fill(0);
+        row[myCol] = 1; // 'filled in'
+        next[cardId] = row;
+      }
+      return next;
+    });
+  }, [storageKey, selfId, hand, players]);
 
   const cycle = (cardId: string, col: number) =>
     setNotes((prev) => {

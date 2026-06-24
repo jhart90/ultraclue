@@ -37,6 +37,23 @@
   pointer-events: none;
 }
 
+/* Shown while the camera is locked onto another player's pawn during their move. */
+.bv__follow {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1a1622;
+  background: rgba(231, 198, 106, 0.92);
+  border: 1px solid #e7c66a;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  pointer-events: none;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+}
+
 .bv__tip {
   position: fixed;
   z-index: 50;

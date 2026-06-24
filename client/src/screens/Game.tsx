@@ -312,6 +312,7 @@ export function Game() {
             weaponLocations={game.weaponLocations}
             canMove={myTurn && game.turnPhase === 'awaitMove' && !suggestionPending}
             onMoveTo={moveTo}
+            myId={myId}
           />
         </div>
 

@@ -15,6 +15,8 @@ const MIN_SCALE = 0.45;
 const MAX_SCALE = 3;
 /** Walk-animation cadence: ms the pawn spends on each tile of its path. */
 export const WALK_STEP_MS = 300;
+/** Zoom level the camera locks to while following another player's move. */
+const FOLLOW_SCALE = 0.8;
 
 const cx = (c: Coord) => c.x * TS + TS / 2;
 const cy = (c: Coord) => c.y * TS + TS / 2;
@@ -22,6 +24,17 @@ const cy = (c: Coord) => c.y * TS + TS / 2;
 // Tile -> room lookup, so reachable room tiles can be collapsed into one big space.
 const ROOM_AT = new Map<string, string>();
 for (const room of Object.values(BOARD.rooms)) for (const t of room.tiles) ROOM_AT.set(coordKey(t), room.id);
+
+/** Where a pawn standing on `tile` is actually drawn: centred in the room if the tile belongs to one
+ *  (so entering never flashes in the top-left corner), otherwise on the tile itself. */
+function pawnWorldPos(tile: Coord): { px: number; py: number } {
+  const rid = ROOM_AT.get(coordKey(tile));
+  if (rid && BOARD.rooms[rid]) {
+    const b = roomBounds(BOARD.rooms[rid]);
+    return { px: b.x + b.w / 2, py: b.y + b.h * 0.62 };
+  }
+  return { px: cx(tile), py: cy(tile) };
+}
 
 function Pawn({ px, py, color, r = TS / 2 - 5, eliminated }: { px: number; py: number; color: string; r?: number; eliminated?: boolean }) {
   return (
@@ -151,6 +164,7 @@ export function Board({
   canMove,
   onMoveTo,
   keyboardZoom = true,
+  myId,
 }: {
   players: PlayerView[];
   reachable?: Coord[];
@@ -160,6 +174,8 @@ export function Board({
   onMoveTo?: (tile: Coord) => void;
   /** Whether this board responds to ↑/↓ keys (off for the secondary map so listeners don't double up). */
   keyboardZoom?: boolean;
+  /** The viewer's own player id. When set, the camera locks onto and follows *other* players' moves. */
+  myId?: string;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ scale: 0.8, tx: 0, ty: 0 });
@@ -171,7 +187,14 @@ export function Board({
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinch = useRef<{ dist: number } | null>(null);
 
-  // Walk-animation: when a new path arrives, step the moving pawn through it at 0.3s / tile.
+  // While true, pan/zoom input is ignored because the camera is following another player's move.
+  const lockedRef = useRef(false);
+  const [followName, setFollowName] = useState<string | null>(null);
+  const playersRef = useRef(players);
+  playersRef.current = players;
+
+  // Walk-animation: when a new path arrives, step the moving pawn through it at 0.3s / tile. For
+  // *other* players' moves we also lock the camera, zoom to 80%, and keep their pawn centred.
   const [anim, setAnim] = useState<{ playerId: string; tile: Coord } | null>(null);
   const animSig = useRef<string>('');
   useEffect(() => {
@@ -182,19 +205,44 @@ export function Board({
     const sig = `${lastMove.playerId}:${lastMove.path.map(coordKey).join('>')}`;
     if (sig === animSig.current) return;
     animSig.current = sig;
+    const follow = !!myId && lastMove.playerId !== myId;
+    if (follow) {
+      lockedRef.current = true;
+      drag.current = null;
+      pinch.current = null;
+      setFollowName(playersRef.current.find((p) => p.id === lastMove.playerId)?.name ?? null);
+    }
+    const step = (tile: Coord) => {
+      setAnim({ playerId: lastMove.playerId, tile });
+      if (follow) {
+        const el = viewportRef.current;
+        if (el) {
+          const { px, py } = pawnWorldPos(tile);
+          setView({
+            scale: FOLLOW_SCALE,
+            tx: el.clientWidth / 2 - px * FOLLOW_SCALE,
+            ty: el.clientHeight / 2 - py * FOLLOW_SCALE,
+          });
+        }
+      }
+    };
     let i = 0;
-    setAnim({ playerId: lastMove.playerId, tile: lastMove.path[0] });
+    step(lastMove.path[0]);
     const timer = setInterval(() => {
       i += 1;
       if (i >= lastMove.path.length) {
         clearInterval(timer);
         setAnim(null);
+        if (follow) {
+          lockedRef.current = false; // reached their destination — hand control back
+          setFollowName(null);
+        }
         return;
       }
-      setAnim({ playerId: lastMove.playerId, tile: lastMove.path[i] });
+      step(lastMove.path[i]);
     }, WALK_STEP_MS);
     return () => clearInterval(timer);
-  }, [lastMove]);
+  }, [lastMove, myId]);
 
   const reachSet = new Set((reachable ?? []).map(coordKey));
 
@@ -220,6 +268,7 @@ export function Board({
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      if (lockedRef.current) return; // camera is following another player
       const rect = el.getBoundingClientRect();
       zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.clientX - rect.left, e.clientY - rect.top);
     };
@@ -246,6 +295,7 @@ export function Board({
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
       e.preventDefault();
+      if (lockedRef.current) return; // camera is following another player
       const el = viewportRef.current;
       if (!el) return;
       zoomAt(e.key === 'ArrowUp' ? 1.12 : 1 / 1.12, el.clientWidth / 2, el.clientHeight / 2);
@@ -258,6 +308,7 @@ export function Board({
     drag.current = { x, y, tx: viewRef.current.tx, ty: viewRef.current.ty, moved: false };
   };
   const onPointerDown = (e: React.PointerEvent) => {
+    if (lockedRef.current) return; // camera is following another player — no pan/pinch
     if ((e.target as HTMLElement).dataset?.move) return; // clicking a move target, not panning
     // Capture to the clicked child (not the viewport): capturing to the viewport itself makes the
     // browser fire pointerleave on it, which would cancel the very drag we're starting.
@@ -277,6 +328,7 @@ export function Board({
     }
   };
   const onPointerMove = (e: React.PointerEvent) => {
+    if (lockedRef.current) return; // camera is following another player
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     // Two-finger pinch: zoom by the change in finger distance, centred on their midpoint.
@@ -621,8 +673,8 @@ export function Board({
             return (
               <>
                 {free.map((p) => {
-                  const tile = anim?.playerId === p.id ? anim.tile : p.position;
-                  return <Pawn key={p.id} px={cx(tile)} py={cy(tile)} color={suspectColor(p.suspectId)} eliminated={p.eliminated} />;
+                  const { px, py } = anim?.playerId === p.id ? pawnWorldPos(anim.tile) : { px: cx(p.position), py: cy(p.position) };
+                  return <Pawn key={p.id} px={px} py={py} color={suspectColor(p.suspectId)} eliminated={p.eliminated} />;
                 })}
                 {[...inRoom.entries()].flatMap(([rid, occ]) => {
                   const b = roomBounds(BOARD.rooms[rid]);
@@ -654,6 +706,7 @@ export function Board({
         </svg>
       </div>
       <div className="bv__hint">scroll or ↑/↓ to zoom · drag to pan</div>
+      {followName && <div className="bv__follow">🎥 Following {followName}…</div>}
       {tip && (
         <div className="bv__tip" style={{ left: tip.x + 14, top: tip.y + 14 }}>
           {tip.text}

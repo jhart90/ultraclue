@@ -10,7 +10,7 @@
 }
 
 .picker {
-  width: min(820px, 95vw);
+  width: min(900px, 95vw);
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -43,15 +43,19 @@
 .picker__grid {
   overflow-y: auto;
   padding: 1rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 0.5rem;
+  /* Multi-column flow: each column fills top-to-bottom, then the next — so the rainbow runs
+     down the left column first, then the next column, etc. Stays responsive to the width. */
+  columns: 210px;
+  column-gap: 0.5rem;
 }
 
 .picker__item {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  width: 100%;
+  margin: 0 0 0.5rem;
+  break-inside: avoid;
   padding: 0.5rem 0.7rem;
   background: #261f3a;
   border: 1px solid rgba(200, 162, 74, 0.25);
@@ -84,9 +88,6 @@
 }
 .picker__name {
   flex: 1;
+  min-width: 0;
   font-size: 0.92rem;
-}
-.picker__order {
-  color: var(--muted, #9a93b3);
-  font-size: 0.75rem;
 }

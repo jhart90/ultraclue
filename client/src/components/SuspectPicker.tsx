@@ -1,4 +1,4 @@
-import { SORTED_SUSPECTS } from '../util/cardSort';
+import { SORTED_SUSPECTS_RAINBOW } from '../util/cardSort';
 import './SuspectPicker.css';
 
 export function SuspectPicker({
@@ -22,7 +22,7 @@ export function SuspectPicker({
           </button>
         </div>
         <div className="picker__grid">
-          {SORTED_SUSPECTS.map((s) => {
+          {SORTED_SUSPECTS_RAINBOW.map((s) => {
             const taken = takenByOthers.has(s.id);
             const mine = s.id === mySuspectId;
             return (
@@ -38,7 +38,6 @@ export function SuspectPicker({
               >
                 <span className="picker__swatch" style={{ background: s.color }} />
                 <span className="picker__name">{s.title}</span>
-                <span className="picker__order">#{s.turnOrder}</span>
               </button>
             );
           })}

@@ -200,25 +200,38 @@
   margin-bottom: 0.4rem;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 820px) {
   .sp__cols {
     grid-template-columns: 1fr;
   }
   .sp__list {
     max-height: 30vh;
   }
-  /* Shrink the disprove/reveal cards so all the options and the Reveal button fit on a phone. */
+  /* Shrink the trio cards and cap the row to two cards wide, so three cards lay out as 2 + 1
+     instead of a tall single column — keeping the action button from being pushed off-screen. */
   .sp--reveal .card,
   .sp--end .card {
-    width: 132px;
+    width: 118px;
   }
   .sp--reveal .card__art,
   .sp--end .card__art {
-    height: 96px;
+    height: 84px;
+  }
+  /* compact card body so two rows of cards stay short */
+  .sp--reveal .card__phrase,
+  .sp--end .card__phrase {
+    min-height: 0;
+    font-size: 0.66rem;
+  }
+  .sp--reveal .card__body,
+  .sp--end .card__body {
+    padding: 0.35rem 0.5rem 0.5rem;
   }
   .sp--reveal .sp__cards,
   .sp--end .sp__cards {
     gap: 0.5rem;
+    padding: 0.4rem; /* less side padding so the cap leaves room for two cards */
+    max-width: 270px; /* fits two 118px cards + gap; a third wraps to a second row */
   }
   .sp__title {
     font-size: 1.2rem;

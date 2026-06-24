@@ -236,7 +236,7 @@ export function Game() {
         <div className="game__title">
           <Wordmark size="sm" /> <span className="game__code">Room {game.code}</span>
         </div>
-        <div className="game__turn">{turnLabel}</div>
+        <div className={`game__turn${myTurn ? ' game__turn--mine' : ''}`}>{turnLabel}</div>
         <button className="btn btn--danger" onClick={leave}>
           Leave
         </button>

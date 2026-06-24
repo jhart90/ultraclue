@@ -38,13 +38,28 @@
   letter-spacing: 0.2em;
   margin-left: 0.5rem;
 }
+/* A "notch" centred at the very top of the screen (à la older iPhones): black by default,
+   traffic-light-green on your turn, with large white text. */
 .game__turn {
-  font-size: 1.05rem;
-  color: var(--ink, #ece8f5);
-  background: rgba(200, 162, 74, 0.16);
-  border: 1px solid rgba(200, 162, 74, 0.4);
-  border-radius: 999px;
-  padding: 0.3rem 1.1rem;
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  background: #000;
+  color: #fff;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 0.55rem 2.4rem 0.7rem;
+  border-radius: 0 0 22px 22px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.game__turn--mine {
+  background: #21c24a; /* traffic-light green */
+  color: #fff;
 }
 
 .game__main {
@@ -325,7 +340,7 @@
 /* Banner shown while the table is waiting on a dropped human */
 .game__waiting {
   position: fixed;
-  top: 10px;
+  top: 62px; /* sit just below the turn notch */
   left: 50%;
   transform: translateX(-50%);
   z-index: 305;
@@ -353,5 +368,11 @@
   }
   .game__main {
     grid-template-columns: 1fr;
+  }
+  /* a slightly smaller notch so it doesn't crowd the top bar on phones */
+  .game__turn {
+    font-size: 1.15rem;
+    padding: 0.4rem 1.3rem 0.55rem;
+    border-radius: 0 0 16px 16px;
   }
 }

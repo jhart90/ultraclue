@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getCard, shortcutDestForRoom } from 'shared';
+import { getCard, shortcutDestForRoom, type Announcement } from 'shared';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
@@ -8,7 +8,7 @@ import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
 import { DetectiveNotes } from '../components/DetectiveNotes';
 import { SelectModal, RevealPanel, NoEvidencePanel, EndScreen } from '../components/SuggestPanels';
-import { StatusModal, AnnouncementModal, RevealModal, type StatusButton } from '../components/GamePopups';
+import { StatusModal, AnnouncementModal, AccusationFlow, RevealModal, type StatusButton } from '../components/GamePopups';
 import './Game.css';
 
 function suspectColor(suspectId?: string): string {
@@ -39,14 +39,20 @@ export function Game() {
   const passSuggestion = useStore((s) => s.passSuggestion);
   const accuse = useStore((s) => s.accuse);
   const endTurn = useStore((s) => s.endTurn);
-  const [notesOpen, setNotesOpen] = useState(false);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
-  const [notesFront, setNotesFront] = useState(false); // notes floated above the suggest/accuse modal
 
   // --- pop-up overlays (status / announcement / reveal) ---
   const [statusOpen, setStatusOpen] = useState(false);
   const [annOpen, setAnnOpen] = useState(false);
   const [revealOpen, setRevealOpen] = useState(false);
+  // A captured accusation (so its two-step reveal survives later announcements overwriting the live one).
+  const [accFlow, setAccFlow] = useState<{
+    ann: Announcement;
+    envelope?: { suspectId: string; weaponId: string; roomId: string };
+    ended: boolean;
+    winnerName?: string;
+  } | null>(null);
+  const accSeqRef = useRef(0);
   const annSeqRef = useRef(0);
   const revealKeyRef = useRef('');
   const statusSigRef = useRef('');
@@ -58,15 +64,31 @@ export function Game() {
   const suggestionPendingNow = !!sgNow && !sgNow.resolved;
   const iMustRevealNow = suggestionPendingNow && sgNow!.pendingResponderId === myId;
 
-  // New suggestion/accusation -> announce it to everyone (and clear any prior reveal pop-up).
+  // New suggestion -> announce it to everyone (and clear any prior reveal pop-up).
   useEffect(() => {
     const a = game?.announcement;
-    if (a && a.seq !== annSeqRef.current) {
+    if (a && a.kind === 'suggestion' && a.seq !== annSeqRef.current) {
       annSeqRef.current = a.seq;
       setRevealOpen(false);
       if (game?.phase === 'play') setAnnOpen(true);
     }
   }, [game?.announcement?.seq, game?.phase]);
+
+  // New accusation -> capture it for the two-step reveal (so it survives later announcements).
+  useEffect(() => {
+    const a = game?.announcement;
+    if (a && a.kind === 'accusation' && a.seq !== accSeqRef.current) {
+      accSeqRef.current = a.seq;
+      setAnnOpen(false);
+      setRevealOpen(false);
+      setAccFlow({
+        ann: a,
+        envelope: game?.envelope,
+        ended: game?.phase === 'ended',
+        winnerName: game?.players.find((p) => p.id === game?.winnerId)?.name,
+      });
+    }
+  }, [game?.announcement?.seq, game?.phase, game?.envelope, game?.winnerId, game?.players]);
 
   // A card was just revealed -> show the face-down reveal pop-up (replacing the announcement).
   useEffect(() => {
@@ -176,14 +198,16 @@ export function Game() {
     };
   })();
 
-  // Only one overlay shows at a time, by priority.
-  const showEnd = game.phase === 'ended';
-  const showDisprove = iMustReveal && !!sug;
-  const showNoEvidence = iMustPass && !!sug;
-  const showReveal = revealOpen && !showDisprove && !showNoEvidence && !showEnd && !modal;
-  const showAnn = annOpen && !!game.announcement && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal;
+  // Only one overlay shows at a time, by priority. The accusation reveal trumps everything,
+  // and the end screen waits until that reveal has been dismissed.
+  const showAccFlow = !!accFlow;
+  const showEnd = game.phase === 'ended' && !showAccFlow;
+  const showDisprove = iMustReveal && !!sug && !showAccFlow;
+  const showNoEvidence = iMustPass && !!sug && !showAccFlow;
+  const showReveal = revealOpen && !showAccFlow && !showDisprove && !showNoEvidence && !showEnd && !modal;
+  const showAnn = annOpen && !!game.announcement && !showAccFlow && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal;
   const showStatus =
-    statusOpen && !!statusDesc && !showAnn && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal && !iAmResponder;
+    statusOpen && !!statusDesc && !showAccFlow && !showAnn && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal && !iAmResponder;
 
   return (
     <div className="game">
@@ -290,42 +314,22 @@ export function Game() {
           <div className="game__handlabel">Your hand · {me?.handCount ?? game.yourHand.length} cards</div>
           <Hand cardIds={game.yourHand} />
         </div>
-        <button className="game__notestab" onClick={() => setNotesOpen(true)}>
-          📓 Detective Notes
-        </button>
       </div>
 
-      {notesOpen && (
-        <DetectiveNotes roomCode={game.code} players={orderedPlayers} onClose={() => setNotesOpen(false)} />
-      )}
+      {/* Detective Notes folder: always pinned to the bottom, slides up over everything when opened. */}
+      <DetectiveNotes roomCode={game.code} players={orderedPlayers} />
 
       {modal && me && (
-        <>
-          {/* Detective Notes sits behind the modal; the 📓 button floats it on top and back. */}
-          <DetectiveNotes
-            roomCode={game.code}
-            players={orderedPlayers}
-            zIndex={notesFront ? 90 : 70}
-            backLabel={modal === 'suggest' ? 'Suggestion' : 'Accusation'}
-            onBack={() => setNotesFront(false)}
-            onClose={() => setNotesFront(false)}
-          />
-          <SelectModal
-            mode={modal}
-            fixedRoomId={modal === 'suggest' ? me.inRoomId : undefined}
-            onCancel={() => {
-              setModal(null);
-              setNotesFront(false);
-            }}
-            onPeekNotes={() => setNotesFront(true)}
-            onSubmit={(s, w, r) => {
-              if (modal === 'suggest') suggest(s, w);
-              else accuse(s, w, r);
-              setModal(null);
-              setNotesFront(false);
-            }}
-          />
-        </>
+        <SelectModal
+          mode={modal}
+          fixedRoomId={modal === 'suggest' ? me.inRoomId : undefined}
+          onCancel={() => setModal(null)}
+          onSubmit={(s, w, r) => {
+            if (modal === 'suggest') suggest(s, w);
+            else accuse(s, w, r);
+            setModal(null);
+          }}
+        />
       )}
 
       {showStatus && statusDesc && (
@@ -339,6 +343,18 @@ export function Game() {
 
       {showAnn && game.announcement && (
         <AnnouncementModal announcement={game.announcement} onClose={() => setAnnOpen(false)} />
+      )}
+
+      {accFlow && (
+        <AccusationFlow
+          key={accFlow.ann.seq}
+          announcement={accFlow.ann}
+          envelope={accFlow.envelope}
+          ended={accFlow.ended}
+          winnerName={accFlow.winnerName}
+          onContinue={() => setAccFlow(null)}
+          onEndGame={() => setAccFlow(null)}
+        />
       )}
 
       {showReveal && sug && (

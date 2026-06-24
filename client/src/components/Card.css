@@ -18,6 +18,7 @@
   line-height: 0;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
+  overflow: hidden; /* keep art inside the rounded top — no square corners poking past the frame */
 }
 
 .card__override {
@@ -26,23 +27,11 @@
   object-fit: cover;
 }
 
-/* Portrait and weapon art may break the top of the frame slightly, so the very top of a head or
-   weapon is never clipped by the rounded corner — it pokes just above the upper edge instead. */
-.card--suspect,
-.card--weapon {
-  overflow: visible;
-}
-.card--suspect .card__art,
-.card--weapon .card__art {
-  overflow: visible;
-}
+/* Anchor portrait and weapon art to the top edge so a head or weapon tip is never cropped, while
+   the card itself keeps clean rounded corners. */
 .card--suspect .card__override,
 .card--weapon .card__override {
-  margin-top: -10px;
-  height: calc(100% + 10px);
   object-position: top;
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
 }
 
 .card__body {

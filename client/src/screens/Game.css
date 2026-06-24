@@ -193,6 +193,8 @@
   display: flex;
   align-items: stretch;
   gap: 0.8rem;
+  /* leave room beneath the hand for the Detective Notes folder tab pinned to the screen bottom */
+  padding-bottom: 44px;
 }
 .game__handwrap {
   flex: 1;
@@ -207,24 +209,6 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent, #c8a24a);
-}
-
-.game__notestab {
-  flex: 0 0 auto;
-  background: linear-gradient(180deg, #2c2447, #221b3a);
-  border: 1px solid var(--accent, #c8a24a);
-  color: var(--accent, #c8a24a);
-  border-radius: 10px;
-  padding: 0 1.2rem;
-  font-family: 'Georgia', serif;
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  writing-mode: horizontal-tb;
-}
-.game__notestab:hover {
-  background: #322a52;
 }
 
 @media (max-width: 820px) {

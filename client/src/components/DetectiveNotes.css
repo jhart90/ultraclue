@@ -1,57 +1,66 @@
-.notes__backdrop {
+/* Detective Notes lives in a manila folder pinned to the bottom of the screen. Closed, only its
+   tab peeks up; open, the folder slides up over everything. z-index sits above every pop-up. */
+.dnotes {
   position: fixed;
-  inset: 0;
-  background: rgba(8, 6, 12, 0.82);
-  z-index: 60;
+  left: 50%;
+  bottom: 0;
+  width: min(1180px, 99vw);
+  z-index: 250;
   display: flex;
-  justify-content: center;
-  padding: 1rem;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%) translateY(calc(100% - 42px)); /* closed: only the tab shows */
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none; /* empty area around the tab stays click-through */
+}
+.dnotes--open {
+  transform: translateX(-50%) translateY(0);
 }
 
-.notes {
-  width: min(1100px, 98vw);
-  max-height: 94vh;
+/* the manila folder tab */
+.dnotes__tab {
+  pointer-events: auto;
+  margin-bottom: -3px;
+  padding: 0.5rem 2.4rem;
+  background: linear-gradient(180deg, #ecd9a4 0%, #d8c082 100%);
+  color: #463716;
+  border: 2px solid #b1934b;
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  font-family: 'Georgia', serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.45);
+}
+.dnotes__tab:hover {
+  background: linear-gradient(180deg, #f3e1ad 0%, #e1cb8d 100%);
+}
+
+/* the folder body */
+.dnotes__folder {
+  pointer-events: auto;
+  width: 100%;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   background: #181426;
-  border: 2px solid var(--accent, #c8a24a);
-  border-radius: 12px;
+  border: 3px solid #c9a24a;
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.62);
   overflow: hidden;
 }
 
-.notes__titlebar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0.7rem 1.2rem;
-  background: #241d38;
-  border: none;
-  border-bottom: 1px solid rgba(200, 162, 74, 0.35);
-  color: var(--accent, #c8a24a);
-  font-family: 'Georgia', serif;
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-.notes__titlebar:hover {
-  background: #2c2444;
-}
-.notes__exit {
-  font-size: 0.8rem;
-  color: var(--muted, #9a93b3);
-  letter-spacing: 0.05em;
-}
-
-.notes__hint {
+.dnotes__hint {
   text-align: center;
-  color: var(--muted, #9a93b3);
+  color: #4a3a18;
   font-size: 0.75rem;
-  padding: 0.35rem;
+  padding: 0.4rem;
   font-style: italic;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, #d8c082, #cdb472);
+  border-bottom: 2px solid #b1934b;
 }
 
 .notes__body {

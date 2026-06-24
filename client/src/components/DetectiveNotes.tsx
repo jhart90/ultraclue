@@ -28,26 +28,12 @@ function loadNotes(key: string): NotesState {
   }
 }
 
-// The near-fullscreen private notes sheet: three 40-row columns (Suspects / Weapons / Rooms),
-// each row with 8 clickable cells — one column per seat (up to 8 players). Marks persist to
-// localStorage per room, so a refresh keeps your deductions.
-export function DetectiveNotes({
-  roomCode,
-  players,
-  onClose,
-  zIndex = 60,
-  backLabel,
-  onBack,
-}: {
-  roomCode: string;
-  players: PlayerView[];
-  onClose: () => void;
-  /** Stacking order — raise it to float the sheet above the suggest/accuse modal. */
-  zIndex?: number;
-  /** When set, the title bar returns to the modal (e.g. "Suggestion") instead of closing. */
-  backLabel?: string;
-  onBack?: () => void;
-}) {
+// A private notes sheet that lives in a manila folder pinned to the bottom of the screen: only its
+// tab shows until clicked, then the folder slides up over everything (even open pop-ups) so the
+// player can jot or reference deductions at any time. Three 40-row columns (Suspects / Weapons /
+// Rooms), each row with 8 clickable cells — one per seat. Marks persist to localStorage per room.
+export function DetectiveNotes({ roomCode, players }: { roomCode: string; players: PlayerView[] }) {
+  const [open, setOpen] = useState(false);
   const storageKey = `ultraclue-notes-${roomCode}`;
   const [notes, setNotes] = useState<NotesState>(() => loadNotes(storageKey));
 
@@ -102,17 +88,13 @@ export function DetectiveNotes({
   );
 
   return (
-    <div className="notes__backdrop" style={{ zIndex }}>
-      <div className="notes">
-        <button
-          className="notes__titlebar"
-          onClick={onBack ?? onClose}
-          title={onBack ? `Back to ${backLabel}` : 'Close notes'}
-        >
-          <span>Detective Notes</span>
-          <span className="notes__exit">{onBack ? `← Back to ${backLabel}` : '✕ Exit'}</span>
-        </button>
-        <div className="notes__hint">
+    <div className={`dnotes${open ? ' dnotes--open' : ''}`}>
+      {/* the manila-folder tab — always visible, click to slide the folder up or back down */}
+      <button className="dnotes__tab" onClick={() => setOpen((o) => !o)} title="Detective Notes">
+        📓 Detective Notes
+      </button>
+      <div className="dnotes__folder">
+        <div className="dnotes__hint">
           Click a cell to cycle through marks · one column per player · saved to this device
         </div>
         <div className="notes__body">

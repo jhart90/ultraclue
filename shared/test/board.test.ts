@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BOARD, buildAdjacency, coordKey, ROOMS, SUSPECTS, type Coord } from '../src';
+import { BOARD, buildAdjacency, coordKey, roomToRoomDistance, ROOMS, SUSPECTS, type Coord } from '../src';
 
 function cellAt(c: Coord) {
   return BOARD.cells.find((t) => t.x === c.x && t.y === c.y);
@@ -34,18 +34,15 @@ describe('board (2D themed sections)', () => {
     expect(by['basement'].x).toBeGreaterThan(by['ground-floor'].x);
   });
 
-  it('contains all 40 rooms, each contiguous with 2–5 entrances (closet has 1)', () => {
+  it('contains all 40 rooms, each contiguous with 1–3 entrances', () => {
     expect(Object.keys(BOARD.rooms)).toHaveLength(40);
     for (const room of ROOMS) {
       const layout = BOARD.rooms[room.id];
       expect(layout, room.id).toBeTruthy();
       expect(layout.tiles.length, room.id).toBeGreaterThan(0);
       expect(isContiguous(layout.tiles), `${room.id} not contiguous`).toBe(true);
-      if (room.id === 'room-walk-in-closet' || room.id === 'room-bunker') expect(layout.entrances).toHaveLength(1);
-      else {
-        expect(layout.entrances.length, `${room.id} entrances`).toBeGreaterThanOrEqual(2);
-        expect(layout.entrances.length, `${room.id} entrances`).toBeLessThanOrEqual(5);
-      }
+      expect(layout.entrances.length, `${room.id} entrances`).toBeGreaterThanOrEqual(1);
+      expect(layout.entrances.length, `${room.id} entrances`).toBeLessThanOrEqual(3);
     }
   });
 
@@ -94,6 +91,36 @@ describe('board (2D themed sections)', () => {
       }
     }
     expect(worst, `4x4 open hall block at ${worst}`).toBeNull();
+  });
+
+  it('requires a roll of 4+ to travel between any two rooms in one move', () => {
+    // The Walk-in Closet is an intentional 1-door annex of the Master Suite, so it is exempt.
+    const ids = Object.keys(BOARD.rooms).filter((id) => id !== 'room-walk-in-closet');
+    let worst = Infinity;
+    let worstPair = '';
+    for (const a of ids) {
+      for (const b of ids) {
+        if (a === b) continue;
+        const d = roomToRoomDistance(BOARD, a, b);
+        if (d < worst) (worst = d), (worstPair = `${a} -> ${b}`);
+      }
+    }
+    expect(worst, `closest room pair (${worstPair}) is only ${worst} steps apart`).toBeGreaterThanOrEqual(4);
+  });
+
+  it('separates the Upper Floor and Basement from the Ground Floor by a 1-wide blank gap', () => {
+    const xAt = (id: string) => BOARD.sections.find((s) => s.id === id)!.origin.x;
+    const wAt = (id: string) => BOARD.sections.find((s) => s.id === id)!.width;
+    // a blank column (no cells) sits between Upper|Ground and Ground|Basement
+    const upperRight = xAt('upper-floor') + wAt('upper-floor'); // first column past the upper floor
+    const groundLeft = xAt('ground-floor');
+    expect(groundLeft - upperRight).toBe(1);
+    const groundRight = xAt('ground-floor') + wAt('ground-floor');
+    const basementLeft = xAt('basement');
+    expect(basementLeft - groundRight).toBe(1);
+    for (const gapX of [upperRight, groundRight]) {
+      expect(BOARD.cells.some((c) => c.x === gapX), `gap column ${gapX} must be blank`).toBe(false);
+    }
   });
 
   it('links the Grounds and Basement via cellar stairs', () => {

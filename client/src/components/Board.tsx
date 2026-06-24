@@ -475,6 +475,22 @@ export function Board({
             <Staircase at={BOARD.cellarLink.b} label="Cellar stairs — up to the Grounds" onTip={setTip} />
           </g>
 
+          {/* grand staircase: Ground Floor <-> Upper Floor link */}
+          <g>
+            <line
+              x1={cx(BOARD.grandLink.a)}
+              y1={cy(BOARD.grandLink.a)}
+              x2={cx(BOARD.grandLink.b)}
+              y2={cy(BOARD.grandLink.b)}
+              stroke="#9aa0a6"
+              strokeWidth="1.5"
+              strokeDasharray="2 4"
+              opacity="0.3"
+            />
+            <Staircase at={BOARD.grandLink.a} label="Grand staircase — up to the Upper Floor" onTip={setTip} />
+            <Staircase at={BOARD.grandLink.b} label="Grand staircase — down to the Ground Floor" onTip={setTip} />
+          </g>
+
           {/* rooms */}
           {Object.values(BOARD.rooms).map((room) => {
             const b = roomBounds(room);

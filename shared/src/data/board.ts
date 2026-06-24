@@ -91,6 +91,9 @@ export interface Board {
   elevators: ElevatorInfo[];
   /** Cellar stairs: a free link between a Grounds tile and a Basement tile. */
   cellarLink: { a: Coord; b: Coord };
+  /** Grand staircase: a free link between the Ground Floor and the Upper Floor (the two are no
+   *  longer adjacent — a blank gap separates them — so this is how you walk up without the lift). */
+  grandLink: { a: Coord; b: Coord };
   /** The 5x5 fountain block in the centre of the Grounds — an obstacle pieces must walk around. */
   fountain: Coord[];
 }
@@ -206,12 +209,15 @@ const GROUNDS: SectionDef = {
 
 const SECTION_DEFS = [GROUNDS, GROUND_FLOOR, UPPER_FLOOR, BASEMENT];
 
-// 2D placement (see header diagram).
+// 2D placement (see header diagram). A 1-tile blank gap separates the Upper Floor from the Ground
+// Floor (column SIDE_W) and the Ground Floor from the Basement (column SIDE_W+1+ROOM_W): no cells
+// live there, so pieces cannot walk across — they must use the stairs or the elevator.
+const GAP = 1;
 const ORIGIN: Record<string, Coord> = {
-  grounds: { x: SIDE_W, y: 0 },
-  'ground-floor': { x: SIDE_W, y: GROUNDS_H },
+  grounds: { x: SIDE_W + GAP, y: 0 },
+  'ground-floor': { x: SIDE_W + GAP, y: GROUNDS_H },
   'upper-floor': { x: 0, y: GROUNDS_H },
-  basement: { x: SIDE_W + ROOM_W, y: GROUNDS_H },
+  basement: { x: SIDE_W + GAP + ROOM_W + GAP, y: GROUNDS_H },
 };
 
 // 6 distant room-to-room secret passages + 2 world ones.
@@ -395,18 +401,6 @@ function buildBoard(): Board {
   // The 5x5 fountain in the centre of the Grounds (built inline with the Courtyard via CTYARD).
   const fountain = fountainTiles;
 
-  // Doorways: 2–5 per room (the Bunker gets a single door; the closet was handled above).
-  for (const room of Object.values(rooms)) {
-    if (room.id === CLOSET_ID) continue;
-    const cands = collectCandidates(room, cellAt);
-    if (room.id === BUNKER_ID) {
-      const doors = middleOut(cands.map((c) => c.door));
-      room.entrances = doors.length ? [doors[0]] : [];
-    } else {
-      room.entrances = pickEntrances(cands);
-    }
-  }
-
   // Pick a corridor tile in a section (by local coords), falling back to any of its path cells.
   const corridorTile = (sectionId: string, lx: number, ly: number): Coord => {
     const sec = sections.find((s) => s.id === sectionId)!;
@@ -421,10 +415,22 @@ function buildBoard(): Board {
 
   // Cellar stairs: free link between a Grounds corridor landing and a Basement corridor landing.
   const cellarLink = { a: corridorTile('grounds', 19, 13), b: corridorTile('basement', 0, 9) };
-  for (const t of [cellarLink.a, cellarLink.b]) {
+  // Grand staircase: free link between a Ground-Floor landing and an Upper-Floor landing (the two
+  // floors no longer touch — a blank gap separates them).
+  const grandLink = { a: corridorTile('ground-floor', 0, 9), b: corridorTile('upper-floor', SIDE_W - 1, 9) };
+  const stairLandings = [cellarLink.a, cellarLink.b, grandLink.a, grandLink.b];
+  for (const t of stairLandings) {
     const c = cellAt.get(coordKey(t));
-    if (c) c.cellar = true;
+    if (c) c.cellar = true; // excluded from start tiles; doors are kept clear of these
   }
+
+  // Doorways: 1–3 per room, placed so the doors of different rooms are never the same tile nor
+  // orthogonally adjacent (incl. across a stairs link) — guaranteeing a 4+ step room→room move.
+  // The closet keeps the inner door carved earlier; the Bunker is capped at one.
+  placeDoors(rooms, cellAt, stairLandings, [
+    [cellarLink.a, cellarLink.b],
+    [grandLink.a, grandLink.b],
+  ]);
 
   // Start tiles: 40 path cells spread across the board, in suspect turn order.
   const pathCells = cells.filter((c) => c.type === 'path' && !c.cellar);
@@ -453,69 +459,105 @@ function buildBoard(): Board {
   const width = Math.max(...cells.map((c) => c.x)) + 1;
   const height = Math.max(...cells.map((c) => c.y)) + 1;
 
-  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, elevators, cellarLink, fountain };
+  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, elevators, cellarLink, grandLink, fountain };
 }
 
-/** Convert the central 5x5 block of the Grounds (currently open plaza) into fountain obstacle cells. */
-function collectCandidates(
-  room: RoomLayout,
+/**
+ * Place 1–3 doorways per room. Guarantees:
+ *  - every room gets at least one door onto the corridor network (so the board stays connected);
+ *  - the doors of *different* rooms are never the same corridor tile nor orthogonally adjacent
+ *    (and are kept clear of stair landings), which forces every room→room trip to be ≥4 steps.
+ * Rooms are processed most-constrained-first; each picks spread-out, non-conflicting doors.
+ */
+function placeDoors(
+  rooms: Record<string, RoomLayout>,
   cellAt: Map<string, BoardCell>,
-): { side: string; door: Doorway }[] {
-  const seen = new Set<string>();
-  const out: { side: string; door: Doorway }[] = [];
-  for (const t of room.tiles) {
+  stairLandings: Coord[],
+  stairLinks: [Coord, Coord][],
+): void {
+  // corridor cell -> id of the room whose door sits there ('#stairs' reserves the landings)
+  const doorOwner = new Map<string, string>();
+  for (const l of stairLandings) doorOwner.set(coordKey(l), '#stairs');
+
+  // neighbours of a corridor cell, including any stairs-linked cell (so a stairs hop counts as adjacency)
+  const corridorNbrs = (c: Coord): string[] => {
+    const out: string[] = [];
     for (const d of ORTHO) {
-      const n = cellAt.get(coordKey({ x: t.x + d.x, y: t.y + d.y }));
-      if (!n || n.type !== 'path') continue;
-      const k = `${coordKey(t)}>${coordKey(n)}`;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      const side = d.y < 0 ? 'top' : d.y > 0 ? 'bottom' : d.x < 0 ? 'left' : 'right';
-      out.push({ side, door: { roomId: room.id, roomTile: { x: t.x, y: t.y }, doorTile: { x: n.x, y: n.y } } });
+      const n = cellAt.get(coordKey({ x: c.x + d.x, y: c.y + d.y }));
+      if (n?.type === 'path') out.push(coordKey(n));
     }
-  }
-  return out;
-}
+    for (const [a, b] of stairLinks) {
+      if (coordKey(a) === coordKey(c)) out.push(coordKey(b));
+      else if (coordKey(b) === coordKey(c)) out.push(coordKey(a));
+    }
+    return out;
+  };
 
-function middleOut<T>(arr: T[]): T[] {
-  if (arr.length <= 1) return arr;
-  const mid = Math.floor(arr.length / 2);
-  const res: T[] = [arr[mid]];
-  for (let off = 1; res.length < arr.length; off++) {
-    if (mid - off >= 0) res.push(arr[mid - off]);
-    if (mid + off < arr.length) res.push(arr[mid + off]);
-  }
-  return res;
-}
+  // a door at `doorTile` for `roomId` is valid if neither it nor any neighbour is owned by another room
+  const conflicts = (roomId: string, doorTile: Coord): number => {
+    let n = 0;
+    const o = doorOwner.get(coordKey(doorTile));
+    if (o && o !== roomId) n++;
+    for (const nk of corridorNbrs(doorTile)) {
+      const no = doorOwner.get(nk);
+      if (no && no !== roomId) n++;
+    }
+    return n;
+  };
 
-function pickEntrances(cands: { side: string; door: Doorway }[]): Doorway[] {
-  if (cands.length <= 2) return cands.map((c) => c.door);
-  const target = Math.min(5, Math.max(2, Math.round(cands.length / 4)));
-  const bySide = new Map<string, Doorway[]>();
-  for (const c of cands) {
-    const arr = bySide.get(c.side) ?? [];
-    arr.push(c.door);
-    bySide.set(c.side, arr);
-  }
-  const sideOrder = ['top', 'right', 'bottom', 'left'].filter((s) => bySide.has(s));
-  for (const s of sideOrder) bySide.set(s, middleOut(bySide.get(s)!));
-  const cursor = new Map(sideOrder.map((s) => [s, 0]));
-  const picked: Doorway[] = [];
-  while (picked.length < target) {
-    let advanced = false;
-    for (const s of sideOrder) {
-      if (picked.length >= target) break;
-      const arr = bySide.get(s)!;
-      const i = cursor.get(s)!;
-      if (i < arr.length) {
-        picked.push(arr[i]);
-        cursor.set(s, i + 1);
-        advanced = true;
+  const candidatesOf = (room: RoomLayout): Doorway[] => {
+    const seen = new Set<string>();
+    const out: Doorway[] = [];
+    for (const t of room.tiles) {
+      for (const d of ORTHO) {
+        const n = cellAt.get(coordKey({ x: t.x + d.x, y: t.y + d.y }));
+        if (!n || n.type !== 'path') continue;
+        if (seen.has(coordKey(n))) continue;
+        seen.add(coordKey(n));
+        out.push({ roomId: room.id, roomTile: { x: t.x, y: t.y }, doorTile: { x: n.x, y: n.y } });
       }
     }
-    if (!advanced) break;
+    return out;
+  };
+
+  // most-constrained rooms (fewest candidates) first; the closet's inner door is already set
+  const order = Object.values(rooms)
+    .filter((r) => r.id !== CLOSET_ID)
+    .map((r) => ({ r, cands: candidatesOf(r) }))
+    .sort((a, b) => a.cands.length - b.cands.length);
+
+  for (const { r, cands } of order) {
+    const maxDoors = r.id === BUNKER_ID ? 1 : Math.min(3, Math.max(1, Math.round(r.tiles.length / 12)));
+    const picked: Doorway[] = [];
+    const remaining = [...cands];
+    while (picked.length < maxDoors && remaining.length) {
+      // among conflict-free candidates, take the one furthest (Manhattan) from already-picked doors
+      let best = -1;
+      let bestScore = -1;
+      for (let i = 0; i < remaining.length; i++) {
+        if (conflicts(r.id, remaining[i].doorTile) > 0) continue;
+        const dt = remaining[i].doorTile;
+        const score = picked.length === 0 ? 0 : Math.min(...picked.map((p) => Math.abs(p.doorTile.x - dt.x) + Math.abs(p.doorTile.y - dt.y)));
+        if (score > bestScore) (bestScore = score), (best = i);
+      }
+      if (best < 0) break;
+      picked.push(remaining[best]);
+      doorOwner.set(coordKey(remaining[best].doorTile), r.id);
+      remaining.splice(best, 1);
+    }
+    // every room must keep at least one door; if all candidates conflict, take the least-conflicting
+    if (picked.length === 0 && cands.length) {
+      let best = 0;
+      let bestC = Infinity;
+      cands.forEach((c, i) => {
+        const k = conflicts(r.id, c.doorTile);
+        if (k < bestC) (bestC = k), (best = i);
+      });
+      picked.push(cands[best]);
+      doorOwner.set(coordKey(cands[best].doorTile), r.id);
+    }
+    r.entrances = picked;
   }
-  return picked;
 }
 
 /** Bite a w×h block out of one corner of a room, freeing those tiles back to hall so the room
@@ -670,8 +712,9 @@ export function buildAdjacency(board: Board, includeShortcuts = true): Map<strin
   for (const room of Object.values(board.rooms)) {
     for (const e of room.entrances) link(e.roomTile, e.doorTile);
   }
-  // Cellar stairs: a free Grounds <-> Basement link.
+  // Cellar stairs (Grounds <-> Basement) and the grand staircase (Ground Floor <-> Upper Floor).
   if (board.cellarLink.a && board.cellarLink.b) link(board.cellarLink.a, board.cellarLink.b);
+  if (board.grandLink.a && board.grandLink.b) link(board.grandLink.a, board.grandLink.b);
   if (includeShortcuts) for (const sc of board.shortcuts) link(sc.a, sc.b);
 
   return adj;

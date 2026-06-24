@@ -55,8 +55,9 @@ function buildMoveGraph(board: Board): { graph: Map<string, string[]>; cellMap: 
   for (const room of Object.values(board.rooms)) {
     for (const e of room.entrances) link(roomNode(room.id), nodeOf(cellMap, e.doorTile));
   }
-  // Cellar stairs: a free Grounds <-> Basement link.
+  // Cellar stairs (Grounds <-> Basement) and the grand staircase (Ground Floor <-> Upper Floor).
   if (board.cellarLink.a && board.cellarLink.b) link(nodeOf(cellMap, board.cellarLink.a), nodeOf(cellMap, board.cellarLink.b));
+  if (board.grandLink.a && board.grandLink.b) link(nodeOf(cellMap, board.grandLink.a), nodeOf(cellMap, board.grandLink.b));
 
   return { graph, cellMap };
 }
@@ -92,6 +93,28 @@ function bfs(board: Board, start: Coord, steps: number, blocked: Set<string>): {
     }
   }
   return { graph, cellMap, startNode, dist, parent };
+}
+
+/** Shortest dice-step count from one room to another over the collapsed move graph (you can't pass
+ *  through a room or elevator). Infinity if unreachable without an elevator ride. For tests/tuning. */
+export function roomToRoomDistance(board: Board, aRoomId: string, bRoomId: string): number {
+  const { graph } = board === BOARD ? CACHE : buildMoveGraph(board);
+  const start = roomNode(aRoomId);
+  const target = roomNode(bRoomId);
+  const dist = new Map<string, number>([[start, 0]]);
+  const queue: string[] = [start];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    const d = dist.get(cur)!;
+    if (isStopNode(cur) && cur !== start) continue; // rooms/elevators end a move — can't pass through
+    for (const n of graph.get(cur) ?? []) {
+      if (!dist.has(n)) {
+        dist.set(n, d + 1);
+        queue.push(n);
+      }
+    }
+  }
+  return dist.has(target) ? dist.get(target)! : Infinity;
 }
 
 /** The room id at a tile, or undefined if it is a corridor / off-board. */

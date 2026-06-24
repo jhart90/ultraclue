@@ -38,16 +38,15 @@
   letter-spacing: 0.2em;
   margin-left: 0.5rem;
 }
-/* A "notch" centred at the very top of the screen (à la older iPhones): black by default,
-   traffic-light-green on your turn, with large white text. */
+/* A "notch" centred at the very top of the screen (à la older iPhones). Its colour is the current
+   player's piece colour (set inline), with a contrasting ink for the large turn text. */
 .game__turn {
   position: fixed;
   top: 0;
   left: 50%;
   transform: translateX(-50%);
   z-index: 200;
-  background: #000;
-  color: #fff;
+  background: #333; /* fallback; the real colour is applied inline per active player */
   font-size: 1.55rem;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -56,10 +55,6 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
   white-space: nowrap;
   pointer-events: none;
-}
-.game__turn--mine {
-  background: #21c24a; /* traffic-light green */
-  color: #fff;
 }
 
 .game__main {

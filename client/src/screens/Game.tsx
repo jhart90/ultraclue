@@ -10,6 +10,7 @@ import { DetectiveNotes } from '../components/DetectiveNotes';
 import { SelectModal, RevealPanel, NoEvidencePanel, EndScreen } from '../components/SuggestPanels';
 import { StatusModal, AnnouncementModal, AccusationFlow, RevealModal, type StatusButton } from '../components/GamePopups';
 import { playDiceRoll } from '../util/sound';
+import { contrastInk } from '../render/colorUtils';
 import './Game.css';
 
 function suspectColor(suspectId?: string): string {
@@ -236,7 +237,12 @@ export function Game() {
         <div className="game__title">
           <Wordmark size="sm" /> <span className="game__code">Room {game.code}</span>
         </div>
-        <div className={`game__turn${myTurn ? ' game__turn--mine' : ''}`}>{turnLabel}</div>
+        <div
+          className="game__turn"
+          style={{ background: suspectColor(activePlayer?.suspectId), color: contrastInk(suspectColor(activePlayer?.suspectId)) }}
+        >
+          {turnLabel}
+        </div>
         <button className="btn btn--danger" onClick={leave}>
           Leave
         </button>

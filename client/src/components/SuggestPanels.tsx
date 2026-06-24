@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getCard, type GameView } from 'shared';
 import { SORTED_SUSPECTS, SORTED_WEAPONS, SORTED_ROOMS } from '../util/cardSort';
+import { highlightChat } from '../util/highlightChat';
 import { Card } from './Card';
 import './SuggestPanels.css';
 
@@ -114,7 +115,7 @@ export function RevealPanel({
       <div className="sp sp--reveal">
         <div className="sp__title">Disprove the suggestion</div>
         <div className="sp__hint">
-          Select one matching card to reveal to {suggesterName} (only they will see which one).
+          {highlightChat(`Select one matching card to reveal to ${suggesterName} (only they will see which one).`)}
         </div>
         <div className="sp__cards">
           {matches.map((c) => {
@@ -168,7 +169,7 @@ export function EndScreen({ game, myId, onLeave }: { game: GameView; myId: strin
   return (
     <div className="sp__backdrop">
       <div className="sp sp--end">
-        <div className="sp__endtitle">{won ? '🎉 You solved the case!' : `${winner?.name ?? 'Someone'} wins!`}</div>
+        <div className="sp__endtitle">{won ? '🎉 You solved the case!' : highlightChat(`${winner?.name ?? 'Someone'} wins!`)}</div>
         <div className="sp__hint">The CLASSIFIED envelope contained:</div>
         <div className="sp__cards">
           {env &&

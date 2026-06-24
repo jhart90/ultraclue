@@ -3,6 +3,7 @@ import { getCard, type Announcement } from 'shared';
 import { Card } from './Card';
 import { CardBack } from './CardBack';
 import { Dice } from './Dice';
+import { highlightChat } from '../util/highlightChat';
 import './GamePopups.css';
 
 type Trio = { suspectId: string; weaponId: string; roomId: string };
@@ -40,7 +41,7 @@ export function AccusationFlow({
     return (
       <div className="sp__backdrop">
         <div className="sp sp--end">
-          <div className="sp__endtitle">{a.byName} has made an accusation!</div>
+          <div className="sp__endtitle">{highlightChat(`${a.byName} has made an accusation!`)}</div>
           <div className="sp__cards">{cardsOf(trio)}</div>
           <button className="btn btn--primary" onClick={() => setStage('result')}>
             See the verdict
@@ -55,7 +56,7 @@ export function AccusationFlow({
     return (
       <div className="sp__backdrop">
         <div className="sp sp--end">
-          <div className="sp__endtitle">🎉 {a.byName} Wins!</div>
+          <div className="sp__endtitle">{highlightChat(`🎉 ${a.byName} Wins!`)}</div>
           <div className="sp__hint">The CLASSIFIED envelope contained:</div>
           <div className="sp__cards">{cardsOf(env)}</div>
           <button className="btn btn--primary" onClick={onEndGame}>
@@ -69,10 +70,10 @@ export function AccusationFlow({
   return (
     <div className="sp__backdrop">
       <div className="sp sp--end">
-        <div className="sp__endtitle">{a.byName} Loses!</div>
+        <div className="sp__endtitle">{highlightChat(`${a.byName} Loses!`)}</div>
         <div className="sp__hint">
           {ended
-            ? `Their cards are redistributed — ${winnerName ?? 'the last detective'} wins by default.`
+            ? highlightChat(`Their cards are redistributed — ${winnerName ?? 'the last detective'} wins by default.`)
             : 'Their cards will be redistributed among the other players.'}
         </div>
         <button className="btn btn--primary" onClick={ended ? onEndGame : onContinue}>
@@ -115,7 +116,7 @@ export function StatusModal({
         )}
         {lines.map((l, i) => (
           <div key={i} className={i === 0 ? 'statpop__line1' : 'statpop__line2'}>
-            {l}
+            {highlightChat(l)}
           </div>
         ))}
         <div className="statpop__btns">
@@ -139,7 +140,7 @@ export function AnnouncementModal({ announcement, onClose }: { announcement: Ann
     <div className="sp__backdrop" onClick={onClose}>
       <div className="sp sp--end" onClick={(e) => e.stopPropagation()}>
         <div className="popup__title">
-          {a.byName} has made {a.kind === 'suggestion' ? 'a suggestion' : 'an accusation'}:
+          {highlightChat(`${a.byName} has made ${a.kind === 'suggestion' ? 'a suggestion' : 'an accusation'}:`)}
         </div>
         <div className="sp__cards">
           {cards.map((id) => {
@@ -176,7 +177,7 @@ export function RevealModal({
     <div className="sp__backdrop" onClick={onClose}>
       <div className="sp sp--end" onClick={(e) => e.stopPropagation()}>
         <div className="popup__title">
-          {responderName} has shown a card to {suggesterName}, disproving the suggestion.
+          {highlightChat(`${responderName} has shown a card to ${suggesterName}, disproving the suggestion.`)}
         </div>
         <div className="sp__cards">{revealedCard ? <Card card={revealedCard} /> : <CardBack />}</div>
         <button className="btn btn--primary" onClick={onClose}>

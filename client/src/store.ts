@@ -165,7 +165,9 @@ socket.on(SOCKET_EVENTS.LOBBY, (p: LobbyPayload) => {
   useStore.setState((state) => {
     const inRoom = lobby.slots.some((s) => s.occupant?.id === state.myId);
     if (inRoom) saveRoom(lobby.code);
-    const screen: Screen = lobby.phase === 'play' ? 'game' : inRoom ? 'lobby' : state.screen;
+    // Only follow a lobby into its screen if we're actually seated in it — otherwise a stray update
+    // (e.g. right after we left) must not drag us back into the game.
+    const screen: Screen = inRoom ? (lobby.phase === 'play' ? 'game' : 'lobby') : state.screen;
     return { lobby, screen, error: undefined };
   });
 });

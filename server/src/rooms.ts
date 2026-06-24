@@ -346,6 +346,36 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
   return room;
 }
 
+/** A player explicitly leaves an in-progress game. Their seat is handed to a bot under a *fresh*
+ *  id so the player's own id is fully detached from the room — otherwise they'd be silently pulled
+ *  back in (findRoomByOccupant would still match) and a refresh would auto-rejoin. */
+export function leaveGameAsBot(room: Room, clientId: string): void {
+  const slot = room.slots.find((s) => s.occupant?.id === clientId);
+  if (!slot?.occupant) return;
+  const wasHost = room.hostId === clientId;
+  const botId = `left-${room.code}-${slot.index}`;
+  remapId(room, clientId, botId);
+  const occ = room.slots.find((s) => s.occupant?.id === botId)?.occupant;
+  if (occ) {
+    occ.isBot = true;
+    occ.connected = true;
+  }
+  const gp = room.game?.players.find((p) => p.id === botId);
+  if (gp) {
+    gp.isBot = true;
+    gp.connected = true;
+    gp.isHost = false;
+  }
+  // If the host left, hand the title to a remaining human (if any).
+  if (wasHost) {
+    const human = room.slots.find((s) => s.occupant && !s.occupant.isBot);
+    if (human?.occupant) {
+      room.hostId = human.occupant.id;
+      if (room.game) for (const p of room.game.players) p.isHost = p.id === room.hostId;
+    }
+  }
+}
+
 /** Build the engine GameState from the lobby roster, assigning suspects to anyone without one. */
 export function startGameInRoom(room: Room, requesterId: string): GameState {
   if (room.hostId !== requesterId) throw new Error('Only the host can start the game.');

@@ -61,6 +61,7 @@ import {
   deleteRoom,
   setSlot,
   bootPlayer,
+  leaveGameAsBot,
   serializeRoom,
   loadRoom,
   startGameInRoom,
@@ -515,22 +516,24 @@ io.on('connection', (socket) => {
   socket.on(SOCKET_EVENTS.LEAVE, () => {
     const clientId = cid(socket);
     socketClient.delete(socket.id);
-    const inGame = findRoomByOccupant(clientId)?.game;
-    if (inGame) {
-      // leaving mid-game is intentional, so hand the seat to a bot so the others can finish
-      const room = disconnectOccupant(clientId, true);
-      if (room) {
-        addChat(room, 'System', `${nameOf(room, clientId)} left — a bot is finishing their game.`, true);
-        emitLobby(room);
-        broadcastGame(room);
-        emitChat(room);
-        scheduleBots(room);
-        scheduleCleanupIfEmpty(room);
-      }
+    // Drop out of every socket.io room so this socket stops receiving the game's broadcasts (which
+    // would otherwise re-save the room and bounce the player back into the game).
+    [...socket.rooms].forEach((r) => r !== socket.id && socket.leave(r));
+    const room = findRoomByOccupant(clientId);
+    if (!room) return;
+    if (room.game) {
+      // Leaving mid-game is intentional: detach the player's id and let a bot finish their seat.
+      const name = nameOf(room, clientId);
+      leaveGameAsBot(room, clientId);
+      addChat(room, 'System', `${name} left — a bot is finishing their game.`, true);
+      emitLobby(room);
+      broadcastGame(room);
+      emitChat(room);
+      scheduleBots(room);
+      scheduleCleanupIfEmpty(room);
     } else {
-      const { room, deleted } = removeOccupant(clientId);
-      socket.rooms.forEach((r) => r !== socket.id && socket.leave(r));
-      if (room && !deleted) emitLobby(room);
+      const { deleted } = removeOccupant(clientId);
+      if (!deleted) emitLobby(room);
     }
   });
 

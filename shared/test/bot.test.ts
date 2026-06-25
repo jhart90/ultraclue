@@ -8,6 +8,7 @@ import {
   makeRng,
   botAccusation,
   botSuggestion,
+  botRevealCard,
   botMoveTarget,
   botShouldStay,
 } from '../src';
@@ -37,15 +38,34 @@ describe('bot deduction', () => {
     });
   });
 
-  it('suggests cards it has not ruled out', () => {
+  it('probes for unknown suspect + weapon when not isolating a room', () => {
     // leave exactly one candidate suspect + weapon so the pick is forced and checkable
     const ruled = new Set<string>([
       ...SUSPECTS.filter((s) => s.id !== 'suspect-plum').map((s) => s.id),
       ...WEAPONS.filter((w) => w.id !== 'weapon-dagger').map((w) => w.id),
     ]);
-    const sugg = botSuggestion(ruled, makeRng(5));
+    const sugg = botSuggestion(ruled, [], undefined, makeRng(5)); // no hand / no room -> just probe
     expect(sugg.suspectId).toBe('suspect-plum');
     expect(sugg.weaponId).toBe('weapon-dagger');
+  });
+
+  it('isolates an unknown room by suggesting a held suspect + held weapon', () => {
+    const hand = ['suspect-plum', 'weapon-dagger', 'room-library']; // 1 held suspect, 1 held weapon
+    const sugg = botSuggestion(new Set(), hand, 'room-study', makeRng(3));
+    expect(sugg.suspectId).toBe('suspect-plum'); // from its own hand…
+    expect(sugg.weaponId).toBe('weapon-dagger'); // …so the room is the only revealable card
+  });
+
+  it('reveals a card the suggester has already seen; otherwise the most-exposed one', () => {
+    // p2 already saw weapon-rope from us -> re-show it (no new info)
+    expect(botRevealCard(['weapon-rope', 'suspect-plum'], new Set(['weapon-rope']), new Map(), makeRng(1))).toBe(
+      'weapon-rope',
+    );
+    // no repeat: reveal whichever card more other players already know
+    const exposure = new Map([['suspect-plum', 2], ['weapon-rope', 0]]);
+    expect(botRevealCard(['weapon-rope', 'suspect-plum'], new Set(), exposure, makeRng(1))).toBe('suspect-plum');
+    // a single match is forced
+    expect(botRevealCard(['room-study'], new Set(), new Map(), makeRng(1))).toBe('room-study');
   });
 
   it('prefers moving into a room over a corridor tile', () => {

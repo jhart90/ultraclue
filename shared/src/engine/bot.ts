@@ -1,4 +1,4 @@
-import { SUSPECTS, WEAPONS, ROOMS, BOARD } from '../data';
+import { SUSPECTS, WEAPONS, ROOMS, BOARD, getCard } from '../data';
 import type { Coord } from '../data/board';
 import { type RNG, pick } from '../rng';
 import { roomIdAt } from './movement';
@@ -35,12 +35,58 @@ export function botAccusation(ruledOut: Set<string>): BotAccusation | null {
   return null;
 }
 
-/** Pick a suspect + weapon to suggest, preferring cards the bot hasn't ruled out (max info). */
-export function botSuggestion(ruledOut: Set<string>, rng: RNG): BotSuggestion {
+/**
+ * Pick a suspect + weapon to suggest.
+ *  - Strategic room isolation: when the bot is standing in a room it knows nothing about, and rooms
+ *    are (one of) the categories it's least sure of, it suggests a suspect AND weapon from its OWN
+ *    hand. Since no one else can hold those, the only card anyone could reveal is the room — so the
+ *    bot is guaranteed to learn whether this room is part of the solution this turn.
+ *  - Otherwise it probes for maximum information: a suspect and weapon it hasn't ruled out.
+ */
+export function botSuggestion(
+  ruledOut: Set<string>,
+  hand: string[],
+  roomId: string | undefined,
+  rng: RNG,
+): BotSuggestion {
   const c = botCandidates(ruledOut);
+  const heldSuspects = hand.filter((id) => getCard(id)?.type === 'suspect');
+  const heldWeapons = hand.filter((id) => getCard(id)?.type === 'weapon');
+  const roomUnknown = !!roomId && !ruledOut.has(roomId);
+
+  if (
+    roomUnknown &&
+    heldSuspects.length > 0 &&
+    heldWeapons.length > 0 &&
+    c.rooms.length >= c.suspects.length &&
+    c.rooms.length >= c.weapons.length
+  ) {
+    return { suspectId: pick(heldSuspects, rng), weaponId: pick(heldWeapons, rng) };
+  }
+
   const suspect = pick(c.suspects.length ? c.suspects : SUSPECTS, rng);
   const weapon = pick(c.weapons.length ? c.weapons : WEAPONS, rng);
   return { suspectId: suspect.id, weaponId: weapon.id };
+}
+
+/**
+ * Choose which matching card a bot reveals to a suggester when it holds more than one.
+ *  - Re-show a card the suggester has already seen from us if we can (it learns nothing new).
+ *  - Otherwise reveal whichever card the most *other* players have already seen, so we leak our hand
+ *    to as few new people as possible.
+ */
+export function botRevealCard(
+  matches: string[],
+  shownToSuggester: Set<string>,
+  exposure: Map<string, number>,
+  rng: RNG,
+): string {
+  if (matches.length <= 1) return matches[0];
+  const repeats = matches.filter((c) => shownToSuggester.has(c));
+  if (repeats.length) return pick(repeats, rng);
+  const best = Math.max(...matches.map((c) => exposure.get(c) ?? 0));
+  const mostExposed = matches.filter((c) => (exposure.get(c) ?? 0) === best);
+  return pick(mostExposed, rng);
 }
 
 /** Choose a destination: prefer entering a room (to suggest), favouring still-unknown rooms. */

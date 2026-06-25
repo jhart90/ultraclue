@@ -19,13 +19,13 @@ import {
   makeSuggestion,
   respondToSuggestion,
   passSuggestion,
-  autoRevealCard,
   makeAccusation,
   endTurn,
   passTurn,
   activeReachable,
   botAccusation,
   botSuggestion,
+  botRevealCard,
   botMoveTarget,
   botShouldStay,
   type GameState,
@@ -118,12 +118,16 @@ const RNG = makeRng(Math.floor(Math.random() * 0x7fffffff) + 1);
 // bot is on the clock the chat shows a transient "<bot> is thinking…" line.
 const BOT_DELAY = 10000;
 
-// Per-room bot memory: cards each bot has seen revealed, and rooms it has already suggested in.
-const botMem = new Map<string, { reveals: Map<string, Set<string>>; visited: Map<string, Set<string>> }>();
+// Per-room bot memory: cards each bot has seen revealed, rooms it has suggested in, and — keyed by
+// `${responderId}|${recipientId}` — which of its own cards it has already shown to each player.
+const botMem = new Map<
+  string,
+  { reveals: Map<string, Set<string>>; visited: Map<string, Set<string>>; shown: Map<string, Set<string>> }
+>();
 function memFor(room: Room) {
   let m = botMem.get(room.code);
   if (!m) {
-    m = { reveals: new Map(), visited: new Map() };
+    m = { reveals: new Map(), visited: new Map(), shown: new Map() };
     botMem.set(room.code, m);
   }
   return m;
@@ -203,11 +207,25 @@ function scheduleBotReveal(room: Room, botId: string): void {
     const sg = s.currentSuggestion;
     if (!sg || sg.resolved || sg.pendingResponderId !== botId) return;
     const trio = [sg.suspectId, sg.weaponId, sg.roomId];
-    const hasMatch = (getPlayer(s, botId)?.hand ?? []).some((c) => trio.includes(c));
+    const matches = (getPlayer(s, botId)?.hand ?? []).filter((c) => trio.includes(c));
     try {
-      room.game = hasMatch
-        ? respondToSuggestion(s, botId, autoRevealCard(s, botId), RNG)
-        : passSuggestion(s, botId, RNG);
+      if (matches.length === 0) {
+        room.game = passSuggestion(s, botId, RNG);
+      } else {
+        const mem = memFor(room);
+        const shownKey = `${botId}|${sg.suggesterId}`;
+        const shownToSuggester = mem.shown.get(shownKey) ?? new Set<string>();
+        // how many distinct players have already seen each card from this bot
+        const exposure = new Map<string, number>();
+        for (const [k, cards] of mem.shown) {
+          if (!k.startsWith(`${botId}|`)) continue;
+          for (const c of cards) exposure.set(c, (exposure.get(c) ?? 0) + 1);
+        }
+        const card = botRevealCard(matches, shownToSuggester, exposure, RNG);
+        shownToSuggester.add(card);
+        mem.shown.set(shownKey, shownToSuggester);
+        room.game = respondToSuggestion(s, botId, card, RNG);
+      }
       progress(room);
     } catch {
       /* ignore */
@@ -282,7 +300,7 @@ function scheduleBots(room: Room): void {
             return;
           }
           if (me?.inRoomId) {
-            const sugg = botSuggestion(ruled, RNG);
+            const sugg = botSuggestion(ruled, me.hand, me.inRoomId, RNG);
             const visited = memFor(room).visited.get(cur.id) ?? new Set<string>();
             visited.add(me.inRoomId);
             memFor(room).visited.set(cur.id, visited);

@@ -78,16 +78,20 @@ describe('setup / dealing', () => {
 });
 
 describe('suggestions', () => {
-  it('auto-passes bots with no match and stops at the first who can disprove, then ends the turn on reveal', () => {
+  it('pauses on each responder; a card-less one passes, the next reveals and the turn ends', () => {
     const st = baseState();
-    st.players[1].isBot = true; // a bot with no match passes automatically
+    st.players[1].isBot = true;
     st.players[1].hand = ['weapon-dagger']; // p2: no match
     st.players[2].hand = ['weapon-candlestick']; // p3: holds the suggested weapon
 
     let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    expect(s.currentSuggestion?.pendingResponderId).toBe('p2'); // pauses on p2 even with no match
+    expect(s.currentSuggestion?.passes).toEqual([]);
+    expect(s.currentSuggestion?.resolved).toBe(false);
+
+    s = passSuggestion(s, 'p2', makeRng(1)); // (the server drives a bot's pass after its "thinking" beat)
     expect(s.currentSuggestion?.passes).toEqual(['p2']);
     expect(s.currentSuggestion?.pendingResponderId).toBe('p3');
-    expect(s.currentSuggestion?.resolved).toBe(false);
 
     s = respondToSuggestion(s, 'p3', 'weapon-candlestick', makeRng(1));
     expect(s.currentSuggestion?.resolved).toBe(true);
@@ -99,8 +103,11 @@ describe('suggestions', () => {
   it('resolves with no reveal when nobody can disprove, and advances the turn', () => {
     const st = baseState();
     st.players.forEach((p) => (p.hand = ['weapon-dagger'])); // none in the suggested trio
-    st.players[1].isBot = st.players[2].isBot = true; // bots pass automatically
-    const s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    st.players[1].isBot = st.players[2].isBot = true;
+    let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    expect(s.currentSuggestion?.pendingResponderId).toBe('p2');
+    s = passSuggestion(s, 'p2', makeRng(1));
+    s = passSuggestion(s, 'p3', makeRng(1));
     expect(s.currentSuggestion?.resolved).toBe(true);
     expect(s.currentSuggestion?.anyRevealed).toBe(false);
     expect(s.currentSuggestion?.passes).toEqual(['p2', 'p3']);
@@ -132,7 +139,8 @@ describe('suggestions', () => {
     st.players[1].isBot = true;
     st.players[1].hand = [];
     st.players[2].hand = ['weapon-candlestick', 'weapon-dagger'];
-    const s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    s = passSuggestion(s, 'p2', makeRng(1)); // advance past the card-less p2 to p3
     expect(() => respondToSuggestion(s, 'p3', 'weapon-dagger', makeRng(1))).toThrow();
   });
 
@@ -225,6 +233,7 @@ describe('per-player view (hidden-information boundary)', () => {
     st.players[1].hand = [];
     st.players[2].hand = ['weapon-candlestick'];
     let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    s = passSuggestion(s, 'p2', makeRng(1)); // card-less p2 passes; play moves to p3
     s = respondToSuggestion(s, 'p3', 'weapon-candlestick', makeRng(1));
 
     expect(viewFor(s, 'p1').currentSuggestion?.revealedCardId).toBe('weapon-candlestick'); // suggester

@@ -188,7 +188,8 @@ function progress(room: Room): void {
   scheduleBots(room);
 }
 
-/** A bot that must disprove a suggestion reveals a matching card after a short beat. */
+/** A bot responding to a suggestion "thinks" for a beat, then reveals a matching card — or, if it
+ *  holds none, passes ("cannot disprove it"). Either way it spends the same time deliberating. */
 function scheduleBotReveal(room: Room, botId: string): void {
   const g = room.game;
   if (g) {
@@ -201,8 +202,12 @@ function scheduleBotReveal(room: Room, botId: string): void {
     if (!s || s.phase !== 'play') return;
     const sg = s.currentSuggestion;
     if (!sg || sg.resolved || sg.pendingResponderId !== botId) return;
+    const trio = [sg.suspectId, sg.weaponId, sg.roomId];
+    const hasMatch = (getPlayer(s, botId)?.hand ?? []).some((c) => trio.includes(c));
     try {
-      room.game = respondToSuggestion(s, botId, autoRevealCard(s, botId), RNG);
+      room.game = hasMatch
+        ? respondToSuggestion(s, botId, autoRevealCard(s, botId), RNG)
+        : passSuggestion(s, botId, RNG);
       progress(room);
     } catch {
       /* ignore */

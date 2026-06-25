@@ -81,28 +81,19 @@ export function makeSuggestion(
 }
 
 /**
- * Walk the query queue, stopping at the next player who has to respond: anyone holding a matching
- * card (they must reveal one), or a human holding none (they must acknowledge "Reveal nothing", so
- * play visibly pauses on them). Only bots with no match pass automatically. If the queue empties
- * with no reveal, the suggestion resolves disproven-by-no-one and the turn ends.
+ * Pause on the next player in the query queue, whoever they are — they must either reveal a matching
+ * card or acknowledge "Reveal nothing". The caller decides timing: a human clicks; the server gives a
+ * bot a beat to "think" and then auto-reveals or auto-passes. If the queue empties with no reveal, the
+ * suggestion resolves disproven-by-no-one and the turn ends.
  */
 export function progressSuggestion(state: GameState, rng: RNG): GameState {
   const s = clone(state);
   const sg = s.currentSuggestion;
   if (!sg || sg.resolved) return s;
 
-  while (sg.queue.length > 0) {
-    const pid = sg.queue[0];
-    const player = requirePlayer(s, pid);
-    const hasMatch = matchingCards(s, pid, sg).length > 0;
-    if (hasMatch || !player.isBot) {
-      sg.pendingResponderId = pid; // wait for their reveal (or, for a card-less human, their "pass")
-      return s;
-    }
-    // a bot with nothing to show passes automatically
-    sg.passes.push(pid);
-    sg.queue.shift();
-    log(s, `${player.name} cannot disprove it.`);
+  if (sg.queue.length > 0) {
+    sg.pendingResponderId = sg.queue[0]; // wait for their reveal (or their "Reveal nothing" pass)
+    return s;
   }
 
   sg.resolved = true;

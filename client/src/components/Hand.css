@@ -45,6 +45,14 @@
   height: 63px;
   line-height: 0;
   background: #14111f;
+  overflow: hidden;
+}
+.hand__thumbimg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top; /* show the face / top of the artwork in the small thumbnail */
+  display: block;
 }
 
 .hand__name {

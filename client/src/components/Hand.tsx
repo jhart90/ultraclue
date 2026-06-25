@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getCard, type AnyCard } from 'shared';
 import { CardArt } from '../render/cardArt';
+import { resolveOverride } from '../render/overrides';
 import { Card } from './Card';
 import { compareCards } from '../util/cardSort';
 import './Hand.css';
@@ -26,7 +27,14 @@ export function Hand({ cardIds }: { cardIds: string[] }) {
             title={`${card.title} — click to enlarge`}
           >
             <div className="hand__thumb">
-              <CardArt card={card} />
+              {(() => {
+                const override = resolveOverride(card.id, card.type, card.title);
+                return override ? (
+                  <img src={override} alt={card.title} className="hand__thumbimg" />
+                ) : (
+                  <CardArt card={card} />
+                );
+              })()}
             </div>
             <div className="hand__name">{card.title}</div>
           </div>

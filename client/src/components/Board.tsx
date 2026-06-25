@@ -190,6 +190,7 @@ export function Board({
   onMoveTo,
   keyboardZoom = true,
   myId,
+  activeId,
 }: {
   players: PlayerView[];
   reachable?: Coord[];
@@ -201,6 +202,8 @@ export function Board({
   keyboardZoom?: boolean;
   /** The viewer's own player id. When set, the camera locks onto and follows *other* players' moves. */
   myId?: string;
+  /** Whose turn it is. When this changes, the camera recentres on them at the follow zoom (unlocked). */
+  activeId?: string;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ scale: 0.8, tx: 0, ty: 0 });
@@ -268,6 +271,26 @@ export function Board({
     }, WALK_STEP_MS);
     return () => clearInterval(timer);
   }, [lastMove, myId]);
+
+  // When the turn passes to a new player, recentre the camera on them at the follow zoom — but leave
+  // it unlocked, so the viewer can immediately pan/zoom away.
+  const turnRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeId) return;
+    const prev = turnRef.current;
+    turnRef.current = activeId;
+    if (prev === null || prev === activeId) return; // skip first mount; only react to a real change
+    if (lockedRef.current) return; // a move is being followed — don't fight that camera
+    const p = playersRef.current.find((pl) => pl.id === activeId);
+    const el = viewportRef.current;
+    if (!p || !el) return;
+    const { px, py } = pawnWorldPos(p.position);
+    setView({
+      scale: FOLLOW_SCALE,
+      tx: el.clientWidth / 2 - px * FOLLOW_SCALE,
+      ty: el.clientHeight / 2 - py * FOLLOW_SCALE,
+    });
+  }, [activeId]);
 
   const reachSet = new Set((reachable ?? []).map(coordKey));
 

@@ -331,6 +331,7 @@ export function Game() {
             canMove={myTurn && game.turnPhase === 'awaitMove' && !suggestionPending}
             onMoveTo={moveTo}
             myId={myId}
+            activeId={activeId}
           />
         </div>
 

@@ -26,7 +26,11 @@ export function Chat({
       <div className="chat__log">
         {messages.length === 0 && <div className="chat__empty">No messages yet. Say hello!</div>}
         {messages.map((m) =>
-          m.system ? (
+          m.whisper ? (
+            <div className="chat__msg chat__msg--whisper" key={m.id}>
+              {highlightChat(m.text, players)}
+            </div>
+          ) : m.system ? (
             <div
               className={`chat__msg chat__msg--sys${/\b(suggests|accuses)\b/.test(m.text) ? ' chat__msg--cased' : ''}`}
               key={m.id}
@@ -56,7 +60,7 @@ export function Chat({
           value={text}
           maxLength={300}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Type a message…"
+          placeholder="Type a message…  (/w name … to whisper)"
         />
         <button type="submit" className="chat__send">
           Send

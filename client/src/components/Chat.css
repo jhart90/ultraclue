@@ -52,6 +52,12 @@
   font-style: italic;
   font-size: 0.84rem;
 }
+/* Private "whisper" lines — visible only to the sender + recipient. */
+.chat__msg--whisper {
+  color: #9a93b3;
+  font-style: italic;
+  font-size: 0.84rem;
+}
 /* Suggestion / accusation log lines get a thin white box to stand out. */
 .chat__msg--cased {
   border: 1px solid rgba(255, 255, 255, 0.85);

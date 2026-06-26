@@ -9,6 +9,7 @@ import {
   viewFor,
   makeRng,
   currentPlayerId,
+  getCard,
   getPlayer,
   rollAndMove,
   moveTo,
@@ -85,7 +86,18 @@ function emitLobby(room: Room): void {
 }
 
 function emitChat(room: Room): void {
-  io.to(room.code).emit(SOCKET_EVENTS.CHAT, { chat: room.chat });
+  // Whispers carry an audience (`to`); send each human only the messages they're allowed to see.
+  const hasPrivate = room.chat.some((m) => m.to);
+  if (!hasPrivate) {
+    io.to(room.code).emit(SOCKET_EVENTS.CHAT, { chat: room.chat });
+    return;
+  }
+  for (const slot of room.slots) {
+    const occ = slot.occupant;
+    if (!occ || occ.isBot) continue;
+    const chat = room.chat.filter((m) => !m.to || m.to.includes(occ.id));
+    io.to(occ.id).emit(SOCKET_EVENTS.CHAT, { chat });
+  }
 }
 
 // Last round number we auto-saved per room, so we save once per completed round.
@@ -148,6 +160,25 @@ function recordReveals(room: Room): void {
   memFor(room).reveals.set(sg.suggesterId, set);
 }
 
+/** Whisper the actual revealed card to just the two players in on it — "<A> reveals <Card> to <B>".
+ *  Fires once per reveal (reset when the next suggestion is in flight). */
+function whisperReveal(room: Room): void {
+  const g = room.game;
+  const sg = g?.currentSuggestion;
+  if (!sg || !sg.resolved) {
+    room.lastRevealWhisper = undefined; // fresh / no suggestion → allow the next reveal to whisper
+    return;
+  }
+  if (!sg.anyRevealed || !sg.revealedCardId || sg.responderId == null) return;
+  const key = `${sg.suggesterId}|${sg.responderId}|${sg.revealedCardId}`;
+  if (room.lastRevealWhisper === key) return;
+  room.lastRevealWhisper = key;
+  const responder = getPlayer(g!, sg.responderId)?.name ?? 'Someone';
+  const suggester = getPlayer(g!, sg.suggesterId)?.name ?? 'Someone';
+  const card = getCard(sg.revealedCardId)?.title ?? 'a card';
+  addChat(room, '', `${responder} reveals ${card} to ${suggester}.`, false, [sg.responderId, sg.suggesterId], true);
+}
+
 /** Push each human their own tailored game view. */
 function broadcastGame(room: Room): void {
   const g = room.game;
@@ -177,6 +208,7 @@ function progress(room: Room): void {
   const g = room.game;
   if (!g) return;
   recordReveals(room); // bots remember what their suggestions surfaced
+  whisperReveal(room); // privately tell the two players which card was shown
   mirrorLog(room); // fold new game events into the chat feed
   broadcastGame(room);
   emitChat(room);
@@ -446,7 +478,30 @@ io.on('connection', (socket) => {
   socket.on(SOCKET_EVENTS.LOBBY_CHAT, (p: LobbyChatPayload) => {
     const room = findRoomByOccupant(cid(socket));
     if (!room) return;
-    addChat(room, nameOf(room, cid(socket)), p?.text ?? '');
+    const me = cid(socket);
+    const myName = nameOf(room, me);
+    const raw = (p?.text ?? '').trim();
+
+    // "/w <Player Name> <message>" → a whisper only the sender and the named recipient can see.
+    const w = raw.match(/^\/w\s+(.+)$/i);
+    if (w) {
+      const rest = w[1];
+      const occupants = room.slots.map((s) => s.occupant).filter((o): o is NonNullable<typeof o> => !!o);
+      // match the longest occupant name that the text starts with (names can contain spaces)
+      const target = occupants
+        .filter((o) => rest.toLowerCase() === o.name.toLowerCase() || rest.toLowerCase().startsWith(o.name.toLowerCase() + ' '))
+        .sort((a, b) => b.name.length - a.name.length)[0];
+      if (!target) {
+        addChat(room, 'System', `No one here is called "${rest.split(/\s+/)[0]}".`, true, [me], true);
+      } else {
+        const msg = rest.slice(target.name.length).trim();
+        if (msg) addChat(room, '', `${myName} whispers to ${target.name}: ${msg}`, false, [me, target.id], true);
+      }
+      emitChat(room);
+      return;
+    }
+
+    addChat(room, myName, raw);
     emitChat(room);
   });
 

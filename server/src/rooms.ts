@@ -24,6 +24,7 @@ export interface Room {
   nextChatId: number;
   mirroredLogId: number; // highest game-log id already copied into the chat stream
   thinkingId?: number; // id of the transient "<bot> is thinking…" chat line, if one is showing
+  lastRevealWhisper?: string; // dedup key for the private "reveals <card>" whisper
 }
 
 const rooms = new Map<string, Room>();
@@ -139,10 +140,17 @@ export function pickSuspect(room: Room, id: string, suspectId: string): void {
   slot.occupant.suspectId = suspectId;
 }
 
-export function addChat(room: Room, fromName: string, text: string, system = false): void {
+export function addChat(
+  room: Room,
+  fromName: string,
+  text: string,
+  system = false,
+  to?: string[],
+  whisper = false,
+): void {
   const clean = text.trim().slice(0, 300);
   if (!clean) return;
-  room.chat.push({ id: room.nextChatId++, from: fromName, text: clean, system });
+  room.chat.push({ id: room.nextChatId++, from: fromName, text: clean, system, to, whisper });
   if (room.chat.length > 500) room.chat.shift();
 }
 

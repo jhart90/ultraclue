@@ -8,6 +8,10 @@ export interface ChatMsg {
   from: string; // display name (ignored for system narration)
   text: string;
   system?: boolean; // game-log narration / room notices, rendered without a "name:" prefix
+  /** Audience (player ids). Undefined = public/everyone; otherwise only these ids may see it. */
+  to?: string[];
+  /** A private "whisper" — rendered in italic grey. */
+  whisper?: boolean;
 }
 
 export interface SlotOccupant {

@@ -51,6 +51,7 @@ export function Game() {
 
   // --- pop-up overlays (status / announcement / reveal) ---
   const [statusOpen, setStatusOpen] = useState(false);
+  const [elevatorReady, setElevatorReady] = useState(false); // gated until the piece reaches the lift
   const [annOpen, setAnnOpen] = useState(false);
   const [revealOpen, setRevealOpen] = useState(false);
   // A captured accusation (so its two-step reveal survives later announcements overwriting the live one).
@@ -147,6 +148,23 @@ export function Game() {
     // lastMove is intentionally omitted: it changes in lock-step with turnPhase/inRoomId (which are
     // listed), and including the fresh object each tick would cancel the pending timeout.
   }, [game?.turnPhase, game?.lastRoll?.[0], game?.lastRoll?.[1], meNow?.inRoomId, myTurnNow, suggestionPendingNow, game?.phase, myId]);
+
+  // Hold the elevator floor-chooser until my piece has finished walking into the lift.
+  useEffect(() => {
+    if (!game || game.turnPhase !== 'awaitElevator' || !myTurnNow) {
+      setElevatorReady(false);
+      return;
+    }
+    const mv = game.lastMove;
+    const tilesToWalk = mv && mv.playerId === myId ? mv.path.length - 1 : 0;
+    if (tilesToWalk <= 0) {
+      setElevatorReady(true);
+      return;
+    }
+    setElevatorReady(false);
+    const t = setTimeout(() => setElevatorReady(true), tilesToWalk * WALK_STEP_MS + 80);
+    return () => clearTimeout(t);
+  }, [game?.turnPhase, myTurnNow, myId, game?.lastMove]);
 
   if (!game) {
     return (
@@ -449,7 +467,7 @@ export function Game() {
         <NoEvidencePanel trio={[sug.suspectId, sug.weaponId, sug.roomId]} onPass={() => passSuggestion()} />
       )}
 
-      {myTurn && game.turnPhase === 'awaitElevator' && game.elevatorFloors && (
+      {myTurn && game.turnPhase === 'awaitElevator' && game.elevatorFloors && elevatorReady && (
         <div className="sp__backdrop">
           <div className="statpop">
             <div className="statpop__line1">🛗 Elevator</div>

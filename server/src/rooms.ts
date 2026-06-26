@@ -27,6 +27,8 @@ export interface Room {
   lastRevealWhisper?: string; // dedup key for the private "reveals <card>" whisper
   /** Every player's private Detective Notes, keyed by player id, so they're in every save. */
   notes: Record<string, string>;
+  /** A freshly loaded game is paused (all seats are bots) until a human takes a seat. */
+  paused?: boolean;
 }
 
 const rooms = new Map<string, Room>();
@@ -336,27 +338,25 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
   };
   room.game!.code = room.code;
 
-  // The loader resumes their OWN seat (so they keep their own hand and never see anyone else's). If
-  // their id isn't in the save (loading on a different device), they take over the original host's
-  // seat instead. Every other human becomes a connected bot, free for others to take over on rejoin.
-  const hasOwnSeat =
+  // Every seat starts as a connected bot and the game is paused: the loader (and anyone who rejoins
+  // by the room code) then picks which player to take over from the seat picker. Free the loader's
+  // own id so they can claim any seat — including their own — without a collision.
+  const usesLoaderId =
     room.game!.players.some((p) => p.id === loaderId) || room.slots.some((s) => s.occupant?.id === loaderId);
-  if (!hasOwnSeat) remapId(room, room.hostId, loaderId);
-  room.hostId = loaderId;
+  if (usesLoaderId) remapId(room, loaderId, `loadbot-${room.code}-self`);
+  room.hostId = loaderId; // the loader owns the loaded room; they become a player once they pick a seat
+  room.paused = true;
+  void loaderName;
 
   for (const slot of room.slots) {
     if (!slot.occupant) continue;
-    const isLoader = slot.occupant.id === loaderId;
+    slot.occupant.isBot = true;
     slot.occupant.connected = true;
-    slot.occupant.isBot = !isLoader;
-    if (isLoader && loaderName) slot.occupant.name = loaderName;
   }
   for (const p of room.game!.players) {
-    const isLoader = p.id === loaderId;
+    p.isBot = true;
     p.connected = true;
-    p.isBot = !isLoader;
-    p.isHost = isLoader;
-    if (isLoader && loaderName) p.name = loaderName;
+    p.isHost = false;
   }
 
   rooms.set(room.code, room);
@@ -412,6 +412,7 @@ export function takeSeat(room: Room, joinerId: string, name: string, index: numb
   if (gp) {
     gp.isBot = false;
     gp.connected = true;
+    gp.isHost = joinerId === room.hostId;
     if (name.trim()) gp.name = name.trim();
   }
 }

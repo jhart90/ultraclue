@@ -69,6 +69,11 @@
   flex: 1;
   font-weight: 700;
 }
+.seatpick__char {
+  font-weight: 400;
+  color: var(--muted, #9a93b3);
+  font-size: 0.85em;
+}
 .seatpick__tag {
   font-size: 0.72rem;
   background: var(--accent, #c8a24a);

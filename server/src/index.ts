@@ -466,8 +466,13 @@ io.on('connection', (socket) => {
       takeSeat(room, clientId, p?.name ?? '', p?.index ?? -1);
       addChat(room, 'System', `${nameOf(room, clientId)} joined the game.`, true);
       emitLobby(room);
-      broadcastGame(room);
-      emitChat(room);
+      if (room.paused) {
+        room.paused = false; // first human took a seat — start the loaded game running
+        progress(room);
+      } else {
+        broadcastGame(room);
+        emitChat(room);
+      }
       sendNotes(socket, room, clientId); // restore the notes for the seat they took over
     } catch (err) {
       emitError(socket, (err as Error).message);
@@ -629,10 +634,10 @@ io.on('connection', (socket) => {
       autoSaveTurn.set(room.code, `${room.game?.round ?? 0}:${room.game?.activeIdx ?? 0}`);
       socket.join(room.code);
       cancelCleanup(room.code);
-      addChat(room, 'System', `${nameOf(room, clientId)} loaded a saved game.`, true);
+      addChat(room, 'System', `${p?.name?.trim() || 'A player'} loaded a saved game.`, true);
+      // The game stays paused (all seats bots); the loader picks a seat from the seat picker, which
+      // un-pauses play. Don't broadcast a game view yet — they have no seat / no cards to see.
       emitLobby(room);
-      progress(room); // broadcast the resumed view and let any up-next bot act
-      sendNotes(socket, room, clientId); // restore the loader's own notes
     } catch (err) {
       emitError(socket, (err as Error).message);
     }

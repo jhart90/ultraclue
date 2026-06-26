@@ -27,11 +27,15 @@ export function SeatPicker() {
           {available.length === 0 && <div className="seatpick__empty">No seats are open to take over right now.</div>}
           {available.map((slot) => {
             const occ = slot.occupant!;
-            const title = (occ.suspectId && getCard(occ.suspectId)?.title) || 'A detective';
+            const character = (occ.suspectId && getCard(occ.suspectId)?.title) || 'A detective';
+            const showName = !!occ.name && occ.name !== character;
             return (
               <button key={slot.index} className="seatpick__seat" onClick={() => takeSeat(slot.index)}>
                 <span className="seatpick__sw" style={{ background: suspectColor(occ.suspectId) }} />
-                <span className="seatpick__name">{title}</span>
+                <span className="seatpick__name">
+                  {showName ? occ.name : character}
+                  {showName && <span className="seatpick__char"> · {character}</span>}
+                </span>
                 <span className="seatpick__tag">Take over</span>
               </button>
             );

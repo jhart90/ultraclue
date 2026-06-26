@@ -172,6 +172,7 @@ export const useStore = create<StoreState>((set) => ({
     const s = readSave();
     if (s) {
       pendingNotes = s.notes ?? null; // restored under the new room code once the game view arrives
+      pendingName = ''; // keep each seat's saved name when the loader picks from the seat picker
       socket.emit(SOCKET_EVENTS.LOAD_GAME, { blob: s.blob, clientId: CLIENT_ID });
     }
   },

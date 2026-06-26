@@ -39,7 +39,7 @@ export const WEAPONS: WeaponCard[] = [
   { id: 'weapon-cane', type: 'weapon', title: 'Walking Cane', phrase: 'A gentleman’s last word.' },
   { id: 'weapon-razor', type: 'weapon', title: 'Straight Razor', phrase: 'Close shave, closer call.' },
   { id: 'weapon-branding-iron', type: 'weapon', title: 'Branding Iron', phrase: 'Leaves a lasting impression.' },
-  { id: 'weapon-tire-iron', type: 'weapon', title: 'Tire Iron', phrase: 'Changes more than tires.' },
+  { id: 'weapon-high-heels', type: 'weapon', title: 'High Heels', phrase: 'Stiletto by name, stiletto by nature.' },
   { id: 'weapon-snow-globe', type: 'weapon', title: 'Snow Globe', phrase: 'A pretty, heavy memento.' },
   { id: 'weapon-champagne', type: 'weapon', title: 'Champagne Bottle', phrase: 'Bubbles to the surface.' },
 ];

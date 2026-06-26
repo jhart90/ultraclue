@@ -42,12 +42,15 @@ import {
   type SetSlotPayload,
   type RejoinPayload,
   type BootPlayerPayload,
+  type TakeSeatPayload,
   type LoadGamePayload,
   type SaveGameDataPayload,
 } from 'shared';
 import {
   type Room,
   addChat,
+  getRoom,
+  takeSeat,
   mirrorLog,
   setThinking,
   clearThinking,
@@ -426,11 +429,37 @@ io.on('connection', (socket) => {
     try {
       const clientId = p?.clientId || socket.id;
       register(clientId);
+      const existing = getRoom(p?.code ?? '');
+      // Joining an in-progress (loaded) game: don't auto-seat — let them pick a seat to take over.
+      if (existing && existing.phase === 'play') {
+        socket.join(existing.code);
+        cancelCleanup(existing.code);
+        emitLobby(existing); // client shows a seat picker (phase 'play' & not yet seated)
+        return;
+      }
       const { room } = joinRoom(p?.code ?? '', clientId, p?.name ?? '');
       socket.join(room.code);
       cancelCleanup(room.code);
       addChat(room, 'System', `${nameOf(room, clientId)} joined the game.`, true);
       emitLobby(room);
+      emitChat(room);
+    } catch (err) {
+      emitError(socket, (err as Error).message);
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.TAKE_SEAT, (p: TakeSeatPayload) => {
+    const room = getRoom(p?.code ?? '');
+    if (!room) {
+      emitError(socket, 'That game no longer exists.');
+      return;
+    }
+    try {
+      const clientId = cid(socket);
+      takeSeat(room, clientId, p?.name ?? '', p?.index ?? -1);
+      addChat(room, 'System', `${nameOf(room, clientId)} joined the game.`, true);
+      emitLobby(room);
+      broadcastGame(room);
       emitChat(room);
     } catch (err) {
       emitError(socket, (err as Error).message);

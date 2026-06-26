@@ -5,6 +5,7 @@ import {
   type Coord,
   type GameView,
   type LobbyView,
+  type Slot,
   type SlotStatus,
   type YouArePayload,
   type LobbyPayload,
@@ -71,6 +72,7 @@ function writeSave(payload: SaveSlot): void {
 // Detective Notes persist in localStorage keyed by room code; carry them across a save/load.
 const notesKey = (code: string) => `ultraclue-notes-${code}`;
 let pendingNotes: string | null = null; // notes to restore once the loaded game's (new) code arrives
+let pendingName = ''; // the name typed on the Join form, reused if we have to pick a seat
 function readNotes(code: string): string | null {
   try {
     return localStorage.getItem(notesKey(code));
@@ -99,11 +101,14 @@ interface StoreState {
   savedMeta?: SavedGameMeta;
   /** Bumps when a save lands, so the in-game menu can flash a brief "Saved" confirmation. */
   savedAt?: number;
+  /** Set when we joined an in-progress (loaded) game and must pick a seat to take over. */
+  seatPick?: { code: string; slots: Slot[] };
 
   // actions
   goto: (screen: Screen) => void;
   createGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
+  takeSeat: (index: number) => void;
   setSlot: (index: number, status: SlotStatus) => void;
   pickSuspect: (suspectId: string) => void;
   sendChat: (text: string) => void;
@@ -134,8 +139,14 @@ export const useStore = create<StoreState>((set) => ({
 
   goto: (screen) => set({ screen }),
   createGame: (name) => socket.emit(SOCKET_EVENTS.CREATE_GAME, { name, clientId: CLIENT_ID }),
-  joinGame: (code, name) =>
-    socket.emit(SOCKET_EVENTS.JOIN_GAME, { code: code.toUpperCase(), name, clientId: CLIENT_ID }),
+  joinGame: (code, name) => {
+    pendingName = name; // remembered in case we land on a seat-picker for an in-progress game
+    socket.emit(SOCKET_EVENTS.JOIN_GAME, { code: code.toUpperCase(), name, clientId: CLIENT_ID });
+  },
+  takeSeat: (index) => {
+    const { seatPick } = useStore.getState();
+    if (seatPick) socket.emit(SOCKET_EVENTS.TAKE_SEAT, { code: seatPick.code, index, name: pendingName });
+  },
   setSlot: (index, status) => socket.emit(SOCKET_EVENTS.SET_SLOT, { index, status }),
   pickSuspect: (suspectId) => socket.emit(SOCKET_EVENTS.PICK_SUSPECT, { suspectId }),
   sendChat: (text) => socket.emit(SOCKET_EVENTS.LOBBY_CHAT, { text }),
@@ -189,10 +200,14 @@ socket.on(SOCKET_EVENTS.LOBBY, (p: LobbyPayload) => {
   useStore.setState((state) => {
     const inRoom = lobby.slots.some((s) => s.occupant?.id === state.myId);
     if (inRoom) saveRoom(lobby.code);
+    // We joined an in-progress (loaded) game but aren't seated yet → pick a seat to take over.
+    if (!inRoom && lobby.phase === 'play') {
+      return { lobby, seatPick: { code: lobby.code, slots: lobby.slots }, error: undefined };
+    }
     // Only follow a lobby into its screen if we're actually seated in it — otherwise a stray update
     // (e.g. right after we left) must not drag us back into the game.
     const screen: Screen = inRoom ? (lobby.phase === 'play' ? 'game' : 'lobby') : state.screen;
-    return { lobby, screen, error: undefined };
+    return { lobby, screen, seatPick: undefined, error: undefined };
   });
 });
 
@@ -204,7 +219,7 @@ socket.on(SOCKET_EVENTS.GAME_STARTED, (p: GameStartedPayload) => {
     pendingNotes = null;
   }
   saveRoom(p.view.code);
-  useStore.setState({ game: p.view, screen: 'game' });
+  useStore.setState({ game: p.view, screen: 'game', seatPick: undefined });
 });
 
 socket.on(SOCKET_EVENTS.REJOIN_FAILED, () => {

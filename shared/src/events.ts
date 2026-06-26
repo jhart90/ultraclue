@@ -34,6 +34,7 @@ export const SOCKET_EVENTS = {
   BOOT_PLAYER: 'bootPlayer', // host replaces a human player with a bot
   SAVE_GAME: 'saveGame', // request a fresh save snapshot of the current game
   LOAD_GAME: 'loadGame', // restore a previously saved game (from the title screen)
+  TAKE_SEAT: 'takeSeat', // join an in-progress (loaded) game by taking over a bot/empty seat
 
   // --- server -> client ---
   YOU_ARE: 'youAre',
@@ -113,6 +114,11 @@ export interface MakeAccusationPayload {
 export interface BootPlayerPayload {
   /** Game player id of the human seat to replace with a bot. */
   targetId: string;
+}
+export interface TakeSeatPayload {
+  code: string;
+  index: number; // slot index of the bot/empty seat to take over
+  name: string;
 }
 
 /** A saved-game snapshot. `blob` is an opaque serialized room (handled only by the server); the

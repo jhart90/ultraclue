@@ -1,0 +1,79 @@
+.seatpick__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 16, 0.82);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.seatpick {
+  width: min(460px, 95vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: #1d1830;
+  border: 2px solid var(--accent, #c8a24a);
+  border-radius: 14px;
+  padding: 1.2rem;
+}
+.seatpick__title {
+  margin: 0;
+  color: var(--accent, #c8a24a);
+  font-family: var(--font-display, 'Georgia', serif);
+}
+.seatpick__hint {
+  margin: 0;
+  color: var(--muted, #9a93b3);
+  font-style: italic;
+}
+.seatpick__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.3rem 0;
+}
+.seatpick__empty {
+  color: var(--muted, #9a93b3);
+  text-align: center;
+  padding: 0.8rem;
+}
+.seatpick__seat {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  background: #261f3a;
+  border: 1px solid rgba(200, 162, 74, 0.3);
+  border-radius: 8px;
+  color: var(--ink, #ece8f5);
+  cursor: pointer;
+  font-family: 'Georgia', serif;
+  text-align: left;
+}
+.seatpick__seat:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.seatpick__sw {
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+.seatpick__name {
+  flex: 1;
+  font-weight: 700;
+}
+.seatpick__tag {
+  font-size: 0.72rem;
+  background: var(--accent, #c8a24a);
+  color: #1a1622;
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  font-weight: 700;
+}

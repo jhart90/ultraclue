@@ -384,6 +384,29 @@ export function leaveGameAsBot(room: Room, clientId: string): void {
   }
 }
 
+/** A player joining an in-progress (loaded) game takes over a bot/empty seat, inheriting that
+ *  character and its hand. The seat must currently be a bot (or empty). */
+export function takeSeat(room: Room, joinerId: string, name: string, index: number): void {
+  if (room.phase !== 'play') throw new Error('That game is not in progress.');
+  const slot = room.slots[index];
+  if (!slot?.occupant) throw new Error('That seat is empty.');
+  if (!slot.occupant.isBot) throw new Error('That seat is taken by a connected player.');
+  if (room.slots.some((s) => s.occupant?.id === joinerId)) throw new Error('You already hold a seat.');
+  remapId(room, slot.occupant.id, joinerId);
+  const occ = room.slots.find((s) => s.occupant?.id === joinerId)?.occupant;
+  if (occ) {
+    occ.isBot = false;
+    occ.connected = true;
+    occ.name = name.trim() || occ.name;
+  }
+  const gp = room.game?.players.find((p) => p.id === joinerId);
+  if (gp) {
+    gp.isBot = false;
+    gp.connected = true;
+    if (name.trim()) gp.name = name.trim();
+  }
+}
+
 /** Build the engine GameState from the lobby roster, assigning suspects to anyone without one. */
 export function startGameInRoom(room: Room, requesterId: string): GameState {
   if (room.hostId !== requesterId) throw new Error('Only the host can start the game.');

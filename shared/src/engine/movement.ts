@@ -1,16 +1,17 @@
 import { BOARD, coordKey, type Board, type BoardCell, type Coord, type FloorId } from '../data/board';
 
-// Movement runs over a "collapsed" graph where every room is a single node (a room counts as one
-// space and ends your move when you enter it) and every corridor cell is its own node. Each floor's
-// elevator is a single terminal node too: entering it ends the move (and triggers the floor choice
-// in the turn engine). Cellar stairs are a free Grounds<->Basement link. The 8 secret shortcuts are
-// NOT part of dice movement (separate mechanic).
+// Movement runs over a "collapsed" graph where every room is a single node (one space) and every
+// corridor cell is its own node. A room is *passable*: it costs one step to enter and you may keep
+// moving out of it (e.g. step into the Master Suite, then on into the Walk-in Closet), or stop there
+// to suggest. Only the elevator is a terminal "stop" node: entering it ends the move and triggers the
+// floor choice. Cellar stairs are a free Grounds<->Basement link. The 8 secret shortcuts are NOT part
+// of dice movement (separate mechanic).
 
 const roomNode = (roomId: string) => `room:${roomId}`;
 const elevNode = (floor: FloorId) => `elev:${floor}`;
 const isRoomNode = (n: string) => n.startsWith('room:');
 const isElevNode = (n: string) => n.startsWith('elev:');
-const isStopNode = (n: string) => isRoomNode(n) || isElevNode(n);
+const isStopNode = (n: string) => isElevNode(n); // only the lift halts a move; rooms are passable
 
 function buildCellMap(board: Board): Map<string, BoardCell> {
   const m = new Map<string, BoardCell>();
@@ -176,11 +177,16 @@ export function pathTo(board: Board, start: Coord, dest: Coord, steps: number, b
     nodes.unshift(cur);
     cur = parent.get(cur);
   }
-  // Expand nodes to tiles: corridors are their coord; the start room uses `start`, the
-  // destination room uses the clicked `dest`.
+  // Expand nodes to tiles: corridors are their coord; the start room/elevator uses `start`, the
+  // destination room/elevator uses the clicked `dest`, and a room merely passed through uses a
+  // representative tile so the pawn is seen crossing it.
   return nodes.map((node, i) => {
-    if (isStopNode(node)) {
-      return i === 0 ? { x: start.x, y: start.y } : { x: dest.x, y: dest.y };
+    if (isElevNode(node)) return i === 0 ? { x: start.x, y: start.y } : { x: dest.x, y: dest.y };
+    if (isRoomNode(node)) {
+      if (i === 0) return { x: start.x, y: start.y };
+      if (i === nodes.length - 1) return { x: dest.x, y: dest.y };
+      const room = board.rooms[node.slice('room:'.length)];
+      return room ? { x: room.label.x, y: room.label.y } : { x: dest.x, y: dest.y };
     }
     const [x, y] = node.split(',').map(Number);
     return { x, y };

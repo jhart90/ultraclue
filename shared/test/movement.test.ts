@@ -78,4 +78,18 @@ describe('movement', () => {
     // p1 is in the open, so the in-room action is illegal here
     expect(() => rollAndMove(s, 'p1', makeRng(1))).toThrow();
   });
+
+  it('treats rooms as passable: from outside the Master Suite, a roll of 2 reaches the Walk-in Closet', () => {
+    const master = BOARD.rooms['room-master-suite'];
+    const closet = BOARD.rooms['room-walk-in-closet'];
+    const masterDoor = master.entrances[0].doorTile; // a corridor cell just outside a Master Suite door
+    const reach = new Set(reachableTiles(BOARD, masterDoor, 2, new Set()).map(coordKey));
+    // 1 step into the Master Suite…
+    expect(master.tiles.some((t) => reach.has(coordKey(t)))).toBe(true);
+    // …then 1 step on into the Walk-in Closet, all in a single roll of 2.
+    expect(closet.tiles.some((t) => reach.has(coordKey(t)))).toBe(true);
+    // but a roll of 1 only reaches the Master Suite, not the Closet beyond it.
+    const reach1 = new Set(reachableTiles(BOARD, masterDoor, 1, new Set()).map(coordKey));
+    expect(closet.tiles.some((t) => reach1.has(coordKey(t)))).toBe(false);
+  });
 });

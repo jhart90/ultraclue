@@ -137,7 +137,13 @@ export function Lobby() {
         </div>
 
         <aside className="lobby__chat">
-          <Chat messages={chat} onSend={sendChat} />
+          <Chat
+            messages={chat}
+            onSend={sendChat}
+            players={lobby.slots
+              .filter((s) => s.occupant)
+              .map((s) => ({ name: s.occupant!.name, color: suspectColor(s.occupant!.suspectId) }))}
+          />
         </aside>
       </div>
 

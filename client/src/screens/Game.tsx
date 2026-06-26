@@ -336,7 +336,11 @@ export function Game() {
         </div>
 
         <aside className="game__chat">
-          <Chat messages={chat} onSend={sendChat} />
+          <Chat
+            messages={chat}
+            onSend={sendChat}
+            players={game.players.map((p) => ({ name: p.name, color: suspectColor(p.suspectId) }))}
+          />
         </aside>
       </div>
 

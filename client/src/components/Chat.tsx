@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChatMsg } from 'shared';
-import { highlightChat } from '../util/highlightChat';
+import { highlightChat, type ChatPlayer } from '../util/highlightChat';
 import './Chat.css';
 
-export function Chat({ messages, onSend }: { messages: ChatMsg[]; onSend: (text: string) => void }) {
+export function Chat({
+  messages,
+  onSend,
+  players = [],
+}: {
+  messages: ChatMsg[];
+  onSend: (text: string) => void;
+  /** Current players, so their names render in their character's colour. */
+  players?: ChatPlayer[];
+}) {
   const [text, setText] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -22,11 +31,11 @@ export function Chat({ messages, onSend }: { messages: ChatMsg[]; onSend: (text:
               className={`chat__msg chat__msg--sys${/\b(suggests|accuses)\b/.test(m.text) ? ' chat__msg--cased' : ''}`}
               key={m.id}
             >
-              {highlightChat(m.text)}
+              {highlightChat(m.text, players)}
             </div>
           ) : (
             <div className="chat__msg" key={m.id}>
-              <span className="chat__from">{highlightChat(m.from)}:</span> {highlightChat(m.text)}
+              <span className="chat__from">{highlightChat(m.from, players)}:</span> {highlightChat(m.text, players)}
             </div>
           ),
         )}

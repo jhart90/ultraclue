@@ -26,15 +26,27 @@ function nodeOf(cellMap: Map<string, BoardCell>, tile: Coord): string {
   return coordKey(tile);
 }
 
-function buildMoveGraph(board: Board): { graph: Map<string, string[]>; cellMap: Map<string, BoardCell> } {
+function buildMoveGraph(board: Board): {
+  graph: Map<string, string[]>;
+  freeLinks: Map<string, string[]>;
+  cellMap: Map<string, BoardCell>;
+} {
   const cellMap = buildCellMap(board);
   const graph = new Map<string, string[]>();
+  const freeLinks = new Map<string, string[]>(); // 0-cost teleports (the between-floor staircases)
   const link = (a: string, b: string) => {
     if (a === b) return;
     if (!graph.has(a)) graph.set(a, []);
     if (!graph.has(b)) graph.set(b, []);
     if (!graph.get(a)!.includes(b)) graph.get(a)!.push(b);
     if (!graph.get(b)!.includes(a)) graph.get(b)!.push(a);
+  };
+  const linkFree = (a: string, b: string) => {
+    if (a === b) return;
+    if (!freeLinks.has(a)) freeLinks.set(a, []);
+    if (!freeLinks.has(b)) freeLinks.set(b, []);
+    if (!freeLinks.get(a)!.includes(b)) freeLinks.get(a)!.push(b);
+    if (!freeLinks.get(b)!.includes(a)) freeLinks.get(b)!.push(a);
   };
 
   const ORTHO = [
@@ -56,11 +68,13 @@ function buildMoveGraph(board: Board): { graph: Map<string, string[]>; cellMap: 
   for (const room of Object.values(board.rooms)) {
     for (const e of room.entrances) link(roomNode(room.id), nodeOf(cellMap, e.doorTile));
   }
-  // Cellar stairs (Grounds <-> Basement) and the grand staircase (Ground Floor <-> Upper Floor).
-  if (board.cellarLink.a && board.cellarLink.b) link(nodeOf(cellMap, board.cellarLink.a), nodeOf(cellMap, board.cellarLink.b));
-  if (board.grandLink.a && board.grandLink.b) link(nodeOf(cellMap, board.grandLink.a), nodeOf(cellMap, board.grandLink.b));
+  // Between-floor staircases — cellar (Grounds<->Basement) and grand (Ground<->Upper) — are FREE
+  // teleports: land on one and you cross for nothing, keeping your remaining roll to spend on the
+  // far side.
+  if (board.cellarLink.a && board.cellarLink.b) linkFree(nodeOf(cellMap, board.cellarLink.a), nodeOf(cellMap, board.cellarLink.b));
+  if (board.grandLink.a && board.grandLink.b) linkFree(nodeOf(cellMap, board.grandLink.a), nodeOf(cellMap, board.grandLink.b));
 
-  return { graph, cellMap };
+  return { graph, freeLinks, cellMap };
 }
 
 // Cache for the static BOARD.
@@ -72,10 +86,12 @@ interface Bfs {
 }
 
 function bfs(board: Board, start: Coord, steps: number, blocked: Set<string>): { graph: Map<string, string[]>; cellMap: Map<string, BoardCell>; startNode: string } & Bfs {
-  const { graph, cellMap } = board === BOARD ? CACHE : buildMoveGraph(board);
+  const { graph, freeLinks, cellMap } = board === BOARD ? CACHE : buildMoveGraph(board);
   const startNode = nodeOf(cellMap, start);
   const dist = new Map<string, number>([[startNode, 0]]);
   const parent = new Map<string, string>();
+  // 0-1 BFS: free links (staircases) cost 0 and go to the front; ordinary steps cost 1 and go to the
+  // back. Popping from the front keeps the queue in non-decreasing distance order.
   const queue: string[] = [startNode];
 
   while (queue.length) {
@@ -83,6 +99,15 @@ function bfs(board: Board, start: Coord, steps: number, blocked: Set<string>): {
     const d = dist.get(cur)!;
     // A room or elevator (other than where you started) ends your move — don't expand through it.
     if (isStopNode(cur) && cur !== startNode) continue;
+    // Cross a staircase for free — allowed even with no steps left.
+    for (const n of freeLinks.get(cur) ?? []) {
+      if (blocked.has(n)) continue;
+      if (!dist.has(n)) {
+        dist.set(n, d);
+        parent.set(n, cur);
+        queue.unshift(n);
+      }
+    }
     if (d >= steps) continue;
     for (const n of graph.get(cur) ?? []) {
       if (!isStopNode(n) && blocked.has(n)) continue; // corridor occupied by another piece

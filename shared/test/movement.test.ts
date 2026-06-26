@@ -79,6 +79,19 @@ describe('movement', () => {
     expect(() => rollAndMove(s, 'p1', makeRng(1))).toThrow();
   });
 
+  it('between-floor staircases are a free teleport: from one landing, a roll of 1 reaches a tile next to the far landing', () => {
+    const a = BOARD.cellarLink.a; // Grounds landing
+    const b = BOARD.cellarLink.b; // Basement landing
+    const reach = new Set(reachableTiles(BOARD, a, 1, new Set()).map(coordKey));
+    const ortho = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+    const bNeighbour = ortho
+      .map((d) => ({ x: b.x + d.x, y: b.y + d.y }))
+      .find((t) => BOARD.cells.find((c) => c.x === t.x && c.y === t.y)?.type === 'path');
+    expect(bNeighbour, 'basement landing has a path neighbour').toBeTruthy();
+    // Reachable in a single step only because crossing the staircase itself cost nothing.
+    expect(reach.has(coordKey(bNeighbour!))).toBe(true);
+  });
+
   it('treats rooms as passable: from outside the Master Suite, a roll of 2 reaches the Walk-in Closet', () => {
     const master = BOARD.rooms['room-master-suite'];
     const closet = BOARD.rooms['room-walk-in-closet'];

@@ -43,6 +43,7 @@ import {
   type RejoinPayload,
   type BootPlayerPayload,
   type TakeSeatPayload,
+  type SetNotesPayload,
   type LoadGamePayload,
   type SaveGameDataPayload,
 } from 'shared';
@@ -181,6 +182,12 @@ function whisperReveal(room: Room): void {
   const suggester = getPlayer(g!, sg.suggesterId)?.name ?? 'Someone';
   const card = getCard(sg.revealedCardId)?.title ?? 'a card';
   addChat(room, '', `${responder} reveals ${card} to ${suggester}.`, false, [sg.responderId, sg.suggesterId], true);
+}
+
+/** Hand a player the saved Detective Notes for the seat they hold (on resume / rejoin / takeover). */
+function sendNotes(socket: Socket, room: Room, id: string): void {
+  const notes = room.notes?.[id];
+  if (notes) socket.emit(SOCKET_EVENTS.NOTES, { notes });
 }
 
 /** Push each human their own tailored game view. */
@@ -461,9 +468,17 @@ io.on('connection', (socket) => {
       emitLobby(room);
       broadcastGame(room);
       emitChat(room);
+      sendNotes(socket, room, clientId); // restore the notes for the seat they took over
     } catch (err) {
       emitError(socket, (err as Error).message);
     }
+  });
+
+  // A player's Detective Notes changed — keep the server copy current so every save carries them.
+  socket.on(SOCKET_EVENTS.SET_NOTES, (p: SetNotesPayload) => {
+    const room = findRoomByOccupant(cid(socket));
+    if (!room || typeof p?.notes !== 'string') return;
+    room.notes[cid(socket)] = p.notes.slice(0, 200_000);
   });
 
   socket.on(SOCKET_EVENTS.REJOIN, (p: RejoinPayload) => {
@@ -481,6 +496,7 @@ io.on('connection', (socket) => {
     emitLobby(room);
     emitChat(room);
     if (room.game) socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: viewFor(room.game, clientId) });
+    sendNotes(socket, room, clientId); // hand back their notes on reconnect
   });
 
   socket.on(SOCKET_EVENTS.SET_SLOT, (p: SetSlotPayload) => {
@@ -616,6 +632,7 @@ io.on('connection', (socket) => {
       addChat(room, 'System', `${nameOf(room, clientId)} loaded a saved game.`, true);
       emitLobby(room);
       progress(room); // broadcast the resumed view and let any up-next bot act
+      sendNotes(socket, room, clientId); // restore the loader's own notes
     } catch (err) {
       emitError(socket, (err as Error).message);
     }

@@ -35,12 +35,14 @@ export const SOCKET_EVENTS = {
   SAVE_GAME: 'saveGame', // request a fresh save snapshot of the current game
   LOAD_GAME: 'loadGame', // restore a previously saved game (from the title screen)
   TAKE_SEAT: 'takeSeat', // join an in-progress (loaded) game by taking over a bot/empty seat
+  SET_NOTES: 'setNotes', // client pushes its Detective Notes so they ride along in every save
 
   // --- server -> client ---
   YOU_ARE: 'youAre',
   LOBBY: 'lobby',
   CHAT: 'chat', // broadcast of the full chat list; works in both lobby and in-game
   GAME_STARTED: 'gameStarted',
+  NOTES: 'notes', // server hands a player the Detective Notes for the seat they hold
   REJOIN_FAILED: 'rejoinFailed', // the saved seat is gone; client should reset to the title
   SAVE_GAME_DATA: 'saveGameData', // a snapshot to stash in browser storage (manual save / auto-save)
   ERROR: 'errorMsg',
@@ -119,6 +121,13 @@ export interface TakeSeatPayload {
   code: string;
   index: number; // slot index of the bot/empty seat to take over
   name: string;
+}
+export interface SetNotesPayload {
+  /** Serialized Detective Notes (the localStorage JSON) for this player's seat. */
+  notes: string;
+}
+export interface NotesPayload {
+  notes: string;
 }
 
 /** A saved-game snapshot. `blob` is an opaque serialized room (handled only by the server); the

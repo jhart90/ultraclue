@@ -103,9 +103,12 @@ interface StoreState {
   savedAt?: number;
   /** Set when we joined an in-progress (loaded) game and must pick a seat to take over. */
   seatPick?: { code: string; slots: Slot[] };
+  /** Bumps when the server hands us restored Detective Notes, so the notes sheet re-reads them. */
+  notesEpoch: number;
 
   // actions
   goto: (screen: Screen) => void;
+  syncNotes: (json: string) => void;
   createGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
   takeSeat: (index: number) => void;
@@ -136,8 +139,10 @@ export const useStore = create<StoreState>((set) => ({
   screen: 'title',
   chat: [],
   savedMeta: readSave()?.meta,
+  notesEpoch: 0,
 
   goto: (screen) => set({ screen }),
+  syncNotes: (json) => socket.emit(SOCKET_EVENTS.SET_NOTES, { notes: json }),
   createGame: (name) => socket.emit(SOCKET_EVENTS.CREATE_GAME, { name, clientId: CLIENT_ID }),
   joinGame: (code, name) => {
     pendingName = name; // remembered in case we land on a seat-picker for an in-progress game
@@ -212,6 +217,15 @@ socket.on(SOCKET_EVENTS.LOBBY, (p: LobbyPayload) => {
 });
 
 socket.on(SOCKET_EVENTS.CHAT, (p: ChatBroadcastPayload) => useStore.setState({ chat: p.chat }));
+
+// The server handed us the Detective Notes for our seat (on resume / rejoin / takeover).
+socket.on(SOCKET_EVENTS.NOTES, (p: { notes: string }) => {
+  const code = useStore.getState().game?.code;
+  if (code && p?.notes) {
+    restoreNotes(code, p.notes);
+    useStore.setState((s) => ({ notesEpoch: s.notesEpoch + 1 }));
+  }
+});
 
 socket.on(SOCKET_EVENTS.GAME_STARTED, (p: GameStartedPayload) => {
   if (pendingNotes) {

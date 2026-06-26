@@ -25,6 +25,8 @@ export interface Room {
   mirroredLogId: number; // highest game-log id already copied into the chat stream
   thinkingId?: number; // id of the transient "<bot> is thinking…" chat line, if one is showing
   lastRevealWhisper?: string; // dedup key for the private "reveals <card>" whisper
+  /** Every player's private Detective Notes, keyed by player id, so they're in every save. */
+  notes: Record<string, string>;
 }
 
 const rooms = new Map<string, Room>();
@@ -69,6 +71,7 @@ export function createRoom(hostId: string, hostName: string): Room {
     phase: 'lobby',
     nextChatId: 1,
     mirroredLogId: 0,
+    notes: {},
   };
   rooms.set(room.code, room);
   return room;
@@ -285,14 +288,19 @@ export function serializeRoom(room: Room): unknown {
     game: room.game,
     nextChatId: room.nextChatId,
     mirroredLogId: room.mirroredLogId,
+    notes: room.notes ?? {}, // every player's notes, so any save carries them all
   });
 }
 
-/** Rewrite every reference to a player id within a snapshot (slots + game state). */
+/** Rewrite every reference to a player id within a snapshot (slots + game state + notes). */
 function remapId(saved: Room, oldId: string, newId: string): void {
   if (oldId === newId) return;
   for (const slot of saved.slots) if (slot.occupant?.id === oldId) slot.occupant.id = newId;
   if (saved.hostId === oldId) saved.hostId = newId;
+  if (saved.notes && saved.notes[oldId] !== undefined) {
+    saved.notes[newId] = saved.notes[oldId]; // notes follow the seat to its new owner
+    delete saved.notes[oldId];
+  }
   const g = saved.game;
   if (!g) return;
   g.turnOrder = g.turnOrder.map((id) => (id === oldId ? newId : id));
@@ -324,6 +332,7 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
     game: saved.game,
     nextChatId: saved.nextChatId ?? 1,
     mirroredLogId: saved.mirroredLogId ?? 0,
+    notes: saved.notes ?? {}, // restore everyone's Detective Notes from the snapshot
   };
   room.game!.code = room.code;
 

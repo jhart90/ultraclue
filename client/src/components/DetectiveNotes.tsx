@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SUSPECTS, WEAPONS, ROOMS, getCard, type AnyCard, type PlayerView } from 'shared';
+import { useStore } from '../store';
 import { NoteBox, NOTE_STATES } from './NoteBox';
 import './DetectiveNotes.css';
 
@@ -45,11 +46,21 @@ export function DetectiveNotes({
   onClose?: () => void;
 }) {
   const storageKey = `ultraclue-notes-${roomCode}`;
+  const syncNotes = useStore((s) => s.syncNotes);
+  const notesEpoch = useStore((s) => s.notesEpoch); // bumps when the server restores our notes
   const [notes, setNotes] = useState<NotesState>(() => loadNotes(storageKey));
 
+  // Persist locally and push to the server so the notes ride along in every save.
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(notes));
-  }, [notes, storageKey]);
+    const json = JSON.stringify(notes);
+    localStorage.setItem(storageKey, json);
+    syncNotes(json);
+  }, [notes, storageKey, syncNotes]);
+
+  // Re-read after the server hands us restored notes (resume / rejoin / takeover).
+  useEffect(() => {
+    setNotes(loadNotes(storageKey));
+  }, [notesEpoch, storageKey]);
 
   // Once per game, pre-fill the marks for the cards in your own hand, in your own column.
   useEffect(() => {

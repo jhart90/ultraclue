@@ -327,12 +327,12 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
   };
   room.game!.code = room.code;
 
-  const oldHost = room.hostId;
-  // If the loader's id already names a *different* player, move that one aside so we don't collide.
-  const collides = room.game!.players.some((p) => p.id === loaderId) || room.slots.some((s) => s.occupant?.id === loaderId);
-  if (collides && loaderId !== oldHost) remapId(room, loaderId, `loadbot-${room.code}`);
-  // The loader inherits the original host's seat.
-  remapId(room, oldHost, loaderId);
+  // The loader resumes their OWN seat (so they keep their own hand and never see anyone else's). If
+  // their id isn't in the save (loading on a different device), they take over the original host's
+  // seat instead. Every other human becomes a connected bot, free for others to take over on rejoin.
+  const hasOwnSeat =
+    room.game!.players.some((p) => p.id === loaderId) || room.slots.some((s) => s.occupant?.id === loaderId);
+  if (!hasOwnSeat) remapId(room, room.hostId, loaderId);
   room.hostId = loaderId;
 
   for (const slot of room.slots) {

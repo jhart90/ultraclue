@@ -101,7 +101,8 @@ function emitChat(room: Room): void {
 }
 
 // Last round number we auto-saved per room, so we save once per completed round.
-const autoSaveRound = new Map<string, number>();
+// Signature of the turn we last auto-saved, per room — so we snapshot once at the start of each turn.
+const autoSaveTurn = new Map<string, string>();
 function buildSave(room: Room, auto: boolean): SaveGameDataPayload {
   return {
     meta: {
@@ -113,13 +114,13 @@ function buildSave(room: Room, auto: boolean): SaveGameDataPayload {
     blob: serializeRoom(room),
   };
 }
-/** Auto-save (to every human's browser) once per completed round of play. */
+/** Auto-save (to every human's browser) at the start of each player's turn. */
 function maybeAutoSave(room: Room): void {
   const g = room.game;
   if (!g || g.phase !== 'play') return;
-  const round = g.round ?? 0;
-  if (round > (autoSaveRound.get(room.code) ?? 0)) {
-    autoSaveRound.set(room.code, round);
+  const sig = `${g.round ?? 0}:${g.activeIdx}`;
+  if (sig !== autoSaveTurn.get(room.code)) {
+    autoSaveTurn.set(room.code, sig);
     io.to(room.code).emit(SOCKET_EVENTS.SAVE_GAME_DATA, buildSave(room, true));
   }
 }
@@ -580,7 +581,7 @@ io.on('connection', (socket) => {
       register(clientId);
       const room = loadRoom(p.blob, clientId, p?.name ?? '');
       botMem.delete(room.code); // fresh bot deductions for the resumed game
-      autoSaveRound.set(room.code, room.game?.round ?? 0);
+      autoSaveTurn.set(room.code, `${room.game?.round ?? 0}:${room.game?.activeIdx ?? 0}`);
       socket.join(room.code);
       cancelCleanup(room.code);
       addChat(room, 'System', `${nameOf(room, clientId)} loaded a saved game.`, true);

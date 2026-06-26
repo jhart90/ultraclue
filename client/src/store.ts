@@ -48,21 +48,42 @@ const clearRoom = () => {
   }
 };
 
-// A single saved-game slot lives in browser storage (manual save + per-round auto-save).
+// A single saved-game slot lives in browser storage (manual save + per-turn auto-save). It also
+// carries this player's private Detective Notes so they survive a save/load.
 const SAVE_KEY = 'ultraclue-savegame';
-function readSave(): { meta: SavedGameMeta; blob: unknown } | null {
+type SaveSlot = { meta: SavedGameMeta; blob: unknown; notes?: string };
+function readSave(): SaveSlot | null {
   try {
     const s = localStorage.getItem(SAVE_KEY);
-    return s ? (JSON.parse(s) as { meta: SavedGameMeta; blob: unknown }) : null;
+    return s ? (JSON.parse(s) as SaveSlot) : null;
   } catch {
     return null;
   }
 }
-function writeSave(payload: { meta: SavedGameMeta; blob: unknown }): void {
+function writeSave(payload: SaveSlot): void {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
   } catch {
     /* storage full / unavailable — ignore */
+  }
+}
+
+// Detective Notes persist in localStorage keyed by room code; carry them across a save/load.
+const notesKey = (code: string) => `ultraclue-notes-${code}`;
+let pendingNotes: string | null = null; // notes to restore once the loaded game's (new) code arrives
+function readNotes(code: string): string | null {
+  try {
+    return localStorage.getItem(notesKey(code));
+  } catch {
+    return null;
+  }
+}
+function restoreNotes(code: string, json: string): void {
+  try {
+    localStorage.setItem(notesKey(code), json);
+    localStorage.setItem(`${notesKey(code)}-seeded`, '1'); // already filled — don't re-seed the hand
+  } catch {
+    /* ignore */
   }
 }
 
@@ -133,7 +154,10 @@ export const useStore = create<StoreState>((set) => ({
   saveGame: () => socket.emit(SOCKET_EVENTS.SAVE_GAME),
   loadGame: () => {
     const s = readSave();
-    if (s) socket.emit(SOCKET_EVENTS.LOAD_GAME, { blob: s.blob, clientId: CLIENT_ID });
+    if (s) {
+      pendingNotes = s.notes ?? null; // restored under the new room code once the game view arrives
+      socket.emit(SOCKET_EVENTS.LOAD_GAME, { blob: s.blob, clientId: CLIENT_ID });
+    }
   },
   leave: () => {
     socket.emit(SOCKET_EVENTS.LEAVE);
@@ -175,6 +199,10 @@ socket.on(SOCKET_EVENTS.LOBBY, (p: LobbyPayload) => {
 socket.on(SOCKET_EVENTS.CHAT, (p: ChatBroadcastPayload) => useStore.setState({ chat: p.chat }));
 
 socket.on(SOCKET_EVENTS.GAME_STARTED, (p: GameStartedPayload) => {
+  if (pendingNotes) {
+    restoreNotes(p.view.code, pendingNotes); // bring the saved Detective Notes into the new room
+    pendingNotes = null;
+  }
   saveRoom(p.view.code);
   useStore.setState({ game: p.view, screen: 'game' });
 });
@@ -184,9 +212,12 @@ socket.on(SOCKET_EVENTS.REJOIN_FAILED, () => {
   useStore.setState({ screen: 'title', lobby: undefined, game: undefined, chat: [] });
 });
 
-// A save snapshot arrived (manual save or per-round auto-save) — stash it in browser storage.
+// A save snapshot arrived (manual save or per-turn auto-save) — stash it, with our own notes, in
+// browser storage.
 socket.on(SOCKET_EVENTS.SAVE_GAME_DATA, (p: SaveGameDataPayload) => {
-  writeSave({ meta: p.meta, blob: p.blob });
+  const code = useStore.getState().game?.code;
+  const notes = code ? readNotes(code) : null;
+  writeSave({ meta: p.meta, blob: p.blob, notes: notes ?? undefined });
   useStore.setState({ savedMeta: p.meta, savedAt: p.meta.savedAt });
 });
 

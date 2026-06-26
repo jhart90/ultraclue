@@ -14,7 +14,7 @@ export const SUSPECTS: SuspectCard[] = [
   { id: 'suspect-indigo', type: 'suspect', title: 'Sir Indigo', color: '#3F4C9B', turnOrder: 9, phrase: 'Old money, darker secrets.' },
   { id: 'suspect-crimson', type: 'suspect', title: 'Curator Crimson', color: '#9B1B2E', turnOrder: 10, phrase: 'Collects masterpieces, and motives, in red.' },
   { id: 'suspect-saffron', type: 'suspect', title: 'Señora Saffron', color: '#E1A93B', turnOrder: 11, phrase: 'Spices her stories with lies.' },
-  { id: 'suspect-teal', type: 'suspect', title: 'Captain Teal', color: '#1C7C7C', turnOrder: 12, phrase: 'Sailed seven seas, sank one fortune.' },
+  { id: 'suspect-teal', type: 'suspect', title: 'Lieutenant Lilac', color: '#1C7C7C', turnOrder: 12, phrase: 'Sailed seven seas, sank one fortune.' },
   { id: 'suspect-violet', type: 'suspect', title: 'Madame Violet', color: '#7E4FA0', turnOrder: 13, phrase: 'Charming, theatrical, utterly unaccountable.' },
   { id: 'suspect-amber', type: 'suspect', title: 'Ambassador Amber', color: '#D9881E', turnOrder: 14, phrase: 'Diplomatic on the surface, fossilized resentments beneath.' },
   { id: 'suspect-sable', type: 'suspect', title: 'Stewardess Sable', color: '#3B342E', turnOrder: 15, phrase: 'Passes sentences, dodges his own.' },
@@ -42,5 +42,5 @@ export const SUSPECTS: SuspectCard[] = [
   { id: 'suspect-copper', type: 'suspect', title: 'Sir Copper', color: '#B87333', turnOrder: 37, phrase: 'Tarnishes quick, conducts trouble fast.' },
   { id: 'suspect-chartreuse', type: 'suspect', title: 'Dame Chartreuse', color: '#9FB81F', turnOrder: 38, phrase: 'Vivid, venomous, vivacious.' },
   { id: 'suspect-cinnamon', type: 'suspect', title: 'Count Cinnamon', color: '#7B3F1D', turnOrder: 39, phrase: 'Old nobility, with a spicy temper.' },
-  { id: 'suspect-lilac', type: 'suspect', title: 'Nurse Lilac', color: '#C3A6DB', turnOrder: 40, phrase: 'A soothing bedside manner, a steady hand with a needle.' },
+  { id: 'suspect-lilac', type: 'suspect', title: 'Nurse Nutmeg', color: '#C3A6DB', turnOrder: 40, phrase: 'A soothing bedside manner, a steady hand with a needle.' },
 ];

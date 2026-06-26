@@ -171,7 +171,7 @@ describe('accusations', () => {
 
   it('eliminates a wrong accuser and redistributes their hand', () => {
     const st = baseState();
-    st.players[0].hand = ['weapon-dagger', 'weapon-cleaver'];
+    st.players[0].hand = ['weapon-dagger', 'weapon-pillow'];
     st.players[1].hand = ['room-library'];
     st.players[2].hand = ['suspect-violet'];
     const before = st.players[1].hand.length + st.players[2].hand.length;

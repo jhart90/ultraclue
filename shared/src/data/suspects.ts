@@ -9,7 +9,7 @@ export const SUSPECTS: SuspectCard[] = [
   { id: 'suspect-plum', type: 'suspect', title: 'Professor Plum', color: '#6D3B8E', turnOrder: 4, phrase: 'Brilliant, distracted, conveniently forgetful.' },
   { id: 'suspect-green', type: 'suspect', title: 'Mr. Green', color: '#2E8B57', turnOrder: 5, phrase: 'Mild-mannered to a fault — or so he would have you believe.' },
   { id: 'suspect-orchid', type: 'suspect', title: 'Dr. Orchid', color: '#C57FC9', turnOrder: 6, phrase: 'Botanist by trade, poisoner by reputation.' },
-  { id: 'suspect-slate', type: 'suspect', title: 'Mr. Slate', color: '#5A6B7B', turnOrder: 7, phrase: 'Grey by name, greyer by conscience.' },
+  { id: 'suspect-slate', type: 'suspect', title: 'Sultan Slate', color: '#5A6B7B', turnOrder: 7, phrase: 'An opulent throne, a conscience cold as slate.' },
   { id: 'suspect-rose', type: 'suspect', title: 'Sister Rose', color: '#E58FA8', turnOrder: 8, phrase: 'All thorns beneath the petals.' },
   { id: 'suspect-indigo', type: 'suspect', title: 'Sir Indigo', color: '#3F4C9B', turnOrder: 9, phrase: 'Old money, darker secrets.' },
   { id: 'suspect-crimson', type: 'suspect', title: 'Curator Crimson', color: '#9B1B2E', turnOrder: 10, phrase: 'Collects masterpieces, and motives, in red.' },

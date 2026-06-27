@@ -13,6 +13,7 @@ function suspectColor(suspectId?: string): string {
 export function SeatPicker() {
   const seatPick = useStore((s) => s.seatPick);
   const takeSeat = useStore((s) => s.takeSeat);
+  const joinAsObserver = useStore((s) => s.joinAsObserver);
   const goto = useStore((s) => s.goto);
   if (!seatPick) return null;
 
@@ -41,6 +42,10 @@ export function SeatPicker() {
             );
           })}
         </div>
+        <button className="seatpick__observe" onClick={() => joinAsObserver()}>
+          👁 Join as observer
+          <span className="seatpick__observehint">Watch the game without playing</span>
+        </button>
         <button
           className="btn btn--ghost"
           onClick={() => {

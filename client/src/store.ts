@@ -112,6 +112,7 @@ interface StoreState {
   createGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
   takeSeat: (index: number) => void;
+  joinAsObserver: () => void;
   setSlot: (index: number, status: SlotStatus) => void;
   setObserver: (observer: boolean) => void;
   pickSuspect: (suspectId: string) => void;
@@ -152,6 +153,10 @@ export const useStore = create<StoreState>((set) => ({
   takeSeat: (index) => {
     const { seatPick } = useStore.getState();
     if (seatPick) socket.emit(SOCKET_EVENTS.TAKE_SEAT, { code: seatPick.code, index, name: pendingName });
+  },
+  joinAsObserver: () => {
+    const { seatPick } = useStore.getState();
+    if (seatPick) socket.emit(SOCKET_EVENTS.JOIN_OBSERVER, { code: seatPick.code, name: pendingName });
   },
   setSlot: (index, status) => socket.emit(SOCKET_EVENTS.SET_SLOT, { index, status }),
   setObserver: (observer) => socket.emit(SOCKET_EVENTS.SET_OBSERVER, { observer }),

@@ -82,3 +82,28 @@
   padding: 0.15rem 0.5rem;
   font-weight: 700;
 }
+
+/* "Join as observer" — a secondary action distinct from taking over a seat. */
+.seatpick__observe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.55rem 0.8rem;
+  background: #2a2440;
+  border: 1px solid #5a4a86;
+  border-radius: 8px;
+  color: var(--ink, #ece8f5);
+  cursor: pointer;
+  font-family: 'Georgia', serif;
+  font-weight: 700;
+}
+.seatpick__observe:hover {
+  border-color: #8a78c0;
+  transform: translateY(-1px);
+}
+.seatpick__observehint {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--muted, #9a93b3);
+}

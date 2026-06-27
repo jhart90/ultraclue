@@ -36,6 +36,7 @@ export const SOCKET_EVENTS = {
   SAVE_GAME: 'saveGame', // request a fresh save snapshot of the current game
   LOAD_GAME: 'loadGame', // restore a previously saved game (from the title screen)
   TAKE_SEAT: 'takeSeat', // join an in-progress (loaded) game by taking over a bot/empty seat
+  JOIN_OBSERVER: 'joinObserver', // join an in-progress game to watch only (not as a player)
   SET_NOTES: 'setNotes', // client pushes its Detective Notes so they ride along in every save
 
   // --- server -> client ---
@@ -124,6 +125,10 @@ export interface BootPlayerPayload {
 export interface TakeSeatPayload {
   code: string;
   index: number; // slot index of the bot/empty seat to take over
+  name: string;
+}
+export interface JoinObserverPayload {
+  code: string;
   name: string;
 }
 export interface SetNotesPayload {

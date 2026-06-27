@@ -47,6 +47,7 @@ import {
   type RejoinPayload,
   type BootPlayerPayload,
   type TakeSeatPayload,
+  type JoinObserverPayload,
   type SetNotesPayload,
   type SetObserverPayload,
   type LoadGamePayload,
@@ -57,6 +58,7 @@ import {
   addChat,
   getRoom,
   takeSeat,
+  joinAsObserver,
   mirrorLog,
   setThinking,
   clearThinking,
@@ -118,7 +120,7 @@ function buildSave(room: Room, auto: boolean): SaveGameDataPayload {
     meta: {
       savedAt: Date.now(),
       round: room.game?.round ?? 0,
-      players: room.slots.filter((s) => s.occupant).length,
+      players: room.slots.filter((s) => s.occupant && !s.occupant.observer).length,
       auto,
     },
     blob: serializeRoom(room),
@@ -520,6 +522,31 @@ io.on('connection', (socket) => {
         emitChat(room);
       }
       sendNotes(socket, room, clientId); // restore the notes for the seat they took over
+    } catch (err) {
+      emitError(socket, (err as Error).message);
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.JOIN_OBSERVER, (p: JoinObserverPayload) => {
+    const room = getRoom(p?.code ?? '');
+    if (!room) {
+      emitError(socket, 'That game no longer exists.');
+      return;
+    }
+    try {
+      const clientId = cid(socket);
+      socket.join(room.code);
+      cancelCleanup(room.code);
+      joinAsObserver(room, clientId, p?.name ?? '');
+      addChat(room, 'System', `${nameOf(room, clientId)} is now observing.`, true);
+      emitLobby(room);
+      if (room.paused) {
+        room.paused = false; // a loaded game starts running (all bots) so the observer can watch
+        progress(room);
+      } else {
+        socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: gameView(room, clientId) });
+        emitChat(room);
+      }
     } catch (err) {
       emitError(socket, (err as Error).message);
     }

@@ -447,6 +447,24 @@ export function takeSeat(room: Room, joinerId: string, name: string, index: numb
   }
 }
 
+/** Join an in-progress game to watch only. The observer occupies a free seat but isn't a dealt
+ *  player (it's flagged observer, so they get no piece, hand, notes, or private reveals); they
+ *  receive game broadcasts like any other seat-holder. */
+export function joinAsObserver(room: Room, joinerId: string, name: string): void {
+  if (room.phase !== 'play') throw new Error('That game is not in progress.');
+  if (room.slots.some((s) => s.occupant?.id === joinerId)) throw new Error('You are already in this game.');
+  const slot = room.slots.find((s) => !s.occupant);
+  if (!slot) throw new Error('This game is full — there is no free seat to observe from.');
+  slot.status = 'open';
+  slot.occupant = {
+    id: joinerId,
+    name: name.trim() || 'Observer',
+    isBot: false,
+    connected: true,
+    observer: true,
+  };
+}
+
 /** Build the engine GameState from the lobby roster, assigning suspects to anyone without one. */
 export function startGameInRoom(room: Room, requesterId: string): GameState {
   if (room.hostId !== requesterId) throw new Error('Only the host can start the game.');

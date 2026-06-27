@@ -21,6 +21,9 @@ export interface SlotOccupant {
   suspectId?: string;
   isBot: boolean;
   connected: boolean;
+  /** Watching only: gets no game piece, hand, or detective notes, and never sees private reveals.
+   *  Set by the human themselves in the lobby; excluded from the dealt players when the game starts. */
+  observer?: boolean;
 }
 
 export interface Slot {

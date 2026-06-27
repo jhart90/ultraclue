@@ -138,6 +138,15 @@ export function setSlot(room: Room, requesterId: string, index: number, status: 
   }
 }
 
+/** A human flips their own seat into (or out of) watch-only observer mode. Lobby-only. */
+export function setObserver(room: Room, id: string, observer: boolean): void {
+  if (room.phase !== 'lobby') throw new Error('The game has already started.');
+  const slot = room.slots.find((s) => s.occupant?.id === id);
+  if (!slot?.occupant) throw new Error('You are not in this game.');
+  if (slot.occupant.isBot) throw new Error('Bots cannot observe.');
+  slot.occupant.observer = observer;
+}
+
 export function pickSuspect(room: Room, id: string, suspectId: string): void {
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
   if (!SUSPECTS.some((s) => s.id === suspectId)) throw new Error('Unknown character.');
@@ -360,10 +369,19 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
   room.paused = true;
   void loaderName;
 
+  // Only seats that map to a dealt player become takeable bots; observer/stray seats from the save
+  // are dropped (a loaded game has no observers — anyone can take a player seat or just watch).
+  const playerIds = new Set(room.game!.players.map((p) => p.id));
   for (const slot of room.slots) {
     if (!slot.occupant) continue;
+    if (!playerIds.has(slot.occupant.id)) {
+      slot.occupant = undefined;
+      slot.status = 'open';
+      continue;
+    }
     slot.occupant.isBot = true;
     slot.occupant.connected = true;
+    slot.occupant.observer = false;
   }
   for (const p of room.game!.players) {
     p.isBot = true;
@@ -434,7 +452,10 @@ export function startGameInRoom(room: Room, requesterId: string): GameState {
   if (room.hostId !== requesterId) throw new Error('Only the host can start the game.');
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
 
-  const occupants = room.slots.map((s) => s.occupant).filter((o) => o != null);
+  // Observers stay in the room to watch but aren't dealt in — only the rest become players.
+  const occupants = room.slots
+    .map((s) => s.occupant)
+    .filter((o): o is NonNullable<typeof o> => o != null && !o.observer);
   if (occupants.length < MIN_PLAYERS) throw new Error(`Need at least ${MIN_PLAYERS} players to start.`);
 
   const rng = makeRng(Math.floor(Math.random() * 0x7fffffff) + 1);

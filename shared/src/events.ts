@@ -15,6 +15,7 @@ export const SOCKET_EVENTS = {
   JOIN_GAME: 'joinGame',
   REJOIN: 'rejoin', // reconnect to an existing seat after a refresh/drop
   SET_SLOT: 'setSlot',
+  SET_OBSERVER: 'setObserver', // a human toggles watch-only mode for their own seat
   PICK_SUSPECT: 'pickSuspect',
   LOBBY_CHAT: 'lobbyChat',
   START_GAME: 'startGame',
@@ -75,6 +76,9 @@ export interface RejoinPayload {
 export interface SetSlotPayload {
   index: number;
   status: SlotStatus;
+}
+export interface SetObserverPayload {
+  observer: boolean;
 }
 export interface PickSuspectPayload {
   suspectId: string;

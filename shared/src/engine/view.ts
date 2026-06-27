@@ -51,6 +51,8 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     turnOrder: state.turnOrder,
     activeIdx: state.activeIdx,
     yourId: viewerId,
+    // A viewer who isn't one of the dealt players is watching in observer mode.
+    observer: !state.players.some((p) => p.id === viewerId),
     yourHand: getPlayer(state, viewerId)?.hand ?? [],
     currentSuggestion,
     announcement: state.announcement,

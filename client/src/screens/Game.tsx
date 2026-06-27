@@ -74,12 +74,15 @@ export function Game() {
   const suggestionPendingNow = !!sgNow && !sgNow.resolved;
   const iMustRevealNow = suggestionPendingNow && sgNow!.pendingResponderId === myId;
 
-  // New suggestion -> announce it to everyone (and clear any prior reveal pop-up).
+  // New suggestion -> announce it to everyone (and clear any prior reveal pop-up). A fresh
+  // suggestion also retires a lingering accusation verdict, so a new pop-up always replaces the old
+  // one — important for observers, who never click "Dismiss".
   useEffect(() => {
     const a = game?.announcement;
     if (a && a.kind === 'suggestion' && a.seq !== annSeqRef.current) {
       annSeqRef.current = a.seq;
       setRevealOpen(false);
+      setAccFlow((prev) => (prev && prev.ann.seq < a.seq ? null : prev));
       if (game?.phase === 'play') setAnnOpen(true);
     }
   }, [game?.announcement?.seq, game?.phase]);
@@ -187,7 +190,9 @@ export function Game() {
   const myShortcutDest = me?.inRoomId ? shortcutDestForRoom(me.inRoomId) : undefined;
   const myShortcutName = myShortcutDest ? getCard(myShortcutDest)?.title : undefined;
 
-  const iAmHost = game.players.find((p) => p.id === myId)?.isHost ?? false;
+  const observer = !!game.observer; // watching only — no piece, hand, notes, or private reveals
+  // Host id comes straight from the room, so an observing host (not among the players) keeps controls.
+  const iAmHost = game.hostId ? game.hostId === myId : (game.players.find((p) => p.id === myId)?.isHost ?? false);
   const sug = game.currentSuggestion;
   const suggestionPending = !!sug && !sug.resolved;
   // The human the table is currently waiting on, if they've dropped: the pending disprover during a
@@ -256,6 +261,7 @@ export function Game() {
       <header className="game__top">
         <div className="game__title">
           <Wordmark size="sm" /> <span className="game__code">Room {game.code}</span>
+          {observer && <span className="game__obsbadge">👁 Observer</span>}
         </div>
         <div
           className="game__turn"
@@ -363,10 +369,14 @@ export function Game() {
       </div>
 
       <div className="game__bottom">
-        <div className="game__handwrap">
-          <div className="game__handlabel">Your hand · {me?.handCount ?? game.yourHand.length} cards</div>
-          <Hand cardIds={game.yourHand} />
-        </div>
+        {observer ? (
+          <div className="game__observing">👁 Observer Mode — watching the game. You hold no cards and make no moves.</div>
+        ) : (
+          <div className="game__handwrap">
+            <div className="game__handlabel">Your hand · {me?.handCount ?? game.yourHand.length} cards</div>
+            <Hand cardIds={game.yourHand} />
+          </div>
+        )}
       </div>
 
       {/* Bottom dock — Manor Map + Detective Notes folders. Only one opens at a time; the open one
@@ -384,11 +394,13 @@ export function Game() {
           )}
         </div>
       </div>
-      <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
-        <div className="dock__folder dock__folder--notes">
-          <DetectiveNotes roomCode={game.code} players={orderedPlayers} selfId={myId} hand={game.yourHand} onClose={() => setDock(null)} />
+      {!observer && (
+        <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
+          <div className="dock__folder dock__folder--notes">
+            <DetectiveNotes roomCode={game.code} players={orderedPlayers} selfId={myId} hand={game.yourHand} onClose={() => setDock(null)} />
+          </div>
         </div>
-      </div>
+      )}
       <div className="dock__tabs">
         <button
           className={`dock__tab${dock === 'map' ? ' dock__tab--active' : ''}`}
@@ -399,12 +411,14 @@ export function Game() {
         >
           🗺️ Manor Map
         </button>
-        <button
-          className={`dock__tab${dock === 'notes' ? ' dock__tab--active' : ''}`}
-          onClick={() => setDock((d) => (d === 'notes' ? null : 'notes'))}
-        >
-          📓 Detective Notes
-        </button>
+        {!observer && (
+          <button
+            className={`dock__tab${dock === 'notes' ? ' dock__tab--active' : ''}`}
+            onClick={() => setDock((d) => (d === 'notes' ? null : 'notes'))}
+          >
+            📓 Detective Notes
+          </button>
+        )}
       </div>
 
       {modal && me && (

@@ -133,6 +133,37 @@
   background: #7a3b46;
   color: #fff;
 }
+.tag--obs {
+  background: #5a4a86;
+  color: #fff;
+}
+
+/* Watch-only seats: a short note in place of the character art, plus the toggle on your own seat. */
+.seat__observing {
+  font-size: 0.82rem;
+  color: #b9b2d4;
+  font-style: italic;
+  text-align: center;
+  margin-top: auto;
+  padding: 0.3rem 0.2rem;
+}
+.seat__observe {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: #d9d3e6;
+  cursor: pointer;
+  margin-top: 0.4rem;
+  user-select: none;
+}
+.seat__observe input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent, #c8a24a);
+  cursor: pointer;
+}
 
 .seat__char {
   font-size: 0.85rem;

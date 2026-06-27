@@ -143,6 +143,10 @@ export interface GameView {
   turnOrder: string[];
   activeIdx: number;
   yourId: string;
+  /** Room host's id, so an observing host still gets host-only controls (set by the server). */
+  hostId?: string;
+  /** True when the viewer is watching only (not one of the dealt players). */
+  observer?: boolean;
   /** The viewer's own hand. Empty for spectators / non-players. */
   yourHand: string[];
   currentSuggestion?: SuggestionView;

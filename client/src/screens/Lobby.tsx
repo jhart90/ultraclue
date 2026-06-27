@@ -31,6 +31,7 @@ export function Lobby() {
   const chat = useStore((s) => s.chat);
   const error = useStore((s) => s.error);
   const setSlot = useStore((s) => s.setSlot);
+  const setObserver = useStore((s) => s.setObserver);
   const pickSuspect = useStore((s) => s.pickSuspect);
   const sendChat = useStore((s) => s.sendChat);
   const startGame = useStore((s) => s.startGame);
@@ -43,8 +44,11 @@ export function Lobby() {
   const amHost = lobby.hostId === myId;
   const mySlot = lobby.slots.find((s) => s.occupant?.id === myId);
   const mySuspectId = mySlot?.occupant?.suspectId;
-  const occupantCount = lobby.slots.filter((s) => s.occupant).length;
-  const canStart = amHost && occupantCount >= MIN_PLAYERS;
+  const amObserver = !!mySlot?.occupant?.observer;
+  // Observers watch but aren't dealt in, so only non-observers count toward the minimum to start.
+  const playerCount = lobby.slots.filter((s) => s.occupant && !s.occupant.observer).length;
+  const observerCount = lobby.slots.filter((s) => s.occupant?.observer).length;
+  const canStart = amHost && playerCount >= MIN_PLAYERS;
 
   const takenByOthers = new Set(
     lobby.slots
@@ -101,17 +105,34 @@ export function Lobby() {
                     <div className="seat__tags">
                       {isHostSeat && <span className="tag tag--host">HOST</span>}
                       {occ.isBot && <span className="tag tag--bot">BOT</span>}
+                      {occ.observer && <span className="tag tag--obs">OBSERVER</span>}
                       {isMe && <span className="tag tag--you">YOU</span>}
                       {!occ.connected && <span className="tag tag--off">OFFLINE</span>}
                     </div>
-                    {isMe && mySuspectId && <SuspectPortrait suspectId={mySuspectId} />}
-                    <div className="seat__char">
-                      {occ.suspectId ? getCard(occ.suspectId)?.title : <em>choosing…</em>}
-                    </div>
+                    {occ.observer ? (
+                      <div className="seat__observing">👁 Watching only — not dealt into the game.</div>
+                    ) : (
+                      <>
+                        {isMe && mySuspectId && <SuspectPortrait suspectId={mySuspectId} />}
+                        <div className="seat__char">
+                          {occ.suspectId ? getCard(occ.suspectId)?.title : <em>choosing…</em>}
+                        </div>
+                        {isMe && (
+                          <button className="seat__pick" onClick={() => setPicking(true)}>
+                            Change character
+                          </button>
+                        )}
+                      </>
+                    )}
                     {isMe && (
-                      <button className="seat__pick" onClick={() => setPicking(true)}>
-                        Change character
-                      </button>
+                      <label className="seat__observe">
+                        <input
+                          type="checkbox"
+                          checked={amObserver}
+                          onChange={(e) => setObserver(e.target.checked)}
+                        />
+                        Observer Mode
+                      </label>
                     )}
                   </>
                 ) : (
@@ -154,8 +175,9 @@ export function Lobby() {
           Exit
         </button>
         <div className="lobby__footinfo">
-          {occupantCount} {occupantCount === 1 ? 'player' : 'players'} seated
-          {amHost && occupantCount < MIN_PLAYERS && ` · need ${MIN_PLAYERS - occupantCount} more to start`}
+          {playerCount} {playerCount === 1 ? 'player' : 'players'} seated
+          {observerCount > 0 && ` · ${observerCount} observing`}
+          {amHost && playerCount < MIN_PLAYERS && ` · need ${MIN_PLAYERS - playerCount} more to start`}
         </div>
         <button className="btn btn--primary" disabled={!canStart} onClick={startGame} title={amHost ? '' : 'Only the host can start'}>
           Start Game

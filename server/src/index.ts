@@ -48,6 +48,7 @@ import {
   type BootPlayerPayload,
   type TakeSeatPayload,
   type SetNotesPayload,
+  type SetObserverPayload,
   type LoadGamePayload,
   type SaveGameDataPayload,
 } from 'shared';
@@ -69,6 +70,7 @@ import {
   hasConnectedHuman,
   deleteRoom,
   setSlot,
+  setObserver,
   bootPlayer,
   leaveGameAsBot,
   serializeRoom,
@@ -228,13 +230,18 @@ function sendNotes(socket: Socket, room: Room, id: string): void {
   if (notes) socket.emit(SOCKET_EVENTS.NOTES, { notes });
 }
 
-/** Push each human their own tailored game view. */
+/** A viewer's game view, stamped with the room host's id so an observing host keeps host controls. */
+function gameView(room: Room, id: string) {
+  return { ...viewFor(room.game!, id), hostId: room.hostId };
+}
+
+/** Push each human their own tailored game view (observers included — they watch). */
 function broadcastGame(room: Room): void {
   const g = room.game;
   if (!g) return;
   for (const slot of room.slots) {
     const occ = slot.occupant;
-    if (occ && !occ.isBot) io.to(occ.id).emit(SOCKET_EVENTS.GAME_STARTED, { view: viewFor(g, occ.id) });
+    if (occ && !occ.isBot) io.to(occ.id).emit(SOCKET_EVENTS.GAME_STARTED, { view: gameView(room, occ.id) });
   }
 }
 
@@ -539,7 +546,7 @@ io.on('connection', (socket) => {
     addChat(room, 'System', `${nameOf(room, clientId)} reconnected.`, true);
     emitLobby(room);
     emitChat(room);
-    if (room.game) socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: viewFor(room.game, clientId) });
+    if (room.game) socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: gameView(room, clientId) });
     sendNotes(socket, room, clientId); // hand back their notes on reconnect
   });
 
@@ -548,6 +555,17 @@ io.on('connection', (socket) => {
     if (!room) return;
     try {
       setSlot(room, cid(socket), p.index, p.status);
+      emitLobby(room);
+    } catch (err) {
+      emitError(socket, (err as Error).message);
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.SET_OBSERVER, (p: SetObserverPayload) => {
+    const room = findRoomByOccupant(cid(socket));
+    if (!room) return;
+    try {
+      setObserver(room, cid(socket), !!p.observer);
       emitLobby(room);
     } catch (err) {
       emitError(socket, (err as Error).message);

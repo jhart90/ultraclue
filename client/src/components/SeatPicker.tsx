@@ -17,7 +17,7 @@ export function SeatPicker() {
   const goto = useStore((s) => s.goto);
   if (!seatPick) return null;
 
-  const available = seatPick.slots.filter((s) => s.occupant && s.occupant.isBot);
+  const available = seatPick.slots.filter((s) => s.occupant && s.occupant.isBot && !s.occupant.observer);
 
   return (
     <div className="seatpick__backdrop">

@@ -369,24 +369,31 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
   room.paused = true;
   void loaderName;
 
-  // Only seats that map to a dealt player become takeable bots; observer/stray seats from the save
-  // are dropped (a loaded game has no observers — anyone can take a player seat or just watch).
-  const playerIds = new Set(room.game!.players.map((p) => p.id));
+  // Every seat that maps to a dealt player becomes a takeable bot named after its character — so the
+  // seat picker shows "Madame Violet", never the name of a human who saved/observed that seat and
+  // isn't really there. Observer/stray seats (not among the dealt players) are dropped entirely.
+  const playerById = new Map(room.game!.players.map((p) => [p.id, p]));
+  const suspectTitle = (id?: string) => SUSPECTS.find((s) => s.id === id)?.title;
   for (const slot of room.slots) {
-    if (!slot.occupant) continue;
-    if (!playerIds.has(slot.occupant.id)) {
+    const occ = slot.occupant;
+    if (!occ) continue;
+    const gp = playerById.get(occ.id);
+    if (!gp) {
       slot.occupant = undefined;
       slot.status = 'open';
       continue;
     }
-    slot.occupant.isBot = true;
-    slot.occupant.connected = true;
-    slot.occupant.observer = false;
+    occ.isBot = true;
+    occ.connected = true;
+    occ.observer = false;
+    occ.suspectId = gp.suspectId;
+    occ.name = suspectTitle(gp.suspectId) ?? `Computer ${slot.index + 1}`;
   }
   for (const p of room.game!.players) {
     p.isBot = true;
     p.connected = true;
     p.isHost = false;
+    p.name = suspectTitle(p.suspectId) ?? p.name;
   }
 
   rooms.set(room.code, room);

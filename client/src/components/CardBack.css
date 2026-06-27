@@ -1,4 +1,6 @@
 .cardback {
+  position: relative;
+  overflow: hidden;
   width: 200px;
   height: 280px;
   border-radius: 12px;
@@ -6,18 +8,41 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    repeating-linear-gradient(91deg, rgba(0, 0, 0, 0.16) 0 2px, rgba(255, 255, 255, 0.025) 2px 6px),
-    repeating-linear-gradient(89deg, #46210f 0 16px, #5c2d16 16px 24px, #3a190c 24px 34px),
-    linear-gradient(160deg, #5c2d16, #2a130a);
+  /* A maroon playing-card back: a studded diamond lattice (two diagonal hatchings crossing, with a
+     light pip where they meet) over a soft radial sheen — the classic ornamental deck pattern. */
+  background-color: #531625;
+  background-image:
+    radial-gradient(circle, rgba(255, 228, 208, 0.24) 0 1.3px, transparent 1.7px),
+    linear-gradient(45deg, transparent 47%, rgba(255, 228, 208, 0.13) 47% 53%, transparent 53%),
+    linear-gradient(-45deg, transparent 47%, rgba(255, 228, 208, 0.13) 47% 53%, transparent 53%),
+    radial-gradient(125% 90% at 50% 34%, #7c2437 0%, #491320 72%);
+  background-size: 18px 18px, 18px 18px, 18px 18px, 100% 100%;
+  background-position: 9px 9px, 0 0, 0 0, 0 0;
+  background-repeat: repeat, repeat, repeat, no-repeat;
   box-shadow:
-    inset 0 0 34px rgba(0, 0, 0, 0.55),
+    inset 0 0 34px rgba(0, 0, 0, 0.5),
     0 6px 16px rgba(0, 0, 0, 0.45);
 }
+/* Gold double-keyline frame, inset from the edge like a real card back. Sits above the pattern but
+   below the logo (the logo is lifted with z-index). */
+.cardback::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 7px;
+  border: 1.5px solid rgba(214, 176, 120, 0.8);
+  box-shadow:
+    inset 0 0 0 2.5px rgba(40, 12, 18, 0.5),
+    inset 0 0 0 4px rgba(214, 176, 120, 0.32);
+  pointer-events: none;
+}
 .cardback__mark {
-  width: 76%;
+  position: relative;
+  z-index: 1;
+  width: 90%;
   height: auto;
-  filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.7));
+  /* Stronger shadow so the wordmark stays legible over the busy lattice. */
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 12px rgba(0, 0, 0, 0.55));
 }
 .cardback--sm {
   width: 132px;

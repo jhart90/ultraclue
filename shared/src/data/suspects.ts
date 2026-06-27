@@ -17,7 +17,7 @@ export const SUSPECTS: SuspectCard[] = [
   { id: 'suspect-teal', type: 'suspect', title: 'Lieutenant Lilac', color: '#C3A6DB', turnOrder: 12, phrase: 'Sailed seven seas, sank one fortune.' },
   { id: 'suspect-violet', type: 'suspect', title: 'Madame Violet', color: '#7E4FA0', turnOrder: 13, phrase: 'Charming, theatrical, utterly unaccountable.' },
   { id: 'suspect-amber', type: 'suspect', title: 'Ambassador Amber', color: '#D9881E', turnOrder: 14, phrase: 'Diplomatic on the surface, fossilized resentments beneath.' },
-  { id: 'suspect-sable', type: 'suspect', title: 'Stewardess Sable', color: '#3B342E', turnOrder: 15, phrase: 'Passes sentences, dodges his own.' },
+  { id: 'suspect-sable', type: 'suspect', title: 'Stewardess Sable', color: '#3B342E', turnOrder: 15, phrase: 'Coffee, tea, or a quiet alibi?' },
   { id: 'suspect-navy', type: 'suspect', title: 'Admiral Navy', color: '#1B2A5B', turnOrder: 16, phrase: 'Commands the seas, and a fleet of secrets.' },
   { id: 'suspect-coral', type: 'suspect', title: 'Chairwoman Coral', color: '#F08071', turnOrder: 17, phrase: 'Soft-spoken, sharp-edged.' },
   { id: 'suspect-jade', type: 'suspect', title: 'Judge Jade', color: '#2FA37C', turnOrder: 18, phrase: 'Rules in green, and rarely in your favour.' },

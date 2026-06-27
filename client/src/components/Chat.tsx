@@ -14,16 +14,19 @@ export function Chat({
   players?: ChatPlayer[];
 }) {
   const [text, setText] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
+  // Keep the newest message in view by scrolling the log *container* — not scrollIntoView, which
+  // also scrolls the page and, on mobile, would yank the whole lobby down to the chat at the bottom.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = logRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages.length]);
 
   return (
     <div className="chat">
       <div className="chat__header">Chat</div>
-      <div className="chat__log">
+      <div className="chat__log" ref={logRef}>
         {messages.length === 0 && <div className="chat__empty">No messages yet. Say hello!</div>}
         {messages.map((m) =>
           m.whisper ? (
@@ -43,7 +46,6 @@ export function Chat({
             </div>
           ),
         )}
-        <div ref={endRef} />
       </div>
       <form
         className="chat__form"

@@ -556,7 +556,6 @@ export function Board({
             const fs = Math.max(6.5, Math.min(11, (b.w - 12) / (title.length * 0.62)));
             const bubbleW = Math.min(b.w - 4, title.length * fs * 0.6 + 12);
             const bubbleH = fs + 7;
-            const glyph = [...room.tiles].sort((p, q) => p.y - q.y || p.x - q.x)[0];
             return (
               <g key={room.id}>
                 {isRect ? (
@@ -594,8 +593,8 @@ export function Board({
                     <path d={roomOutline(room.tiles)} fill="none" stroke="#e7c66a" strokeWidth="2" strokeLinejoin="round" />
                   </>
                 )}
-                {/* small thematic glyph, tucked into the room's top-left tile */}
-                <text x={glyph.x * TS + 11} y={glyph.y * TS + 15} textAnchor="middle" fontSize="11" style={{ pointerEvents: 'none' }}>
+                {/* thematic glyph, centred just above the room name */}
+                <text x={cxr} y={cyr - bubbleH / 2 - 3} textAnchor="middle" fontSize="13" style={{ pointerEvents: 'none' }}>
                   {EMOJI[room.id] ?? ''}
                 </text>
                 {room.entrances.map((e, i) => (

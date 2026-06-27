@@ -12,6 +12,7 @@ import {
   type RoomPhase,
   type Slot,
   type SlotStatus,
+  type SuggestionEvent,
 } from 'shared';
 
 export interface Room {
@@ -25,6 +26,9 @@ export interface Room {
   mirroredLogId: number; // highest game-log id already copied into the chat stream
   thinkingId?: number; // id of the transient "<bot> is thinking…" chat line, if one is showing
   lastRevealWhisper?: string; // dedup key for the private "reveals <card>" whisper
+  lastLoggedSuggestion?: string; // dedup key for appending a resolved suggestion to the log below
+  /** Every resolved suggestion (server truth, incl. the revealed card) — feeds bot deductions. */
+  suggestionLog: SuggestionEvent[];
   /** Every player's private Detective Notes, keyed by player id, so they're in every save. */
   notes: Record<string, string>;
   /** A freshly loaded game is paused (all seats are bots) until a human takes a seat. */
@@ -73,6 +77,7 @@ export function createRoom(hostId: string, hostName: string): Room {
     phase: 'lobby',
     nextChatId: 1,
     mirroredLogId: 0,
+    suggestionLog: [],
     notes: {},
   };
   rooms.set(room.code, room);
@@ -290,6 +295,7 @@ export function serializeRoom(room: Room): unknown {
     game: room.game,
     nextChatId: room.nextChatId,
     mirroredLogId: room.mirroredLogId,
+    suggestionLog: room.suggestionLog ?? [], // bot deductions survive a save/load
     notes: room.notes ?? {}, // every player's notes, so any save carries them all
   });
 }
@@ -316,6 +322,11 @@ function remapId(saved: Room, oldId: string, newId: string): void {
     sg.queue = sg.queue.map((id) => (id === oldId ? newId : id));
     sg.passes = sg.passes.map((id) => (id === oldId ? newId : id));
   }
+  for (const e of saved.suggestionLog ?? []) {
+    if (e.suggesterId === oldId) e.suggesterId = newId;
+    if (e.responderId === oldId) e.responderId = newId;
+    e.passers = e.passers.map((id) => (id === oldId ? newId : id));
+  }
 }
 
 /** Restore a saved snapshot as a fresh room. The loader takes over the original host's seat; every
@@ -334,6 +345,7 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
     game: saved.game,
     nextChatId: saved.nextChatId ?? 1,
     mirroredLogId: saved.mirroredLogId ?? 0,
+    suggestionLog: saved.suggestionLog ?? [],
     notes: saved.notes ?? {}, // restore everyone's Detective Notes from the snapshot
   };
   room.game!.code = room.code;

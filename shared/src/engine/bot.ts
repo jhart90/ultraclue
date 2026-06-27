@@ -3,10 +3,11 @@ import type { Coord } from '../data/board';
 import { type RNG, pick } from '../rng';
 import { roomIdAt } from './movement';
 
-// Bot deduction is intentionally simple but sound: a card is "ruled out" of the solution if the
-// bot holds it or has seen it revealed. When exactly one card remains in each of the three
-// categories, that triple must be the envelope — so the bot accuses. Otherwise it tours rooms
-// and keeps suggesting to gather more reveals.
+// These helpers turn a bot's deduction into a decision. A card is "ruled out" of the solution once
+// the deduction (see botNotes.ts — own hand, passes, reveals, and cross-inferences) places it in
+// some player's hand. When exactly one card remains in each of the three categories, that triple
+// must be the envelope — so the bot accuses. Otherwise it tours still-unknown rooms and keeps
+// suggesting to gather more reveals.
 
 export interface BotSuggestion {
   suspectId: string;

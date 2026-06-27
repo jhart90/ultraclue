@@ -29,6 +29,10 @@ import {
   botRevealCard,
   botMoveTarget,
   botShouldStay,
+  deduceBotKnowledge,
+  botNotesGrid,
+  type BotKnowledge,
+  type SuggestionEvent,
   type GameState,
   type CreateGamePayload,
   type JoinGamePayload,
@@ -135,34 +139,68 @@ const RNG = makeRng(Math.floor(Math.random() * 0x7fffffff) + 1);
 // bot is on the clock the chat shows a transient "<bot> is thinking…" line.
 const BOT_DELAY = 10000;
 
-// Per-room bot memory: cards each bot has seen revealed, rooms it has suggested in, and — keyed by
+// Per-room bot memory: rooms each bot has already suggested in (so it explores), and — keyed by
 // `${responderId}|${recipientId}` — which of its own cards it has already shown to each player.
-const botMem = new Map<
-  string,
-  { reveals: Map<string, Set<string>>; visited: Map<string, Set<string>>; shown: Map<string, Set<string>> }
->();
+// (Card deductions live in room.suggestionLog, replayed per-bot; see deductionFor.)
+const botMem = new Map<string, { visited: Map<string, Set<string>>; shown: Map<string, Set<string>> }>();
 function memFor(room: Room) {
   let m = botMem.get(room.code);
   if (!m) {
-    m = { reveals: new Map(), visited: new Map(), shown: new Map() };
+    m = { visited: new Map(), shown: new Map() };
     botMem.set(room.code, m);
   }
   return m;
 }
-/** Cards a bot knows are not in the envelope: its own hand plus everything revealed to it. */
-function ruledOutFor(g: GameState, botId: string, room: Room): Set<string> {
-  const hand = getPlayer(g, botId)?.hand ?? [];
-  return new Set([...hand, ...(memFor(room).reveals.get(botId) ?? [])]);
+/** The suggestion history as a given player is entitled to know it: the revealed card is filled in
+ *  only for the suggestions that player made (they alone saw what was shown to them). */
+function eventsForPlayer(room: Room, playerId: string): SuggestionEvent[] {
+  return room.suggestionLog.map((e) => ({
+    suggesterId: e.suggesterId,
+    trio: e.trio,
+    passers: e.passers,
+    responderId: e.responderId,
+    revealedCardId: e.suggesterId === playerId ? e.revealedCardId : undefined,
+  }));
 }
-/** Record a card a bot saw, once a suggestion it made is disproven. */
-function recordReveals(room: Room): void {
+/** A player's full Clue deduction from what they've witnessed (their hand + the suggestion log). */
+function deductionFor(g: GameState, playerId: string, room: Room): BotKnowledge {
+  const hand = getPlayer(g, playerId)?.hand ?? [];
+  return deduceBotKnowledge(playerId, hand, g.turnOrder, eventsForPlayer(room, playerId));
+}
+/** Cards a bot knows are not in the envelope: everything its deduction places in someone's hand. */
+function ruledOutFor(g: GameState, botId: string, room: Room): Set<string> {
+  return deductionFor(g, botId, room).ruledOut;
+}
+/** Append a resolved suggestion to the room's log (once), so every bot can deduce from it. */
+function recordSuggestion(room: Room): void {
   const g = room.game;
   const sg = g?.currentSuggestion;
-  if (!g || !sg?.resolved || !sg.anyRevealed || !sg.revealedCardId) return;
-  if (!getPlayer(g, sg.suggesterId)?.isBot) return;
-  const set = memFor(room).reveals.get(sg.suggesterId) ?? new Set<string>();
-  set.add(sg.revealedCardId);
-  memFor(room).reveals.set(sg.suggesterId, set);
+  if (!g || !sg?.resolved) {
+    room.lastLoggedSuggestion = undefined; // a fresh suggestion may log when it resolves
+    return;
+  }
+  const key = `${sg.suggesterId}|${sg.suspectId}|${sg.weaponId}|${sg.roomId}|${sg.responderId ?? ''}|${sg.revealedCardId ?? ''}`;
+  if (room.lastLoggedSuggestion === key) return;
+  room.lastLoggedSuggestion = key;
+  const revealed = sg.anyRevealed && sg.responderId != null;
+  room.suggestionLog.push({
+    suggesterId: sg.suggesterId,
+    trio: [sg.suspectId, sg.weaponId, sg.roomId],
+    passers: [...sg.passes],
+    responderId: revealed ? sg.responderId : undefined,
+    revealedCardId: revealed ? sg.revealedCardId : undefined,
+  });
+}
+/** Refresh every bot's Detective Notes sheet from its current deduction, stored under its seat (so
+ *  the notes ride along in saves and a human taking over a bot inherits its reasoning). */
+function updateBotNotes(room: Room): void {
+  const g = room.game;
+  if (!g) return;
+  for (const p of g.players) {
+    if (!p.isBot) continue;
+    const grid = botNotesGrid(deductionFor(g, p.id, room), g.turnOrder);
+    room.notes[p.id] = JSON.stringify(grid);
+  }
 }
 
 /** Whisper the actual revealed card to just the two players in on it — "<A> reveals <Card> to <B>".
@@ -218,7 +256,8 @@ function withGame(socket: Socket, fn: (room: Room, g: GameState) => GameState): 
 function progress(room: Room): void {
   const g = room.game;
   if (!g) return;
-  recordReveals(room); // bots remember what their suggestions surfaced
+  recordSuggestion(room); // log a resolved suggestion so every bot can deduce from it
+  updateBotNotes(room); // refresh each bot's Detective Notes from its latest deduction
   whisperReveal(room); // privately tell the two players which card was shown
   mirrorLog(room); // fold new game events into the chat feed
   broadcastGame(room);

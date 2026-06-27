@@ -7,6 +7,15 @@ import './Gallery.css';
 
 type Filter = 'all' | CardType;
 
+// Each category sorted alphabetically by title; the gallery always lists them suspects → weapons →
+// rooms. (Weapon cards share one cream background, so they sort by name like the others.)
+const byTitle = (a: AnyCard, b: AnyCard) => a.title.localeCompare(b.title);
+const SORTED = {
+  suspect: [...SUSPECTS].sort(byTitle),
+  weapon: [...WEAPONS].sort(byTitle),
+  room: [...ROOMS].sort(byTitle),
+};
+
 const TABS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All 120' },
   { key: 'suspect', label: 'Suspects' },
@@ -19,10 +28,10 @@ export function Gallery() {
   const goto = useStore((s) => s.goto);
 
   const cards: AnyCard[] = useMemo(() => {
-    if (filter === 'suspect') return SUSPECTS;
-    if (filter === 'weapon') return WEAPONS;
-    if (filter === 'room') return ROOMS;
-    return [...SUSPECTS, ...WEAPONS, ...ROOMS];
+    if (filter === 'suspect') return SORTED.suspect;
+    if (filter === 'weapon') return SORTED.weapon;
+    if (filter === 'room') return SORTED.room;
+    return [...SORTED.suspect, ...SORTED.weapon, ...SORTED.room];
   }, [filter]);
 
   return (

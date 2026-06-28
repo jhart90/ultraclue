@@ -1,0 +1,19 @@
+/* A very large envelope angled off the upper-right corner of the screen, sitting upper-left of the
+   logo and behind everything (the logo and menu draw on top, but it's placed not to overlap them). */
+.title .title__envelope {
+  position: fixed;
+  top: -13vh;
+  left: -13vw;
+  width: min(56vw, 700px);
+  z-index: 0;
+  pointer-events: none;
+  /* Sits over the screen's top-left corner, tilted, so it runs off both the top and left edges. */
+  transform: rotate(13deg);
+  transform-origin: center;
+  filter: drop-shadow(0 22px 34px rgba(0, 0, 0, 0.6));
+}
+.title__envelope svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}

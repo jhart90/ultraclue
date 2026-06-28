@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../store';
 import { Wordmark } from '../components/Wordmark';
 import { TitleCards } from '../components/TitleCards';
+import { TitleEnvelope } from '../components/TitleEnvelope';
 import './Title.css';
 
 type Mode = 'menu' | 'start' | 'join';
@@ -37,6 +38,7 @@ export function Title() {
 
   return (
     <div className="title">
+      <TitleEnvelope />
       <TitleCards />
       <Wordmark size="lg" className="title__h1" />
       <p className="title__tag">“{tagline}”</p>

@@ -48,7 +48,7 @@ export function Title() {
           <button className="btn btn--primary title__start" disabled={!connected} onClick={() => setMode('start')}>
             Start Game
           </button>
-          <button className="btn" disabled={!connected} onClick={() => setMode('join')}>
+          <button className="btn title__join" disabled={!connected} onClick={() => setMode('join')}>
             Join Game
           </button>
           {savedMeta && (

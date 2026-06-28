@@ -5,6 +5,42 @@
   padding: 4rem 1.5rem;
   text-align: center;
 }
+/* Keep the wordmark, tagline, and menu above the scattered cards strewn behind them. */
+.title > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Title-screen buttons take on the display title font and the stadium (pill) shape of the room-name
+   bubbles on the board. */
+.title .btn {
+  font-family: var(--font-display);
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+/* The Start Game button is the headline action — noticeably larger than the rest. */
+.title .btn.title__start {
+  font-size: 1.5rem;
+  padding: 1rem 2rem;
+  letter-spacing: 0.06em;
+}
+
+/* Decorative cards strewn across the bottom half, behind the menu. */
+.title__cards {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 56vh;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.title__card {
+  position: absolute;
+  transform-origin: center center;
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.55));
+}
 
 .title__crest {
   font-size: 3rem;

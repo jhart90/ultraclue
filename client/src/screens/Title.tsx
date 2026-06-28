@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { Wordmark } from '../components/Wordmark';
+import { TitleCards } from '../components/TitleCards';
 import './Title.css';
 
 type Mode = 'menu' | 'start' | 'join';
@@ -36,6 +37,7 @@ export function Title() {
 
   return (
     <div className="title">
+      <TitleCards />
       <Wordmark size="lg" className="title__h1" />
       <p className="title__tag">{tagline}</p>
 
@@ -43,7 +45,7 @@ export function Title() {
 
       {mode === 'menu' && (
         <div className="title__menu">
-          <button className="btn btn--primary" disabled={!connected} onClick={() => setMode('start')}>
+          <button className="btn btn--primary title__start" disabled={!connected} onClick={() => setMode('start')}>
             Start Game
           </button>
           <button className="btn" disabled={!connected} onClick={() => setMode('join')}>

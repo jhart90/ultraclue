@@ -44,6 +44,9 @@ function buildScatter(): Placed[] {
   }
   return pool.map((card, i) => {
     const angle = Math.round(-75 + Math.random() * 150);
+    // Always anchor one card running off the lower-left corner and one off the lower-right corner.
+    if (i === 0) return { card, faceUp: faces[i], left: 1 + Math.random() * 5, bottom: -8 + Math.random() * 5, angle };
+    if (i === 1) return { card, faceUp: faces[i], left: 94 + Math.random() * 5, bottom: -8 + Math.random() * 5, angle };
     const bottom = Math.random() * 20;
     let left = clamp(((i + 0.5) / count) * 100 + (Math.random() * 16 - 8), 7, 93);
     // Re-roll the horizontal position until the card clears the central 10% column entirely.

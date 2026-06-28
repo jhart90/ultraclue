@@ -223,11 +223,7 @@
      instead of a tall single column — keeping the action button from being pushed off-screen. */
   .sp--reveal .card,
   .sp--end .card {
-    width: 118px;
-  }
-  .sp--reveal .card__art,
-  .sp--end .card__art {
-    height: 84px;
+    width: 118px; /* aspect-ratio keeps the height proportional */
   }
   /* compact card body so two rows of cards stay short */
   .sp--reveal .card__phrase,

@@ -2,7 +2,7 @@
   position: relative;
   overflow: hidden;
   width: 200px;
-  height: 280px;
+  aspect-ratio: 200 / 306; /* match the uniform card-front size so backs line up beside faces */
   border-radius: 12px;
   border: 3px solid var(--accent, #c8a24a);
   display: flex;
@@ -46,5 +46,4 @@
 }
 .cardback--sm {
   width: 132px;
-  height: 184px;
 }

@@ -76,7 +76,7 @@ export function Title() {
         >
           <label>
             Your name
-            <input autoFocus value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex" />
+            <input autoFocus value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="e.g. Jack" />
           </label>
           <div className="title__row">
             <button type="button" className="btn btn--ghost" onClick={() => setMode('menu')}>
@@ -99,7 +99,7 @@ export function Title() {
         >
           <label>
             Your name
-            <input autoFocus value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex" />
+            <input autoFocus value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="e.g. Jack" />
           </label>
           <label>
             Room code

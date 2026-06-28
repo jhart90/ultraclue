@@ -8,7 +8,7 @@
   z-index: 0;
   pointer-events: none;
   /* Sits over the screen's top-left corner, tilted, so it runs off both the top and left edges. */
-  transform: rotate(13deg);
+  transform: rotate(-25deg);
   transform-origin: center;
   filter: drop-shadow(0 22px 34px rgba(0, 0, 0, 0.6));
 }

@@ -49,6 +49,23 @@ const clearRoom = () => {
   }
 };
 
+// A shared invite link (?join=ABCD) drops the recipient straight onto the Join form with the code
+// filled in. Honour the invite over any saved game (don't silently auto-rejoin an old room), and
+// scrub the param from the URL so a refresh doesn't re-trigger it.
+export const initialJoinCode = (() => {
+  try {
+    const c = new URLSearchParams(window.location.search).get('join');
+    if (c && /^[A-Za-z0-9]{4}$/.test(c)) {
+      localStorage.removeItem(ROOM_KEY);
+      window.history.replaceState(null, '', window.location.pathname);
+      return c.toUpperCase();
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+})();
+
 // A single saved-game slot lives in browser storage (manual save + per-turn auto-save). It also
 // carries this player's private Detective Notes so they survive a save/load.
 const SAVE_KEY = 'ultraclue-savegame';

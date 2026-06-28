@@ -25,6 +25,22 @@ function suspectColor(suspectId?: string): string {
   return c && c.type === 'suspect' ? c.color : '#555';
 }
 
+/** Share a direct join link (?join=CODE) via the native share sheet — Messages, WhatsApp, etc. —
+ *  falling back to the SMS composer where Web Share isn't available. */
+async function sendInvite(code: string): Promise<void> {
+  const url = `${window.location.origin}${window.location.pathname}?join=${code}`;
+  const msg = `Join my Ultra Clue game — room ${code}!`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Ultra Clue', text: msg, url });
+    } catch {
+      /* the user dismissed the share sheet */
+    }
+    return;
+  }
+  window.location.href = `sms:?&body=${encodeURIComponent(`${msg} ${url}`)}`;
+}
+
 export function Lobby() {
   const lobby = useStore((s) => s.lobby);
   const myId = useStore((s) => s.myId);
@@ -79,9 +95,14 @@ export function Lobby() {
               : 'Waiting for the host to start the game.'}
           </p>
         </div>
-        <div className="lobby__code">
-          <span>Room Code</span>
-          <strong>{lobby.code}</strong>
+        <div className="lobby__codecol">
+          <div className="lobby__code">
+            <span>Room Code</span>
+            <strong>{lobby.code}</strong>
+          </div>
+          <button className="lobby__sendlink" onClick={() => sendInvite(lobby.code)}>
+            📲 Send link
+          </button>
         </div>
       </header>
 

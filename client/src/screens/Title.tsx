@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStore } from '../store';
+import { useStore, initialJoinCode } from '../store';
 import { Wordmark } from '../components/Wordmark';
 import { TitleCards } from '../components/TitleCards';
 import { TitleEnvelope } from '../components/TitleEnvelope';
@@ -30,9 +30,9 @@ export function Title() {
   const savedMeta = useStore((s) => s.savedMeta);
   const goto = useStore((s) => s.goto);
 
-  const [mode, setMode] = useState<Mode>('menu');
+  const [mode, setMode] = useState<Mode>(initialJoinCode ? 'join' : 'menu');
   const [name, setName] = useState('');
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(initialJoinCode ?? '');
   const [tagline] = useState(() => TAGLINES[Math.floor(Math.random() * TAGLINES.length)]);
 
   const canSubmit = connected && name.trim().length > 0;

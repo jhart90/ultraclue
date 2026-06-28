@@ -24,10 +24,11 @@
   padding: 1rem 2rem;
   letter-spacing: 0.06em;
 }
-/* Join Game wears the maroon of the card backs. */
+/* Join Game wears a light blue. */
 .title .btn.title__join {
-  background: #531625;
-  color: var(--ink, #ece8f5);
+  background: #7fc4e8;
+  color: #11212b;
+  border-color: rgba(127, 196, 232, 0.7);
 }
 
 /* Decorative cards strewn across the bottom half, behind the menu. */

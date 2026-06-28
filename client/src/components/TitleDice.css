@@ -1,11 +1,12 @@
-/* A rolled pair of dice lying flat on the table (top-down) to the upper-right of the logo. */
+/* A rolled pair of dice lying flat on the table (top-down) in the upper-right corner. On mobile they
+   hug the corner — and may run off the right edge — so they keep clear of the logo. */
 .title .title__dice {
   position: fixed;
-  top: 5vh;
-  left: 60%;
+  top: 1.5vh;
+  right: -3vw;
   z-index: 1;
   display: flex;
-  gap: 26px;
+  gap: 16px;
   pointer-events: none;
 }
 .tdie {
@@ -13,7 +14,17 @@
   height: 58px;
 }
 .tdie:nth-child(2) {
-  margin-top: 18px; /* offset the second die so the pair looks tossed, like the reference photo */
+  margin-top: 16px; /* offset the second die so the pair looks tossed, like the reference photo */
+}
+
+/* Desktop: tuck into the corner and enlarge the whole pair (mobile keeps the size above). */
+@media (min-width: 761px) {
+  .title .title__dice {
+    top: 3vh;
+    right: 3.5vw;
+    transform: scale(1.5);
+    transform-origin: top right;
+  }
 }
 
 /* The top face seen from above: rounded die corners, a thin extruded edge for thickness, and a soft

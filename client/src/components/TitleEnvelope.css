@@ -17,3 +17,10 @@
   width: 100%;
   height: auto;
 }
+
+/* On mobile, nudge the envelope down a touch so its wax seal clears the top edge. */
+@media (max-width: 760px) {
+  .title .title__envelope {
+    top: -9vh;
+  }
+}

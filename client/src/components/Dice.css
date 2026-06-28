@@ -1,29 +1,39 @@
 .dice {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.55rem;
 }
 
-.die {
-  width: 34px;
-  height: 34px;
-  border-radius: 7px;
-  background: linear-gradient(145deg, #fbf7ee, #d8cfbb);
-  box-shadow: inset 0 -3px 4px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.4);
-  padding: 4px;
-  perspective: 200px;
+/* Gold + maroon dice matching the title screen (flat, seen from above). */
+.gdie {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
 }
-.die--rolling {
-  animation: die-tumble 0.55s ease-in-out;
+.gdie--roll {
+  animation: gdie-pop 0.45s ease;
 }
-@keyframes die-tumble {
-  0% { transform: rotateX(0) rotateY(0); }
-  30% { transform: rotateX(220deg) rotateY(140deg); }
-  60% { transform: rotateX(390deg) rotateY(300deg); }
-  100% { transform: rotateX(360deg) rotateY(360deg); }
+@keyframes gdie-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.22) translateY(-3px); }
+  100% { transform: scale(1); }
 }
 
-.die__grid {
+.gdie__face {
+  width: 100%;
+  height: 100%;
+  border-radius: 24%;
+  box-sizing: border-box;
+  padding: 13%;
+}
+.gdie--gold .gdie__face {
+  transform: rotate(-9deg);
+}
+.gdie--maroon .gdie__face {
+  transform: rotate(9deg);
+}
+
+.gdie__grid {
   width: 100%;
   height: 100%;
   display: grid;
@@ -31,15 +41,39 @@
   grid-template-rows: repeat(3, 1fr);
   place-items: center;
 }
-.pip {
-  width: 6px;
-  height: 6px;
+.gdie__pip {
+  width: 62%;
+  height: 62%;
   border-radius: 50%;
   background: transparent;
 }
-.pip--on {
-  background: #2a1f14;
-  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+
+/* Gold die: gilt top with dark recessed pips. */
+.gdie--gold .gdie__face {
+  background: radial-gradient(circle at 36% 28%, #f8e6ad, #dcae46 58%, #b98c2b);
+  box-shadow:
+    inset 0 1px 3px rgba(255, 250, 225, 0.6),
+    inset 0 -2px 4px rgba(120, 90, 20, 0.45),
+    0 3px 0 #997820,
+    2px 9px 11px rgba(0, 0, 0, 0.5);
+}
+.gdie--gold .gdie__pip--on {
+  background: radial-gradient(circle at 35% 30%, #4a3614, #241803);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.55);
+}
+
+/* Maroon die: wine top with raised cream pips. */
+.gdie--maroon .gdie__face {
+  background: radial-gradient(circle at 36% 28%, #a23a4d, #6c2030 56%, #471320);
+  box-shadow:
+    inset 0 1px 3px rgba(255, 210, 210, 0.3),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+    0 3px 0 #360d16,
+    2px 9px 11px rgba(0, 0, 0, 0.5);
+}
+.gdie--maroon .gdie__pip--on {
+  background: radial-gradient(circle at 35% 30%, #fbf3df, #d9c9a6);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
 
 .dice__sum {

@@ -10,21 +10,21 @@ const PIPS: Record<number, [number, number][]> = {
   6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]],
 };
 
-function Face({ value, rolling }: { value: number; rolling: boolean }) {
+function Pips({ value }: { value: number }) {
   return (
-    <div className={`die${rolling ? ' die--rolling' : ''}`}>
-      <div className="die__grid">
-        {Array.from({ length: 9 }, (_, i) => {
-          const col = i % 3;
-          const row = Math.floor(i / 3);
-          const on = PIPS[value]?.some(([c, r]) => c === col && r === row);
-          return <span key={i} className={on ? 'pip pip--on' : 'pip'} />;
-        })}
-      </div>
+    <div className="gdie__grid">
+      {Array.from({ length: 9 }, (_, i) => {
+        const c = i % 3;
+        const r = Math.floor(i / 3);
+        const on = PIPS[value]?.some(([pc, pr]) => pc === c && pr === r);
+        return <span key={i} className={`gdie__pip${on ? ' gdie__pip--on' : ''}`} />;
+      })}
     </div>
   );
 }
 
+/** The in-game roll: a gold + maroon pair styled to match the title-screen dice (flat, top-down),
+ *  plus the rolled total. Pops briefly on each new roll. */
 export function Dice({ values }: { values: [number, number] }) {
   const [rolling, setRolling] = useState(false);
   const prev = useRef<string>('');
@@ -32,7 +32,7 @@ export function Dice({ values }: { values: [number, number] }) {
     const key = values.join(',');
     if (prev.current && prev.current !== key) {
       setRolling(true);
-      const t = setTimeout(() => setRolling(false), 550);
+      const t = setTimeout(() => setRolling(false), 450);
       return () => clearTimeout(t);
     }
     prev.current = key;
@@ -40,8 +40,16 @@ export function Dice({ values }: { values: [number, number] }) {
 
   return (
     <div className="dice">
-      <Face value={values[0]} rolling={rolling} />
-      <Face value={values[1]} rolling={rolling} />
+      <div className={`gdie gdie--gold${rolling ? ' gdie--roll' : ''}`}>
+        <div className="gdie__face">
+          <Pips value={values[0]} />
+        </div>
+      </div>
+      <div className={`gdie gdie--maroon${rolling ? ' gdie--roll' : ''}`}>
+        <div className="gdie__face">
+          <Pips value={values[1]} />
+        </div>
+      </div>
       <span className="dice__sum">= {values[0] + values[1]}</span>
     </div>
   );

@@ -24,11 +24,11 @@
   padding: 1rem 2rem;
   letter-spacing: 0.06em;
 }
-/* Join Game wears a light blue. */
+/* Join Game wears the cerulean blue of Coach Cerulean's card background. */
 .title .btn.title__join {
-  background: #7fc4e8;
-  color: #11212b;
-  border-color: rgba(127, 196, 232, 0.7);
+  background: #136999;
+  color: var(--ink, #ece8f5);
+  border-color: rgba(120, 190, 225, 0.7);
 }
 
 /* Decorative cards strewn across the bottom half, behind the menu. */

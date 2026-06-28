@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { Wordmark } from '../components/Wordmark';
 import { TitleCards } from '../components/TitleCards';
 import { TitleEnvelope } from '../components/TitleEnvelope';
+import { TitleDice } from '../components/TitleDice';
 import './Title.css';
 
 type Mode = 'menu' | 'start' | 'join';
@@ -41,6 +42,7 @@ export function Title() {
       <TitleEnvelope />
       <TitleCards />
       <Wordmark size="lg" className="title__h1" />
+      <TitleDice />
       <p className="title__tag">“{tagline}”</p>
 
       {!connected && <p className="title__status">Connecting to the server…</p>}

@@ -19,16 +19,14 @@ const CARD_W = 160;
 const CARD_H = 245;
 const MARGIN = 2;
 
-/** Does a card centred at (cx%, cyTop%) and tilted by `angle` overlap the central 10% box (45–55% on
- *  each axis, plus margin)? Uses the rotated bounding box so a steeply tilted card's corners are
- *  accounted for, keeping the focal centre — logo + menu — uncovered. */
-function hitsCentre(cx: number, cyTop: number, angle: number, vw: number, vh: number): boolean {
+/** Does a card centred at horizontal `cx%` and tilted by `angle` intrude on the central 10% column
+ *  (45–55% of width, plus margin) at any height? Uses the rotated width so a steeply tilted card's
+ *  corners are accounted for, keeping the central strip — under the logo and menu — fully clear. */
+function hitsCentre(cx: number, angle: number, vw: number): boolean {
   const rad = (Math.abs(angle) * Math.PI) / 180;
   const rotW = Math.abs(Math.cos(rad)) * CARD_W + Math.abs(Math.sin(rad)) * CARD_H;
-  const rotH = Math.abs(Math.sin(rad)) * CARD_W + Math.abs(Math.cos(rad)) * CARD_H;
   const halfW = (rotW / 2 / vw) * 100;
-  const halfH = (rotH / 2 / vh) * 100;
-  return cx + halfW > 45 - MARGIN && cx - halfW < 55 + MARGIN && cyTop + halfH > 45 - MARGIN && cyTop - halfH < 55 + MARGIN;
+  return cx + halfW > 45 - MARGIN && cx - halfW < 55 + MARGIN;
 }
 
 /** Pick 4–7 random cards, half face-up / half face-down, scattered across the lower screen at random
@@ -36,7 +34,6 @@ function hitsCentre(cx: number, cyTop: number, angle: number, vw: number, vh: nu
  *  menu. */
 function buildScatter(): Placed[] {
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const count = 4 + Math.floor(Math.random() * 4); // 4..7
   const pool = [...ALL_CARDS].sort(() => Math.random() - 0.5).slice(0, count);
   // roughly half face up; shuffle which positions are up so it's not the first N
@@ -47,14 +44,11 @@ function buildScatter(): Placed[] {
   }
   return pool.map((card, i) => {
     const angle = Math.round(-75 + Math.random() * 150);
+    const bottom = Math.random() * 20;
     let left = clamp(((i + 0.5) / count) * 100 + (Math.random() * 16 - 8), 7, 93);
-    let bottom = Math.random() * 20;
-    // Re-roll any placement whose (rotated) body would cover the centre 10% of the screen.
-    for (let tries = 0; tries < 30; tries++) {
-      const cyTop = 100 - ((bottom / 100) * vh + CARD_H / 2) / vh * 100;
-      if (!hitsCentre(left, cyTop, angle, vw, vh)) break;
+    // Re-roll the horizontal position until the card clears the central 10% column entirely.
+    for (let tries = 0; tries < 40 && hitsCentre(left, angle, vw); tries++) {
       left = 7 + Math.random() * 86;
-      bottom = Math.random() * 20;
     }
     return { card, faceUp: faces[i], left, bottom, angle };
   });

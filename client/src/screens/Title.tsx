@@ -39,7 +39,7 @@ export function Title() {
     <div className="title">
       <TitleCards />
       <Wordmark size="lg" className="title__h1" />
-      <p className="title__tag">{tagline}</p>
+      <p className="title__tag">“{tagline}”</p>
 
       {!connected && <p className="title__status">Connecting to the server…</p>}
 

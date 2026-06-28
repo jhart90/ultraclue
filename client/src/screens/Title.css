@@ -64,6 +64,7 @@
 .title__tag {
   color: var(--muted, #9a93b3);
   font-style: italic;
+  font-size: 1.15rem;
   margin-top: 0.3rem;
 }
 

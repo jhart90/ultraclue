@@ -34,7 +34,8 @@ function hitsCentre(cx: number, angle: number, vw: number): boolean {
  *  menu. */
 function buildScatter(): Placed[] {
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-  const count = 4 + Math.floor(Math.random() * 4); // 4..7
+  const mobile = vw <= 760;
+  const count = (mobile ? 2 : 4) + Math.floor(Math.random() * 4); // 2..5 on mobile, 4..7 otherwise
   const pool = [...ALL_CARDS].sort(() => Math.random() - 0.5).slice(0, count);
   // roughly half face up; shuffle which positions are up so it's not the first N
   const faces = Array.from({ length: count }, (_, i) => i < Math.round(count / 2));

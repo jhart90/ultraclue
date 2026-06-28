@@ -1,92 +1,30 @@
-/* A rolled pair of 3D dice to the upper-right of the logo. */
+/* A rolled pair of dice lying flat on the table (top-down) to the upper-right of the logo. */
 .title .title__dice {
   position: fixed;
-  top: 4vh;
+  top: 5vh;
   left: 60%;
   z-index: 1;
   display: flex;
-  gap: 20px;
+  gap: 26px;
   pointer-events: none;
-  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.55));
 }
-
 .tdie {
   width: 58px;
   height: 58px;
-  perspective: 480px;
 }
 .tdie:nth-child(2) {
-  transform: translateY(16px); /* stagger the second die so the pair looks tossed */
+  margin-top: 18px; /* offset the second die so the pair looks tossed, like the reference photo */
 }
 
-.tdie__cube {
-  position: relative;
-  width: 58px;
-  height: 58px;
-  transform-style: preserve-3d;
-  transform: var(--rest);
-  animation: tdie-roll 0.9s cubic-bezier(0.2, 0.85, 0.3, 1) both;
-}
-.tdie:nth-child(2) .tdie__cube {
-  animation-delay: 0.08s;
-}
-@keyframes tdie-roll {
-  0% {
-    transform: rotateX(-430deg) rotateY(340deg);
-  }
-  100% {
-    transform: var(--rest);
-  }
-}
-
+/* The top face seen from above: rounded die corners, a thin extruded edge for thickness, and a soft
+   cast shadow thrown to one side as if lit from above. */
 .tdie__face {
-  position: absolute;
-  width: 58px;
-  height: 58px;
-  border-radius: 10px;
+  width: 100%;
+  height: 100%;
+  border-radius: 24%;
   box-sizing: border-box;
-  padding: 6px;
-  backface-visibility: hidden; /* keep the cube reading as a solid block */
+  padding: 7px;
 }
-.tdie__face--front {
-  transform: translateZ(29px);
-}
-.tdie__face--back {
-  transform: rotateY(180deg) translateZ(29px);
-}
-.tdie__face--right {
-  transform: rotateY(90deg) translateZ(29px);
-}
-.tdie__face--left {
-  transform: rotateY(-90deg) translateZ(29px);
-}
-.tdie__face--top {
-  transform: rotateX(90deg) translateZ(29px);
-}
-.tdie__face--bottom {
-  transform: rotateX(-90deg) translateZ(29px);
-}
-
-/* Gold die: warm gilt faces with dark pips. */
-.tdie--gold .tdie__face {
-  background: linear-gradient(150deg, #f4da8d 0%, #d6ab47 45%, #b98a28 100%);
-  border: 1px solid #9c7c22;
-  box-shadow: inset 0 0 10px rgba(120, 90, 20, 0.45), inset 0 2px 3px rgba(255, 250, 220, 0.5);
-}
-.tdie--gold .tdie__pip--on {
-  background: radial-gradient(circle at 35% 30%, #4a3614, #241803);
-}
-
-/* Maroon die: deep wine faces with cream pips. */
-.tdie--maroon .tdie__face {
-  background: linear-gradient(150deg, #8c2d40 0%, #631c2b 48%, #45121d 100%);
-  border: 1px solid #380e17;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), inset 0 2px 3px rgba(255, 200, 200, 0.18);
-}
-.tdie--maroon .tdie__pip--on {
-  background: radial-gradient(circle at 35% 30%, #fbf3df, #d9c9a6);
-}
-
 .tdie__grid {
   width: 100%;
   height: 100%;
@@ -101,6 +39,31 @@
   border-radius: 50%;
   background: transparent;
 }
-.tdie__pip--on {
+
+/* Gold die: gilt top with dark recessed pips. */
+.tdie--gold .tdie__face {
+  background: radial-gradient(circle at 36% 28%, #f8e6ad, #dcae46 58%, #b98c2b);
+  box-shadow:
+    inset 0 2px 4px rgba(255, 250, 225, 0.6),
+    inset 0 -3px 6px rgba(120, 90, 20, 0.45),
+    0 5px 0 #997820,
+    /* die thickness */ 3px 16px 18px rgba(0, 0, 0, 0.55); /* table shadow */
+}
+.tdie--gold .tdie__pip--on {
+  background: radial-gradient(circle at 35% 30%, #4a3614, #241803);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.55);
+}
+
+/* Maroon die: wine top with raised cream pips. */
+.tdie--maroon .tdie__face {
+  background: radial-gradient(circle at 36% 28%, #a23a4d, #6c2030 56%, #471320);
+  box-shadow:
+    inset 0 2px 4px rgba(255, 210, 210, 0.3),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.5),
+    0 5px 0 #360d16,
+    /* die thickness */ 3px 16px 18px rgba(0, 0, 0, 0.55); /* table shadow */
+}
+.tdie--maroon .tdie__pip--on {
+  background: radial-gradient(circle at 35% 30%, #fbf3df, #d9c9a6);
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }

@@ -112,7 +112,8 @@ export function Lobby() {
             const occ = slot.occupant;
             const isMe = occ?.id === myId;
             const isHostSeat = occ?.id === lobby.hostId;
-            const showCtrls = amHost && !(occ && !occ.isBot) && slot.index !== 0;
+            // Open/Closed/Bot cluster is only for empty seats; a filled bot seat gets a "Boot Bot" button.
+            const showCtrls = amHost && !occ && slot.index !== 0;
             return (
               <div className={`seat${occ ? ' seat--filled' : ''}`} key={slot.index}>
                 <div className="seat__num">Seat {slot.index + 1}</div>
@@ -134,13 +135,18 @@ export function Lobby() {
                       <div className="seat__observing">👁 Watching only — not dealt into the game.</div>
                     ) : (
                       <>
-                        {isMe && mySuspectId && <SuspectPortrait suspectId={mySuspectId} />}
+                        {occ.suspectId && <SuspectPortrait suspectId={occ.suspectId} />}
                         <div className="seat__char">
                           {occ.suspectId ? getCard(occ.suspectId)?.title : <em>choosing…</em>}
                         </div>
                         {isMe && (
                           <button className="seat__pick" onClick={() => setPicking(true)}>
                             Change character
+                          </button>
+                        )}
+                        {amHost && occ.isBot && (
+                          <button className="seat__pick" onClick={() => setSlot(slot.index, 'open')}>
+                            Boot Bot
                           </button>
                         )}
                       </>

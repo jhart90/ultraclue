@@ -271,6 +271,24 @@ function progress(room: Room): void {
   if (room.accusingId && (g.phase !== 'play' || currentPlayerId(g) !== room.accusingId)) {
     room.accusingId = undefined;
   }
+  // A winning accusation: hold its "case solved" reveal out of the chat for 30s (let the verdict
+  // pop-up land first), then drop it in with a sign-off. Fires once per win, human or bot.
+  const ann = g.announcement;
+  if (g.phase === 'ended' && ann?.kind === 'accusation' && ann.correct && room.winAnnounced !== ann.seq) {
+    room.winAnnounced = ann.seq;
+    const winnerName = getPlayer(g, g.winnerId ?? '')?.name;
+    if (g.log.length && /CORRECT/i.test(g.log[g.log.length - 1].text)) g.log.pop(); // keep it out of mirrorLog
+    if (winnerName) {
+      const code = room.code;
+      setTimeout(() => {
+        const r = getRoom(code);
+        if (!r) return;
+        addChat(r, 'System', `The accusation is CORRECT — ${winnerName} has solved the case and wins!`, true);
+        addChat(r, 'System', 'Thanks for playing ULTRA CLUE!', true);
+        emitChat(r);
+      }, 30_000);
+    }
+  }
   recordSuggestion(room); // log a resolved suggestion so every bot can deduce from it
   updateBotNotes(room); // refresh each bot's Detective Notes from its latest deduction
   whisperReveal(room); // privately tell the two players which card was shown

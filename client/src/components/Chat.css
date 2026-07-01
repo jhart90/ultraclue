@@ -49,10 +49,10 @@
 }
 .chat__msg--sys {
   color: #9aa2b5;
-  font-style: italic;
   font-size: 0.84rem;
 }
-/* Private "whisper" lines — visible only to the sender + recipient. */
+/* Private lines — whispers and reveals shown only to a subset — are italic to signal not everyone
+   sees them. */
 .chat__msg--whisper {
   color: #9a93b3;
   font-style: italic;

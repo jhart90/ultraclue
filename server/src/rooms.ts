@@ -35,6 +35,8 @@ export interface Room {
   paused?: boolean;
   /** Id of a player currently composing an accusation (picking cards), to warn the rest of the table. */
   accusingId?: string;
+  /** announcement.seq of a winning accusation already handled, so its delayed reveal fires once. */
+  winAnnounced?: number;
 }
 
 const rooms = new Map<string, Room>();

@@ -48,6 +48,7 @@ import {
   type BootPlayerPayload,
   type TakeSeatPayload,
   type JoinObserverPayload,
+  type SetAccusingPayload,
   type SetNotesPayload,
   type SetObserverPayload,
   type LoadGamePayload,
@@ -232,9 +233,10 @@ function sendNotes(socket: Socket, room: Room, id: string): void {
   if (notes) socket.emit(SOCKET_EVENTS.NOTES, { notes });
 }
 
-/** A viewer's game view, stamped with the room host's id so an observing host keeps host controls. */
+/** A viewer's game view, stamped with the room host's id so an observing host keeps host controls,
+ *  and whoever is mid-accusation so the table can be warned. */
 function gameView(room: Room, id: string) {
-  return { ...viewFor(room.game!, id), hostId: room.hostId };
+  return { ...viewFor(room.game!, id), hostId: room.hostId, accusingId: room.accusingId };
 }
 
 /** Push each human their own tailored game view (observers included — they watch). */
@@ -265,6 +267,10 @@ function withGame(socket: Socket, fn: (room: Room, g: GameState) => GameState): 
 function progress(room: Room): void {
   const g = room.game;
   if (!g) return;
+  // The "is accusing" warning only stands while it's still that player's live turn.
+  if (room.accusingId && (g.phase !== 'play' || currentPlayerId(g) !== room.accusingId)) {
+    room.accusingId = undefined;
+  }
   recordSuggestion(room); // log a resolved suggestion so every bot can deduce from it
   updateBotNotes(room); // refresh each bot's Detective Notes from its latest deduction
   whisperReveal(room); // privately tell the two players which card was shown
@@ -552,6 +558,21 @@ io.on('connection', (socket) => {
     }
   });
 
+  // A player opened (or closed) the accusation picker — warn the rest of the table.
+  socket.on(SOCKET_EVENTS.SET_ACCUSING, (p: SetAccusingPayload) => {
+    const room = findRoomByOccupant(cid(socket));
+    if (!room?.game || room.game.phase !== 'play') return;
+    const id = cid(socket);
+    // Only the active player can be composing an accusation.
+    if (p?.accusing) {
+      if (currentPlayerId(room.game) !== id) return;
+      room.accusingId = id;
+    } else if (room.accusingId === id) {
+      room.accusingId = undefined;
+    }
+    broadcastGame(room);
+  });
+
   // A player's Detective Notes changed — keep the server copy current so every save carries them.
   socket.on(SOCKET_EVENTS.SET_NOTES, (p: SetNotesPayload) => {
     const room = findRoomByOccupant(cid(socket));
@@ -758,6 +779,7 @@ io.on('connection', (socket) => {
     if ([...socketClient.values()].includes(clientId)) return; // another tab still open
     const room = disconnectOccupant(clientId); // stays human — the table waits for them to return
     if (!room) return;
+    if (room.accusingId === clientId) room.accusingId = undefined; // drop a stale "is accusing" warning
     addChat(room, 'System', `${nameOf(room, clientId)} disconnected — the game waits for them to return.`, true);
     emitLobby(room);
     emitChat(room);

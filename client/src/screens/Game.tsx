@@ -8,7 +8,7 @@ import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
 import { DetectiveNotes } from '../components/DetectiveNotes';
 import { SelectModal, RevealPanel, NoEvidencePanel, EndScreen } from '../components/SuggestPanels';
-import { StatusModal, AnnouncementModal, AccusationFlow, RevealModal, type StatusButton } from '../components/GamePopups';
+import { StatusModal, AnnouncementModal, AccusationFlow, AccusingModal, RevealModal, type StatusButton } from '../components/GamePopups';
 import { playDiceRoll } from '../util/sound';
 import { contrastInk } from '../render/colorUtils';
 import './Game.css';
@@ -40,6 +40,7 @@ export function Game() {
   const revealCard = useStore((s) => s.revealCard);
   const passSuggestion = useStore((s) => s.passSuggestion);
   const accuse = useStore((s) => s.accuse);
+  const setAccusing = useStore((s) => s.setAccusing);
   const endTurn = useStore((s) => s.endTurn);
   const bootPlayer = useStore((s) => s.bootPlayer);
   const saveGame = useStore((s) => s.saveGame);
@@ -235,7 +236,7 @@ export function Game() {
     const buttons: StatusButton[] = [];
     if (me?.inRoomId)
       buttons.push({ label: 'Suggest', icon: '🔍', primary: true, onClick: () => (setStatusOpen(false), setModal('suggest')) });
-    buttons.push({ label: 'Accuse', icon: '🗡️', onClick: () => (setStatusOpen(false), setModal('accuse')) });
+    buttons.push({ label: 'Accuse', icon: '🗡️', onClick: () => (setStatusOpen(false), setAccusing(true), setModal('accuse')) });
     buttons.push({ label: 'End Turn', icon: '⏳', onClick: () => (setStatusOpen(false), endTurn()) });
     return {
       lines: me?.inRoomId
@@ -255,6 +256,9 @@ export function Game() {
   const showAnn = annOpen && !!game.announcement && !showAccFlow && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal;
   const showStatus =
     statusOpen && !!statusDesc && !showAccFlow && !showAnn && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal && !iAmResponder;
+  // Someone else is composing an accusation — warn this player (not the accuser).
+  const accuser = game.accusingId && game.accusingId !== myId ? game.players.find((p) => p.id === game.accusingId) : undefined;
+  const showAccusing = !!accuser && !showAccFlow && !showEnd;
 
   return (
     <div className="game">
@@ -339,7 +343,7 @@ export function Game() {
                     {me?.inRoomId && (
                       <button className="btn btn--primary" onClick={() => setModal('suggest')}>Suggest</button>
                     )}
-                    <button className="btn" onClick={() => setModal('accuse')}>Accuse</button>
+                    <button className="btn" onClick={() => (setAccusing(true), setModal('accuse'))}>Accuse</button>
                     <button className="btn" onClick={endTurn}>End Turn</button>
                   </>
                 )}
@@ -425,10 +429,16 @@ export function Game() {
         <SelectModal
           mode={modal}
           fixedRoomId={modal === 'suggest' ? me.inRoomId : undefined}
-          onCancel={() => setModal(null)}
+          onCancel={() => {
+            if (modal === 'accuse') setAccusing(false); // withdrew — clear the table's warning
+            setModal(null);
+          }}
           onSubmit={(s, w, r) => {
             if (modal === 'suggest') suggest(s, w);
-            else accuse(s, w, r);
+            else {
+              accuse(s, w, r);
+              setAccusing(false);
+            }
             setModal(null);
           }}
         />
@@ -458,6 +468,8 @@ export function Game() {
           onEndGame={() => setAccFlow(null)}
         />
       )}
+
+      {showAccusing && accuser && <AccusingModal name={accuser.name} />}
 
       {showReveal && sug && (
         <RevealModal

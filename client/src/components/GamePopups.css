@@ -6,6 +6,11 @@
   margin-bottom: 0.6rem;
   line-height: 1.25;
 }
+.popup__title--accuse {
+  color: #e5342f;
+  text-shadow: 0 2px 12px rgba(229, 52, 47, 0.55);
+  letter-spacing: 0.01em;
+}
 
 /* Big turn-status pop-up */
 .statpop {

@@ -144,6 +144,7 @@ interface StoreState {
   revealCard: (cardId: string) => void;
   passSuggestion: () => void;
   accuse: (suspectId: string, weaponId: string, roomId: string) => void;
+  setAccusing: (accusing: boolean) => void;
   endTurn: () => void;
   bootPlayer: (targetId: string) => void;
   saveGame: () => void;
@@ -189,6 +190,7 @@ export const useStore = create<StoreState>((set) => ({
   revealCard: (cardId) => socket.emit(SOCKET_EVENTS.REVEAL_CARD, { cardId }),
   passSuggestion: () => socket.emit(SOCKET_EVENTS.PASS_SUGGESTION),
   accuse: (suspectId, weaponId, roomId) => socket.emit(SOCKET_EVENTS.MAKE_ACCUSATION, { suspectId, weaponId, roomId }),
+  setAccusing: (accusing) => socket.emit(SOCKET_EVENTS.SET_ACCUSING, { accusing }),
   endTurn: () => socket.emit(SOCKET_EVENTS.END_TURN),
   bootPlayer: (targetId) => socket.emit(SOCKET_EVENTS.BOOT_PLAYER, { targetId }),
   saveGame: () => socket.emit(SOCKET_EVENTS.SAVE_GAME),

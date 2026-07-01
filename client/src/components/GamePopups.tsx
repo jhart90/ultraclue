@@ -132,6 +132,18 @@ export function StatusModal({
   );
 }
 
+/** A red-titled warning shown to everyone else while a player is composing an accusation. */
+export function AccusingModal({ name }: { name: string }) {
+  return (
+    <div className="sp__backdrop">
+      <div className="sp sp--end">
+        <div className="popup__title popup__title--accuse">{name} is ready to make an ACCUSATION!</div>
+        <div className="sp__hint">The table holds its breath…</div>
+      </div>
+    </div>
+  );
+}
+
 /** "<name> has made a suggestion/accusation:" + the three named cards. Shown to every player. */
 export function AnnouncementModal({ announcement, onClose }: { announcement: Announcement; onClose: () => void }) {
   const a = announcement;

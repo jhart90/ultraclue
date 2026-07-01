@@ -37,6 +37,7 @@ export const SOCKET_EVENTS = {
   LOAD_GAME: 'loadGame', // restore a previously saved game (from the title screen)
   TAKE_SEAT: 'takeSeat', // join an in-progress (loaded) game by taking over a bot/empty seat
   JOIN_OBSERVER: 'joinObserver', // join an in-progress game to watch only (not as a player)
+  SET_ACCUSING: 'setAccusing', // a player opened/closed the accusation picker (warn the table)
   SET_NOTES: 'setNotes', // client pushes its Detective Notes so they ride along in every save
 
   // --- server -> client ---
@@ -130,6 +131,9 @@ export interface TakeSeatPayload {
 export interface JoinObserverPayload {
   code: string;
   name: string;
+}
+export interface SetAccusingPayload {
+  accusing: boolean;
 }
 export interface SetNotesPayload {
   /** Serialized Detective Notes (the localStorage JSON) for this player's seat. */

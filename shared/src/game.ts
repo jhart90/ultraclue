@@ -145,6 +145,8 @@ export interface GameView {
   yourId: string;
   /** Room host's id, so an observing host still gets host-only controls (set by the server). */
   hostId?: string;
+  /** Set to the id of a player currently composing an accusation, so the table can be warned. */
+  accusingId?: string;
   /** True when the viewer is watching only (not one of the dealt players). */
   observer?: boolean;
   /** The viewer's own hand. Empty for spectators / non-players. */

@@ -33,6 +33,8 @@ export interface Room {
   notes: Record<string, string>;
   /** A freshly loaded game is paused (all seats are bots) until a human takes a seat. */
   paused?: boolean;
+  /** Id of a player currently composing an accusation (picking cards), to warn the rest of the table. */
+  accusingId?: string;
 }
 
 const rooms = new Map<string, Room>();

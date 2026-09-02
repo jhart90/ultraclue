@@ -34,6 +34,7 @@ export function PublicLobby() {
   const error = useStore((s) => s.error);
   const serverOffset = useStore((s) => s.serverOffset);
   const pickSuspect = useStore((s) => s.pickSuspect);
+  const setObserver = useStore((s) => s.setObserver);
   const sendChat = useStore((s) => s.sendChat);
   const setRoomSettings = useStore((s) => s.setRoomSettings);
   const setBotDifficulty = useStore((s) => s.setBotDifficulty);
@@ -53,8 +54,10 @@ export function PublicLobby() {
   const mySlot = lobby.slots.find((s) => s.occupant?.id === myId);
   const mySuspectId = mySlot?.occupant?.suspectId;
   const total = lobby.settings?.totalPlayers ?? lobby.slots.length;
-  const humans = lobby.slots.filter((s) => s.occupant && !s.occupant.isBot).length;
+  const humans = lobby.slots.filter((s) => s.occupant && !s.occupant.isBot && !s.occupant.observer).length;
+  const watchers = lobby.slots.filter((s) => s.occupant?.observer).length;
   const cpus = lobby.slots.filter((s) => s.occupant?.isBot).length;
+  const amObserver = !!mySlot?.occupant?.observer;
   const botDifficulty = lobby.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
   // The server's clock drives the start; correct for our own clock's skew so everyone agrees.
   const remaining = Math.max(0, (lobby.startsAt ?? now) - (now + serverOffset));
@@ -127,6 +130,33 @@ export function PublicLobby() {
             const isMe = occ.id === myId;
             const isHostSeat = occ.id === lobby.hostId;
             const character = occ.suspectId ? getCard(occ.suspectId)?.title : undefined;
+            if (occ.observer) {
+              return (
+                <div className={`pseat pseat--human pseat--watcher${isMe ? ' pseat--me' : ''}`} key={slot.index} title={`${occ.name} is watching`}>
+                  <div className="pseat__num">👁</div>
+                  <div className="pseat__thumb pseat__thumb--eye">👁</div>
+                  <div className="pseat__text">
+                    <div className="pseat__name">{occ.name}</div>
+                    <div className="pseat__sub">
+                      Watching
+                      {isMe && (
+                        <>
+                          {' · '}
+                          <button className="pseat__link" onClick={() => setObserver(false)} title="Take a seat and play">
+                            play instead
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="pseat__tags">
+                    {isHostSeat && <span className="tag tag--host">HOST</span>}
+                    {isMe && <span className="tag tag--you">YOU</span>}
+                    {!occ.connected && <span className="tag tag--off">OFFLINE</span>}
+                  </div>
+                </div>
+              );
+            }
             return (
               <div
                 className={`pseat${occ.isBot ? '' : ' pseat--human'}${isMe ? ' pseat--me' : ''}`}
@@ -144,6 +174,10 @@ export function PublicLobby() {
                         {' · '}
                         <button className="pseat__link" onClick={() => setPicking(true)} title="Change character">
                           change
+                        </button>
+                        {' · '}
+                        <button className="pseat__link" onClick={() => setObserver(true)} title="Give the seat to a computer and just watch">
+                          watch instead
                         </button>
                       </>
                     )}
@@ -187,9 +221,12 @@ export function PublicLobby() {
         </button>
         <div className="lobby__footinfo">
           {humans} {humans === 1 ? 'human' : 'humans'} · {cpus} {cpus === 1 ? 'computer' : 'computers'} · {total} seats
+          {watchers > 0 && ` · ${watchers} watching`}
         </div>
         <div className="plobby__footclock">Starts in {fmtCountdown(remaining)}</div>
       </footer>
+
+      {amObserver && <p className="plobby__watchnote">You're watching this one. The game starts for you too when the clock runs out.</p>}
 
       {picking && (
         <SuspectPicker

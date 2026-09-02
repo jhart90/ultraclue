@@ -166,11 +166,32 @@ export function electHost(room: Room): void {
 
 /** A human joins the public lobby: they take over the lowest computer seat (keeping its character).
  *  Someone already seated just gets their existing seat back. */
-export function joinPublicLobby(room: Room, id: string, name: string): number {
+/** Public observers sit in extra slots appended past the table (index >= totalPlayers), so the
+ *  humans-plus-computers count of the playing seats is untouched. */
+function appendObserverSlot(room: Room, occupant: SlotOccupant): Slot {
+  const slot: Slot = { index: room.slots.length, status: 'open', occupant: { ...occupant, observer: true, suspectId: undefined } };
+  room.slots.push(slot);
+  return slot;
+}
+function dropSlot(room: Room, slot: Slot): void {
+  room.slots = room.slots.filter((s) => s !== slot);
+  room.slots.forEach((s, i) => (s.index = i));
+}
+/** Is this a public observer slot (past the playing seats)? */
+function isPublicObserverSlot(room: Room, slot: Slot): boolean {
+  return !!room.isPublic && slot.index >= (room.settings?.totalPlayers ?? room.slots.length);
+}
+
+export function joinPublicLobby(room: Room, id: string, name: string, observer = false): number {
   if (!room.isPublic) throw new Error('Not the public room.');
   if (room.phase !== 'lobby') throw new Error('The public game has already started.');
   const mine = room.slots.find((s) => s.occupant?.id === id);
   if (mine) return mine.index;
+  if (observer) {
+    const s = appendObserverSlot(room, { id, name: name.trim() || 'Observer', isBot: false, connected: true, joinedAt: Date.now() });
+    electHost(room);
+    return s.index;
+  }
   const slot = room.slots.find((s) => s.occupant?.isBot);
   if (!slot?.occupant) throw new Error('The public table is full.');
   slot.status = 'open';
@@ -205,11 +226,14 @@ export function setRoomSettings(
   if (patch.totalPlayers == null) return;
   if (!room.isPublic) throw new Error('Only the public table can be resized.');
   const n = clampTotal(patch.totalPlayers);
-  const humans = room.slots.filter((s) => s.occupant && !s.occupant.isBot).length;
+  const humans = room.slots.filter((s) => s.occupant && !s.occupant.isBot && !s.occupant.observer).length;
   if (n < humans) throw new Error(`${humans} people are already seated — the table can't be smaller than that.`);
-  if (n < room.slots.length) {
-    const keep = room.slots.slice(0, n);
-    const overflow = room.slots
+  const oldTotal = room.settings?.totalPlayers ?? room.slots.length;
+  const observers = room.slots.slice(oldTotal); // watchers sit past the playing seats; keep them
+  let playing = room.slots.slice(0, oldTotal);
+  if (n < playing.length) {
+    const keep = playing.slice(0, n);
+    const overflow = playing
       .slice(n)
       .map((s) => s.occupant)
       .filter((o): o is SlotOccupant => !!o && !o.isBot);
@@ -219,12 +243,14 @@ export function setRoomSettings(
       target.status = 'open';
       target.occupant = h;
     }
-    room.slots = keep;
+    playing = keep;
   } else {
-    for (let i = room.slots.length; i < n; i++) {
-      room.slots.push({ index: i, status: 'bot', occupant: botOccupant(room, i) });
+    for (let i = playing.length; i < n; i++) {
+      playing.push({ index: i, status: 'bot', occupant: botOccupant({ ...room, slots: playing }, i) });
     }
   }
+  room.slots = [...playing, ...observers];
+  room.slots.forEach((s, i) => (s.index = i));
   room.settings = { ...(room.settings ?? { botDifficulty: DEFAULT_BOT_DIFFICULTY }), totalPlayers: n };
 }
 
@@ -252,6 +278,10 @@ export function resetPublicRoom(): Room {
   rooms.delete(PUBLIC_ROOM_CODE);
   const room = createPublicRoom(total, difficulty);
   for (const h of humans) {
+    if (h.observer) {
+      appendObserverSlot(room, { ...h, connected: true });
+      continue;
+    }
     const slot = room.slots.find((s) => s.occupant?.isBot);
     if (!slot?.occupant) break;
     // Keep their character: if a computer seat happened to draw it, hand that seat this one's.
@@ -349,11 +379,29 @@ export function setSlot(room: Room, requesterId: string, index: number, status: 
 /** A human flips their own seat into (or out of) watch-only observer mode. Lobby-only. */
 export function setObserver(room: Room, id: string, observer: boolean): void {
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
-  if (room.isPublic) throw new Error('Everyone in the public lobby plays — you can observe once a game is running.');
   const slot = room.slots.find((s) => s.occupant?.id === id);
   if (!slot?.occupant) throw new Error('You are not in this game.');
   if (slot.occupant.isBot) throw new Error('Bots cannot observe.');
-  slot.occupant.observer = observer;
+  if (!room.isPublic) {
+    slot.occupant.observer = observer;
+    return;
+  }
+  // Public: a watcher moves out to an observer slot and a computer takes the playing seat back;
+  // a watcher who wants to play takes the lowest computer seat.
+  if (observer === !!slot.occupant.observer) return;
+  const occ = slot.occupant;
+  if (observer) {
+    slot.status = 'bot';
+    slot.occupant = { ...botOccupant(room, slot.index), suspectId: occ.suspectId };
+    appendObserverSlot(room, occ);
+  } else {
+    const seat = room.slots.find((s) => s.occupant?.isBot);
+    if (!seat?.occupant) throw new Error('The public table is full.');
+    dropSlot(room, slot);
+    seat.status = 'open';
+    seat.occupant = { ...occ, observer: false, suspectId: seat.occupant.suspectId };
+  }
+  electHost(room);
 }
 
 export function pickSuspect(room: Room, id: string, suspectId: string): void {
@@ -498,7 +546,9 @@ export function removeOccupant(id: string): { room?: Room; deleted: boolean } {
 
   const slot = room.slots.find((s) => s.occupant?.id === id);
   if (slot) {
-    if (room.isPublic) {
+    if (room.isPublic && isPublicObserverSlot(room, slot)) {
+      dropSlot(room, slot); // a watcher's extra seat goes away with them
+    } else if (room.isPublic) {
       // Public seats never sit empty: hand it straight back to a computer.
       slot.status = 'bot';
       slot.occupant = botOccupant(room, slot.index);

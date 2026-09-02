@@ -131,7 +131,7 @@ interface StoreState {
   syncNotes: (json: string) => void;
   createGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
-  joinPublic: (name: string) => void;
+  joinPublic: (name: string, observer?: boolean) => void;
   setRoomSettings: (patch: { totalPlayers?: number; botDifficulty?: BotDifficulty }) => void;
   setBotDifficulty: (index: number, difficulty: BotDifficulty) => void;
   setDice: (color: string, pips: string) => void;
@@ -176,9 +176,9 @@ export const useStore = create<StoreState>((set) => ({
     pendingName = name; // remembered in case we land on a seat-picker for an in-progress game
     socket.emit(SOCKET_EVENTS.JOIN_GAME, { code: code.toUpperCase(), name, clientId: CLIENT_ID });
   },
-  joinPublic: (name) => {
+  joinPublic: (name, observer = false) => {
     pendingName = name; // reused on the seat picker if the public game is already running
-    socket.emit(SOCKET_EVENTS.JOIN_PUBLIC, { name, clientId: CLIENT_ID });
+    socket.emit(SOCKET_EVENTS.JOIN_PUBLIC, { name, clientId: CLIENT_ID, observer });
   },
   setRoomSettings: (patch) => socket.emit(SOCKET_EVENTS.SET_ROOM_SETTINGS, patch),
   setBotDifficulty: (index, difficulty) => socket.emit(SOCKET_EVENTS.SET_BOT_DIFFICULTY, { index, difficulty }),

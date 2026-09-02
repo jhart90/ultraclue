@@ -777,8 +777,8 @@ io.on('connection', (socket) => {
       const seated = room.slots.find((s) => s.occupant?.id === clientId)?.occupant;
       if (room.phase === 'lobby') {
         if (!seated) {
-          joinPublicLobby(room, clientId, p?.name ?? '');
-          addChat(room, 'System', `${nameOf(room, clientId)} joined the public game.`, true);
+          joinPublicLobby(room, clientId, p?.name ?? '', !!p?.observer);
+          addChat(room, 'System', `${nameOf(room, clientId)} ${p?.observer ? 'is watching the public game' : 'joined the public game'}.`, true);
         } else {
           reconnectOccupant(clientId);
         }
@@ -794,6 +794,15 @@ io.on('connection', (socket) => {
           socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: gameView(room, clientId) });
           emitChat(room);
           sendNotes(socket, room, clientId);
+          return;
+        }
+        if (p?.observer && !seated) {
+          // Asked to watch: straight into an observer seat, no seat picker.
+          joinAsObserver(room, clientId, p?.name ?? '');
+          addChat(room, 'System', `${nameOf(room, clientId)} is now observing.`, true);
+          emitLobby(room);
+          socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: gameView(room, clientId) });
+          emitChat(room);
           return;
         }
         emitLobby(room); // not seated & in play → the client shows the seat picker

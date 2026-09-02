@@ -32,6 +32,22 @@
   font-weight: 700;
   font-size: 1.15rem;
 }
+/* "Just watch" checkbox on the public join form — a normal-case row, unlike the field labels. */
+.title__form label.title__check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.9rem;
+  color: var(--ink, #ece8f5);
+  cursor: pointer;
+}
+.title__check input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent, #c8a24a);
+}
 .title__publichint {
   margin: 0;
   color: var(--muted, #9a93b3);

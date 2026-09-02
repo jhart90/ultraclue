@@ -82,6 +82,8 @@ export interface RejoinPayload {
 export interface JoinPublicPayload {
   name: string;
   clientId: string;
+  /** Watch only: take an observer seat rather than a playing seat. */
+  observer?: boolean;
 }
 export interface SetRoomSettingsPayload {
   totalPlayers?: number;

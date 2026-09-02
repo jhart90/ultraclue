@@ -34,6 +34,7 @@ export function Title() {
   const [mode, setMode] = useState<Mode>(initialJoinCode ? 'join' : 'menu');
   const [name, setName] = useState('');
   const [code, setCode] = useState(initialJoinCode ?? '');
+  const [watchOnly, setWatchOnly] = useState(false);
   const [tagline] = useState(() => TAGLINES[Math.floor(Math.random() * TAGLINES.length)]);
 
   const canSubmit = connected && name.trim().length > 0;
@@ -98,7 +99,7 @@ export function Title() {
           className="title__form"
           onSubmit={(e) => {
             e.preventDefault();
-            if (canSubmit) joinPublic(name);
+            if (canSubmit) joinPublic(name, watchOnly);
           }}
         >
           <p className="title__publichint">
@@ -109,12 +110,16 @@ export function Title() {
             Your name
             <input autoFocus value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="e.g. Jack" />
           </label>
+          <label className="title__check">
+            <input type="checkbox" checked={watchOnly} onChange={(e) => setWatchOnly(e.target.checked)} />
+            Just watch — join as an observer
+          </label>
           <div className="title__row">
             <button type="button" className="btn btn--ghost" onClick={() => setMode('menu')}>
               Back
             </button>
             <button type="submit" className="btn btn--primary" disabled={!canSubmit}>
-              Join Public Lobby
+              {watchOnly ? 'Watch the Public Game' : 'Join Public Lobby'}
             </button>
           </div>
         </form>

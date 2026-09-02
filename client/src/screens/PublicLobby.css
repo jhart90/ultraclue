@@ -160,6 +160,24 @@
   color: #e6c46a;
 }
 
+/* Watchers: a dimmed row past the playing seats, with an eye instead of a portrait. */
+.pseat--watcher {
+  opacity: 0.85;
+  border-style: dashed;
+}
+.pseat__thumb--eye {
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  border-color: #5a4a86;
+}
+.plobby__watchnote {
+  text-align: center;
+  color: var(--muted, #9a93b3);
+  font-style: italic;
+  margin: 0.4rem 0 0;
+}
+
 .plobby__footclock {
   color: var(--accent, #c8a24a);
   font-weight: 700;

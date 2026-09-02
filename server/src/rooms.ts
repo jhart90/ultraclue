@@ -1,10 +1,17 @@
 import {
   SUSPECTS,
+  defaultDice,
   startGame,
   makeRng,
   shuffle,
   MAX_PLAYERS,
   MIN_PLAYERS,
+  PUBLIC_MIN_PLAYERS,
+  PUBLIC_MAX_PLAYERS,
+  PUBLIC_DEFAULT_PLAYERS,
+  PUBLIC_ROOM_CODE,
+  type RoomSettings,
+  type SlotOccupant,
   type ChatMsg,
   type GameState,
   type LobbyView,
@@ -37,6 +44,18 @@ export interface Room {
   accusingId?: string;
   /** announcement.seq of a winning accusation already handled, so its delayed reveal fires once. */
   winAnnounced?: number;
+  /** The single always-on public room (code PUBLIC_ROOM_CODE): never deleted, every seat a computer
+   *  until a human takes it, host = longest-tenured human, game auto-starts at `startsAt`. */
+  isPublic?: boolean;
+  settings?: RoomSettings;
+  /** Public room: epoch ms at which the lobby starts its game (server-driven timer). */
+  startsAt?: number;
+  /** Public game: when the human currently on the clock must have acted by, and which wait it's for. */
+  turnDeadline?: number;
+  turnKey?: string;
+  /** When the last dice roll was broadcast, so bots let the roll animation finish before acting. */
+  lastRollAt?: number;
+  lastRollSeq?: number;
 }
 
 const rooms = new Map<string, Room>();
@@ -62,6 +81,157 @@ function randomFreeSuspect(slots: Slot[]): string | undefined {
   const taken = new Set(slots.map((s) => s.occupant?.suspectId).filter((x): x is string => !!x));
   const free = SUSPECTS.filter((s) => !taken.has(s.id));
   return free.length ? free[Math.floor(Math.random() * free.length)].id : undefined;
+}
+
+/** A fresh computer occupant for a seat. Bot ids embed the seat index; a seat's previous bot is
+ *  always remapped away (to the human who took it) before a new one is minted, so ids stay unique. */
+function botOccupant(room: Pick<Room, 'code' | 'slots'>, index: number): SlotOccupant {
+  return {
+    id: `bot-${room.code}-${index}`,
+    name: `Computer ${index + 1}`,
+    isBot: true,
+    connected: true,
+    suspectId: randomFreeSuspect(room.slots),
+  };
+}
+
+// ---- the public room --------------------------------------------------------------------------
+
+function clampTotal(n: number): number {
+  const v = Math.round(Number(n));
+  if (!Number.isFinite(v)) return PUBLIC_DEFAULT_PLAYERS;
+  return Math.min(PUBLIC_MAX_PLAYERS, Math.max(PUBLIC_MIN_PLAYERS, v));
+}
+
+/** When a public lobby formed at `now` should start: 10 minutes out — unless the next :00 or :30
+ *  is within 15 minutes, in which case the game starts on that mark so it lands on a round time. */
+export function publicStartTime(now = Date.now()): number {
+  const HALF_HOUR = 30 * 60_000;
+  const nextMark = (Math.floor(now / HALF_HOUR) + 1) * HALF_HOUR;
+  if (nextMark - now <= 15 * 60_000) return nextMark;
+  return now + 10 * 60_000;
+}
+
+export function getPublicRoom(): Room | undefined {
+  return rooms.get(PUBLIC_ROOM_CODE);
+}
+
+/** Build the public lobby: `totalPlayers` seats, every one a computer, clock already running. */
+export function createPublicRoom(totalPlayers = PUBLIC_DEFAULT_PLAYERS): Room {
+  const room: Room = {
+    code: PUBLIC_ROOM_CODE,
+    hostId: '',
+    slots: [],
+    chat: [],
+    phase: 'lobby',
+    nextChatId: 1,
+    mirroredLogId: 0,
+    suggestionLog: [],
+    notes: {},
+    isPublic: true,
+    settings: { totalPlayers: clampTotal(totalPlayers) },
+    startsAt: publicStartTime(),
+  };
+  for (let i = 0; i < room.settings!.totalPlayers; i++) {
+    room.slots.push({ index: i, status: 'bot', occupant: botOccupant(room, i) });
+  }
+  rooms.set(room.code, room);
+  return room;
+}
+
+/** Public room host = the longest-tenured human still in the room (players before observers).
+ *  A sitting host keeps the title while they remain; only when they're gone does it pass on. */
+export function electHost(room: Room): void {
+  const humans = room.slots
+    .map((s) => s.occupant)
+    .filter((o): o is SlotOccupant => !!o && !o.isBot);
+  if (humans.some((h) => h.id === room.hostId)) return;
+  humans.sort((a, b) => (a.observer ? 1 : 0) - (b.observer ? 1 : 0) || (a.joinedAt ?? 0) - (b.joinedAt ?? 0));
+  room.hostId = humans[0]?.id ?? '';
+  if (room.game) for (const p of room.game.players) p.isHost = p.id === room.hostId;
+}
+
+/** A human joins the public lobby: they take over the lowest computer seat (keeping its character).
+ *  Someone already seated just gets their existing seat back. */
+export function joinPublicLobby(room: Room, id: string, name: string): number {
+  if (!room.isPublic) throw new Error('Not the public room.');
+  if (room.phase !== 'lobby') throw new Error('The public game has already started.');
+  const mine = room.slots.find((s) => s.occupant?.id === id);
+  if (mine) return mine.index;
+  const slot = room.slots.find((s) => s.occupant?.isBot);
+  if (!slot?.occupant) throw new Error('The public table is full.');
+  slot.status = 'open';
+  slot.occupant = {
+    id,
+    name: name.trim() || 'Player',
+    isBot: false,
+    connected: true,
+    suspectId: slot.occupant.suspectId,
+    joinedAt: Date.now(),
+  };
+  electHost(room);
+  return slot.index;
+}
+
+/** Host resizes the public table. Growing appends computer seats; shrinking drops computer seats
+ *  from the end, moving any human sitting past the new size into a freed computer seat. */
+export function setRoomSettings(room: Room, requesterId: string, totalPlayers: number): void {
+  if (!room.isPublic) throw new Error('Only the public room has settings.');
+  if (room.hostId !== requesterId) throw new Error('Only the host can change the settings.');
+  if (room.phase !== 'lobby') throw new Error('The game has already started.');
+  const n = clampTotal(totalPlayers);
+  const humans = room.slots.filter((s) => s.occupant && !s.occupant.isBot).length;
+  if (n < humans) throw new Error(`${humans} people are already seated — the table can't be smaller than that.`);
+  if (n < room.slots.length) {
+    const keep = room.slots.slice(0, n);
+    const overflow = room.slots
+      .slice(n)
+      .map((s) => s.occupant)
+      .filter((o): o is SlotOccupant => !!o && !o.isBot);
+    for (const h of overflow) {
+      const target = keep.find((s) => s.occupant?.isBot);
+      if (!target) throw new Error('Not enough seats for everyone already here.');
+      target.status = 'open';
+      target.occupant = h;
+    }
+    room.slots = keep;
+  } else {
+    for (let i = room.slots.length; i < n; i++) {
+      room.slots.push({ index: i, status: 'bot', occupant: botOccupant(room, i) });
+    }
+  }
+  room.settings = { totalPlayers: n };
+}
+
+/** After a public game ends: tear it down and form the next lobby (same table size, clock reset),
+ *  re-seating every human who is still connected — with their character where it's free. */
+export function resetPublicRoom(): Room {
+  const old = getPublicRoom();
+  const total = old?.settings?.totalPlayers ?? PUBLIC_DEFAULT_PLAYERS;
+  const humans = old
+    ? old.slots.map((s) => s.occupant).filter((o): o is SlotOccupant => !!o && !o.isBot && o.connected)
+    : [];
+  rooms.delete(PUBLIC_ROOM_CODE);
+  const room = createPublicRoom(total);
+  for (const h of humans) {
+    const slot = room.slots.find((s) => s.occupant?.isBot);
+    if (!slot?.occupant) break;
+    // Keep their character: if a computer seat happened to draw it, hand that seat this one's.
+    const wanted = h.suspectId ?? slot.occupant.suspectId;
+    const holder = room.slots.find((s) => s !== slot && s.occupant?.suspectId === wanted);
+    if (holder?.occupant) holder.occupant.suspectId = slot.occupant.suspectId;
+    slot.status = 'open';
+    slot.occupant = {
+      id: h.id,
+      name: h.name,
+      isBot: false,
+      connected: true,
+      suspectId: wanted,
+      joinedAt: h.joinedAt ?? Date.now(),
+    };
+  }
+  electHost(room);
+  return room;
 }
 
 export function createRoom(hostId: string, hostName: string): Room {
@@ -118,6 +288,7 @@ export function joinRoom(code: string, id: string, name: string): { room: Room; 
 export function setSlot(room: Room, requesterId: string, index: number, status: SlotStatus): void {
   if (room.hostId !== requesterId) throw new Error('Only the host can change slots.');
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
+  if (room.isPublic) throw new Error('Public seats are always filled — resize the table instead.');
   const slot = room.slots[index];
   if (!slot) throw new Error('Invalid slot.');
   if (slot.occupant?.id === room.hostId) throw new Error('The host slot cannot be changed.');
@@ -128,13 +299,7 @@ export function setSlot(room: Room, requesterId: string, index: number, status: 
 
   if (status === 'bot') {
     slot.status = 'bot';
-    slot.occupant = {
-      id: `bot-${room.code}-${index}`,
-      name: `Computer ${index + 1}`,
-      isBot: true,
-      connected: true,
-      suspectId: randomFreeSuspect(room.slots),
-    };
+    slot.occupant = botOccupant(room, index);
   } else {
     // 'open' or 'closed' — both clear any bot occupant.
     slot.status = status;
@@ -145,6 +310,7 @@ export function setSlot(room: Room, requesterId: string, index: number, status: 
 /** A human flips their own seat into (or out of) watch-only observer mode. Lobby-only. */
 export function setObserver(room: Room, id: string, observer: boolean): void {
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
+  if (room.isPublic) throw new Error('Everyone in the public lobby plays — you can observe once a game is running.');
   const slot = room.slots.find((s) => s.occupant?.id === id);
   if (!slot?.occupant) throw new Error('You are not in this game.');
   if (slot.occupant.isBot) throw new Error('Bots cannot observe.');
@@ -154,12 +320,15 @@ export function setObserver(room: Room, id: string, observer: boolean): void {
 export function pickSuspect(room: Room, id: string, suspectId: string): void {
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
   if (!SUSPECTS.some((s) => s.id === suspectId)) throw new Error('Unknown character.');
-  const takenByOther = room.slots.some(
-    (s) => s.occupant && s.occupant.id !== id && s.occupant.suspectId === suspectId,
-  );
-  if (takenByOther) throw new Error('That character is already taken.');
   const slot = room.slots.find((s) => s.occupant?.id === id);
   if (!slot?.occupant) throw new Error('You are not in this game.');
+  const holder = room.slots.find((s) => s.occupant && s.occupant.id !== id && s.occupant.suspectId === suspectId)?.occupant;
+  if (holder && !holder.isBot) throw new Error('That character is already taken.');
+  // A computer's character is up for grabs: it takes over the character you're giving up.
+  if (holder) {
+    holder.suspectId = slot.occupant.suspectId;
+    holder.dice = undefined; // computers always roll their character's colours
+  }
   slot.occupant.suspectId = suspectId;
 }
 
@@ -268,7 +437,20 @@ export function removeOccupant(id: string): { room?: Room; deleted: boolean } {
   if (!room) return { deleted: false };
 
   const slot = room.slots.find((s) => s.occupant?.id === id);
-  if (slot) slot.occupant = undefined; // their slot stays 'open'
+  if (slot) {
+    if (room.isPublic) {
+      // Public seats never sit empty: hand it straight back to a computer.
+      slot.status = 'bot';
+      slot.occupant = botOccupant(room, slot.index);
+    } else {
+      slot.occupant = undefined; // their slot stays 'open'
+    }
+  }
+
+  if (room.isPublic) {
+    electHost(room); // the room lives on regardless — it is never deleted
+    return { room, deleted: false };
+  }
 
   if (room.hostId === id) {
     const nextHuman = room.slots.find((s) => s.occupant && !s.occupant.isBot);
@@ -286,12 +468,19 @@ export function removeOccupant(id: string): { room?: Room; deleted: boolean } {
 }
 
 export function toLobbyView(room: Room): LobbyView {
-  return {
+  const view: LobbyView = {
     code: room.code,
     hostId: room.hostId,
     slots: room.slots,
     phase: room.phase,
   };
+  if (room.isPublic) {
+    view.isPublic = true;
+    view.startsAt = room.startsAt;
+    view.serverNow = Date.now();
+    view.settings = room.settings;
+  }
+  return view;
 }
 
 // ---- save / load ----------------------------------------------------------------------------
@@ -424,12 +613,22 @@ export function leaveGameAsBot(room: Room, clientId: string): void {
     gp.connected = true;
     gp.isHost = false;
   }
+  // A public observer seat was appended past the table size just for them — drop it again so the
+  // seat list doesn't fill with ghost observers. (Player seats stay: the bot finishes their game.)
+  if (room.isPublic && occ?.observer) {
+    room.slots = room.slots.filter((s) => s !== slot);
+    room.slots.forEach((s, i) => (s.index = i));
+  }
   // If the host left, hand the title to a remaining human (if any).
   if (wasHost) {
-    const human = room.slots.find((s) => s.occupant && !s.occupant.isBot);
-    if (human?.occupant) {
-      room.hostId = human.occupant.id;
-      if (room.game) for (const p of room.game.players) p.isHost = p.id === room.hostId;
+    if (room.isPublic) {
+      electHost(room);
+    } else {
+      const human = room.slots.find((s) => s.occupant && !s.occupant.isBot);
+      if (human?.occupant) {
+        room.hostId = human.occupant.id;
+        if (room.game) for (const p of room.game.players) p.isHost = p.id === room.hostId;
+      }
     }
   }
 }
@@ -448,13 +647,16 @@ export function takeSeat(room: Room, joinerId: string, name: string, index: numb
     occ.isBot = false;
     occ.connected = true;
     occ.name = name.trim() || occ.name;
+    occ.joinedAt = Date.now();
   }
+  if (room.isPublic) electHost(room); // an empty public table makes its first human the host
   const gp = room.game?.players.find((p) => p.id === joinerId);
   if (gp) {
     gp.isBot = false;
     gp.connected = true;
     gp.isHost = joinerId === room.hostId;
     if (name.trim()) gp.name = name.trim();
+    // A seat inherits its character's dice; a returning human's own choice comes via SET_DICE.
   }
 }
 
@@ -464,8 +666,13 @@ export function takeSeat(room: Room, joinerId: string, name: string, index: numb
 export function joinAsObserver(room: Room, joinerId: string, name: string): void {
   if (room.phase !== 'play') throw new Error('That game is not in progress.');
   if (room.slots.some((s) => s.occupant?.id === joinerId)) throw new Error('You are already in this game.');
-  const slot = room.slots.find((s) => !s.occupant);
-  if (!slot) throw new Error('This game is full — there is no free seat to observe from.');
+  let slot = room.slots.find((s) => !s.occupant);
+  if (!slot) {
+    // The public table is always full, so observers get an extra seat appended past it.
+    if (!room.isPublic) throw new Error('This game is full — there is no free seat to observe from.');
+    slot = { index: room.slots.length, status: 'open' };
+    room.slots.push(slot);
+  }
   slot.status = 'open';
   slot.occupant = {
     id: joinerId,
@@ -473,13 +680,30 @@ export function joinAsObserver(room: Room, joinerId: string, name: string): void
     isBot: false,
     connected: true,
     observer: true,
+    joinedAt: Date.now(),
   };
+  if (room.isPublic) electHost(room);
 }
 
-/** Build the engine GameState from the lobby roster, assigning suspects to anyone without one. */
-export function startGameInRoom(room: Room, requesterId: string): GameState {
-  if (room.hostId !== requesterId) throw new Error('Only the host can start the game.');
+/** Build the engine GameState from the lobby roster, assigning suspects to anyone without one.
+ *  `force` is for the public room's clock, which starts the game with no host at all. */
+export function startGameInRoom(room: Room, requesterId: string, opts: { force?: boolean } = {}): GameState {
+  if (!opts.force && room.hostId !== requesterId) throw new Error('Only the host can start the game.');
+  if (room.isPublic && !opts.force) throw new Error('The public game starts when the clock runs out.');
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
+
+  if (room.isPublic) {
+    // Nobody may stall a public table: a human who dropped before the clock ran out is replaced by
+    // a computer (keeping the seat's character). If they come back they can take any seat over.
+    for (const s of room.slots) {
+      const o = s.occupant;
+      if (o && !o.isBot && !o.connected) {
+        s.status = 'bot';
+        s.occupant = { ...botOccupant(room, s.index), suspectId: o.suspectId };
+      }
+    }
+    electHost(room);
+  }
 
   // Observers stay in the room to watch but aren't dealt in — only the rest become players.
   const occupants = room.slots
@@ -499,6 +723,7 @@ export function startGameInRoom(room: Room, requesterId: string): GameState {
     const suspectId = o.suspectId ?? freeSuspects[next++];
     // Bots play (and are named after) a random suspect not claimed by a human, e.g. "Miss Coral".
     const name = o.isBot ? SUSPECTS.find((s) => s.id === suspectId)?.title ?? o.name : o.name;
+    if (o.isBot) o.name = name; // so the seat picker / chat call the seat by its character too
     return {
       id: o.id,
       name,
@@ -506,6 +731,7 @@ export function startGameInRoom(room: Room, requesterId: string): GameState {
       isBot: o.isBot,
       isHost: o.id === room.hostId,
       connected: o.connected,
+      dice: o.dice ?? defaultDice(suspectId),
       hand: [],
       eliminated: false,
       position: { x: 0, y: 0 }, // real start tile assigned inside startGame()

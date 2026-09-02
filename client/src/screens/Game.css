@@ -255,6 +255,52 @@
   font-size: 0.9rem;
 }
 
+/* Public turn clock: hangs under the turn banner for the last 30 seconds, red for the last 10. */
+.game__timer {
+  position: fixed;
+  top: 3.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  background: #1a1622;
+  border: 2px solid var(--accent, #c8a24a);
+  color: var(--accent, #c8a24a);
+  border-radius: 999px;
+  padding: 0.15rem 0.9rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.game__timer--red {
+  background: #c2262f;
+  border-color: #ff7b7b;
+  color: #fff;
+  animation: game-timer-pulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes game-timer-pulse {
+  from {
+    transform: translateX(-50%) scale(1);
+  }
+  to {
+    transform: translateX(-50%) scale(1.08);
+  }
+}
+
+.game__settoggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+}
+.game__settoggle input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent, #c8a24a);
+}
+
 /* Settings wheel (lower-left) + its player menu */
 .game__gear {
   position: fixed;

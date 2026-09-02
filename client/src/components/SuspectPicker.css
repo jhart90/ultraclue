@@ -86,6 +86,17 @@
   border: 2px solid rgba(255, 255, 255, 0.6);
   flex-shrink: 0;
 }
+.picker__swap {
+  margin-left: auto;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #06243a;
+  background: #5bb8e6;
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  font-weight: 700;
+}
 .picker__name {
   flex: 1;
   min-width: 0;

@@ -13,6 +13,8 @@ export const SOCKET_EVENTS = {
   // --- client -> server (lobby intents) ---
   CREATE_GAME: 'createGame',
   JOIN_GAME: 'joinGame',
+  JOIN_PUBLIC: 'joinPublic', // join the always-on public room (no code): take a seat, or pick one mid-game
+  SET_ROOM_SETTINGS: 'setRoomSettings', // host adjusts the room's settings (public room: total players)
   REJOIN: 'rejoin', // reconnect to an existing seat after a refresh/drop
   SET_SLOT: 'setSlot',
   SET_OBSERVER: 'setObserver', // a human toggles watch-only mode for their own seat
@@ -39,6 +41,7 @@ export const SOCKET_EVENTS = {
   JOIN_OBSERVER: 'joinObserver', // join an in-progress game to watch only (not as a player)
   SET_ACCUSING: 'setAccusing', // a player opened/closed the accusation picker (warn the table)
   SET_NOTES: 'setNotes', // client pushes its Detective Notes so they ride along in every save
+  SET_DICE: 'setDice', // a human picks the colours of their dice
 
   // --- server -> client ---
   YOU_ARE: 'youAre',
@@ -74,6 +77,13 @@ export interface JoinGamePayload {
 }
 export interface RejoinPayload {
   clientId: string;
+}
+export interface JoinPublicPayload {
+  name: string;
+  clientId: string;
+}
+export interface SetRoomSettingsPayload {
+  totalPlayers: number;
 }
 export interface SetSlotPayload {
   index: number;
@@ -134,6 +144,10 @@ export interface JoinObserverPayload {
 }
 export interface SetAccusingPayload {
   accusing: boolean;
+}
+export interface SetDicePayload {
+  color: string;
+  pips: string;
 }
 export interface SetNotesPayload {
   /** Serialized Detective Notes (the localStorage JSON) for this player's seat. */

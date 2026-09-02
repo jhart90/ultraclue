@@ -5,6 +5,7 @@ import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
 import { CardArt } from '../render/cardArt';
 import { resolveOverride } from '../render/overrides';
+import { PublicLobby } from './PublicLobby';
 import './Lobby.css';
 
 /** The chosen character's art (override image if present, else the procedural crest). */
@@ -56,6 +57,7 @@ export function Lobby() {
   const [picking, setPicking] = useState(false);
 
   if (!lobby) return null;
+  if (lobby.isPublic) return <PublicLobby />; // the 40-seat public table gets its own condensed view
 
   const amHost = lobby.hostId === myId;
   const mySlot = lobby.slots.find((s) => s.occupant?.id === myId);
@@ -66,10 +68,14 @@ export function Lobby() {
   const observerCount = lobby.slots.filter((s) => s.occupant?.observer).length;
   const canStart = amHost && playerCount >= MIN_PLAYERS;
 
+  // Only other humans' characters are off-limits; a computer's character can be swapped for yours.
   const takenByOthers = new Set(
     lobby.slots
-      .filter((s) => s.occupant && s.occupant.id !== myId && s.occupant.suspectId)
+      .filter((s) => s.occupant && !s.occupant.isBot && s.occupant.id !== myId && s.occupant.suspectId)
       .map((s) => s.occupant!.suspectId as string),
+  );
+  const heldByComputers = new Set(
+    lobby.slots.filter((s) => s.occupant?.isBot && s.occupant.suspectId).map((s) => s.occupant!.suspectId as string),
   );
 
   const statusBtn = (slot: Slot, status: SlotStatus, label: string) => {
@@ -214,6 +220,7 @@ export function Lobby() {
       {picking && (
         <SuspectPicker
           takenByOthers={takenByOthers}
+          heldByComputers={heldByComputers}
           mySuspectId={mySuspectId}
           onPick={pickSuspect}
           onClose={() => setPicking(false)}

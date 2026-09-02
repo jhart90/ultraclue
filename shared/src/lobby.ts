@@ -1,4 +1,4 @@
-import type { SlotStatus } from './game';
+import type { SlotStatus, DiceStyle } from './game';
 
 // Lobby / room model. Unlike GameState there is no hidden information here, so a single LobbyView
 // is broadcast to everyone in the room; each client identifies itself by its own socket id.
@@ -24,6 +24,11 @@ export interface SlotOccupant {
   /** Watching only: gets no game piece, hand, or detective notes, and never sees private reveals.
    *  Set by the human themselves in the lobby; excluded from the dealt players when the game starts. */
   observer?: boolean;
+  /** When this human joined the room (epoch ms). In the public room the longest-tenured human is
+   *  the host, so this decides who controls the settings. Unset for bots. */
+  joinedAt?: number;
+  /** Dice colours chosen by this human (bots use their character's colour by default). */
+  dice?: DiceStyle;
 }
 
 export interface Slot {
@@ -34,12 +39,39 @@ export interface Slot {
 
 export type RoomPhase = 'lobby' | 'play' | 'ended';
 
+/** Host-adjustable room settings. Only the public room exposes any today. */
+export interface RoomSettings {
+  /** Seats at the table (humans + computers always sum to this). Public room: 8..40. */
+  totalPlayers: number;
+}
+
 export interface LobbyView {
   code: string;
   hostId: string;
-  slots: Slot[]; // always length 8
+  /** MAX_PLAYERS long for a private room; `settings.totalPlayers` long for the public room (plus
+   *  any extra observer seats appended mid-game). */
+  slots: Slot[];
   phase: RoomPhase;
+  /** The single always-on public room: every seat is a computer until a human takes it over, and
+   *  the game starts itself when the countdown (`startsAt`) runs out. */
+  isPublic?: boolean;
+  /** Epoch ms at which the public lobby auto-starts its game. */
+  startsAt?: number;
+  /** Server clock (epoch ms) when this view was built, so clients can correct the countdown for
+   *  their own clock skew. */
+  serverNow?: number;
+  settings?: RoomSettings;
 }
 
+/** Private rooms: a fixed 8-seat table. */
 export const MAX_PLAYERS = 8;
 export const MIN_PLAYERS = 2;
+
+/** The public room: the host picks a table size in this range; every seat is filled (by a
+ *  computer if no human has taken it). 40 is the full suspect roster. */
+export const PUBLIC_MIN_PLAYERS = 8;
+export const PUBLIC_MAX_PLAYERS = 40;
+export const PUBLIC_DEFAULT_PLAYERS = 40;
+/** The public room's fixed code. Six letters, so it can never collide with a generated 4-letter
+ *  private code; it's joined from the title screen, never typed. */
+export const PUBLIC_ROOM_CODE = 'PUBLIC';

@@ -19,6 +19,7 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     isHost: p.isHost,
     connected: p.connected,
     eliminated: p.eliminated,
+    dice: p.dice,
     handCount: p.hand.length,
     position: p.position,
     inRoomId: p.inRoomId,

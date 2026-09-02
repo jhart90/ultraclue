@@ -1,0 +1,113 @@
+/* 3D dice fly over everything but never catch clicks: the board stays usable underneath. */
+.dice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  pointer-events: none;
+  animation: dice-overlay-in 0.2s ease-out;
+}
+@keyframes dice-overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+.dice3d-canvas {
+  position: absolute;
+  inset: 0;
+}
+.dice-overlay__label {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  font-family: 'Georgia', serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent, #c8a24a);
+  text-shadow: 0 2px 6px #000, 0 0 12px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+.dice-overlay__total {
+  color: #fff;
+  font-size: 18px;
+  display: inline-block;
+  animation: dice-total-pop 0.3s ease-out;
+}
+@keyframes dice-total-pop {
+  0% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Dice colour pickers (settings menu). */
+.dicepick__row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin: 0.35rem 0;
+}
+.dicepick__label {
+  flex: none;
+  width: 3.4rem;
+  font-size: 0.72rem;
+  color: var(--muted, #9a93b3);
+}
+.dicepick__swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.dicepick__swatch--on {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--accent, #c8a24a);
+}
+.dicepick__custom {
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+.dicepick__auto {
+  background: none;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-radius: 999px;
+  color: var(--muted, #9a93b3);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.5rem;
+  cursor: pointer;
+}
+.dicepick__auto--on {
+  color: #1a1622;
+  background: var(--accent, #c8a24a);
+  border-color: var(--accent, #c8a24a);
+}
+.dicepick__preview {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.dicepick__die {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.dicepick__pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}

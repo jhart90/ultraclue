@@ -6,6 +6,8 @@ import express from 'express';
 import { Server, type Socket } from 'socket.io';
 import {
   SOCKET_EVENTS,
+  DICE_ANIM_MS,
+  PUBLIC_TURN_MS,
   viewFor,
   makeRng,
   currentPlayerId,
@@ -53,6 +55,10 @@ import {
   type SetObserverPayload,
   type LoadGamePayload,
   type SaveGameDataPayload,
+  type JoinPublicPayload,
+  type SetRoomSettingsPayload,
+  type SetDicePayload,
+  type DiceStyle,
 } from 'shared';
 import {
   type Room,
@@ -80,6 +86,12 @@ import {
   loadRoom,
   startGameInRoom,
   toLobbyView,
+  getPublicRoom,
+  createPublicRoom,
+  joinPublicLobby,
+  setRoomSettings,
+  resetPublicRoom,
+  electHost,
 } from './rooms';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -127,10 +139,11 @@ function buildSave(room: Room, auto: boolean): SaveGameDataPayload {
     blob: serializeRoom(room),
   };
 }
-/** Auto-save (to every human's browser) at the start of each player's turn. */
+/** Auto-save (to every human's browser) at the start of each player's turn. The public game is
+ *  never saved — it would clobber the player's private save with a 40-seat table they don't own. */
 function maybeAutoSave(room: Room): void {
   const g = room.game;
-  if (!g || g.phase !== 'play') return;
+  if (!g || g.phase !== 'play' || room.isPublic) return;
   const sig = `${g.round ?? 0}:${g.activeIdx}`;
   if (sig !== autoSaveTurn.get(room.code)) {
     autoSaveTurn.set(room.code, sig);
@@ -141,8 +154,17 @@ function maybeAutoSave(room: Room): void {
 const RNG = makeRng(Math.floor(Math.random() * 0x7fffffff) + 1);
 
 // Pace every bot action ~10s apart so human players can read pop-ups and digest each move. While a
-// bot is on the clock the chat shows a transient "<bot> is thinking…" line.
+// bot is on the clock the chat shows a transient "<bot> is thinking…" line. The public table seats
+// up to 40 (mostly computers), so its bots move faster or a single round would take a quarter hour.
 const BOT_DELAY = 10000;
+const PUBLIC_BOT_DELAY = 5000;
+const botDelay = (room: Room): number => (room.isPublic ? PUBLIC_BOT_DELAY : BOT_DELAY);
+/** How long a bot waits before its next action: its pacing delay, stretched so a dice roll that is
+ *  still animating on players' screens finishes first. */
+function botWait(room: Room): number {
+  const animEnds = (room.lastRollAt ?? 0) + DICE_ANIM_MS + 400;
+  return Math.max(botDelay(room), animEnds - Date.now());
+}
 
 // Per-room bot memory: rooms each bot has already suggested in (so it explores), and — keyed by
 // `${responderId}|${recipientId}` — which of its own cards it has already shown to each player.
@@ -236,13 +258,24 @@ function sendNotes(socket: Socket, room: Room, id: string): void {
 /** A viewer's game view, stamped with the room host's id so an observing host keeps host controls,
  *  and whoever is mid-accusation so the table can be warned. */
 function gameView(room: Room, id: string) {
-  return { ...viewFor(room.game!, id), hostId: room.hostId, accusingId: room.accusingId };
+  return {
+    ...viewFor(room.game!, id),
+    hostId: room.hostId,
+    accusingId: room.accusingId,
+    turnDeadline: room.turnDeadline,
+    serverNow: Date.now(),
+  };
 }
 
 /** Push each human their own tailored game view (observers included — they watch). */
 function broadcastGame(room: Room): void {
   const g = room.game;
   if (!g) return;
+  // Note each fresh roll: clients now play the dice animation, so bots hold off until it's done.
+  if ((g.rollSeq ?? 0) !== (room.lastRollSeq ?? 0)) {
+    room.lastRollSeq = g.rollSeq ?? 0;
+    room.lastRollAt = Date.now();
+  }
   for (const slot of room.slots) {
     const occ = slot.occupant;
     if (occ && !occ.isBot) io.to(occ.id).emit(SOCKET_EVENTS.GAME_STARTED, { view: gameView(room, occ.id) });
@@ -293,9 +326,11 @@ function progress(room: Room): void {
   updateBotNotes(room); // refresh each bot's Detective Notes from its latest deduction
   whisperReveal(room); // privately tell the two players which card was shown
   mirrorLog(room); // fold new game events into the chat feed
+  armTurnTimer(room); // public: (re)start the 90s clock for whichever human the table waits on
   broadcastGame(room);
   emitChat(room);
   maybeAutoSave(room); // snapshot to browsers after each completed round
+  if (g.phase === 'ended' && room.isPublic) schedulePublicReset(); // the next public lobby forms shortly
   if (g.phase !== 'play') return;
 
   const sg = g.currentSuggestion;
@@ -345,7 +380,7 @@ function scheduleBotReveal(room: Room, botId: string): void {
     } catch {
       /* ignore */
     }
-  }, BOT_DELAY);
+  }, botWait(room));
 }
 
 /** A bot's turn: deduce, move toward a useful room, suggest, and accuse when confident. */
@@ -440,12 +475,187 @@ function scheduleBots(room: Room): void {
           }
         }
       }
-    }, BOT_DELAY);
-  }, BOT_DELAY);
+    }, botWait(room));
+  }, botWait(room));
 }
 
 function emitError(socket: Socket, message: string): void {
   socket.emit(SOCKET_EVENTS.ERROR, { message });
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+function cleanDice(p: Partial<SetDicePayload> | undefined): DiceStyle | undefined {
+  if (!p || typeof p.color !== 'string' || typeof p.pips !== 'string') return undefined;
+  if (!HEX.test(p.color) || !HEX.test(p.pips)) return undefined;
+  return { color: p.color.toLowerCase(), pips: p.pips.toLowerCase() };
+}
+
+// ---- the public room's lifecycle ------------------------------------------------------------
+// One public room always exists. Its lobby runs a server-side clock; when it hits zero the game
+// starts with whoever is seated (computers fill the rest). When that game ends, a fresh lobby forms
+// after a short pause and everyone still connected is carried across.
+const PUBLIC_RESET_DELAY = 60_000;
+const PUBLIC_DROP_GRACE = 60_000; // a public player who disconnects gets this long to come back
+let publicStartTimer: NodeJS.Timeout | undefined;
+let publicResetTimer: NodeJS.Timeout | undefined;
+const publicDropTimers = new Map<string, NodeJS.Timeout>();
+
+function ensurePublicRoom(): Room {
+  let room = getPublicRoom();
+  if (!room) {
+    room = createPublicRoom();
+    addChat(room, 'System', 'Welcome to the public table. Every seat is a computer until someone takes it — the game starts when the clock runs out.', true);
+    armPublicClock(room);
+  }
+  return room;
+}
+
+function armPublicClock(room: Room): void {
+  if (publicStartTimer) clearTimeout(publicStartTimer);
+  const delay = Math.max(0, (room.startsAt ?? Date.now()) - Date.now());
+  publicStartTimer = setTimeout(() => {
+    publicStartTimer = undefined;
+    startPublicGame();
+  }, delay);
+}
+
+function startPublicGame(): void {
+  const room = getPublicRoom();
+  if (!room || room.phase !== 'lobby') return;
+  try {
+    botMem.delete(room.code);
+    startGameInRoom(room, room.hostId, { force: true });
+    addChat(room, 'System', 'The clock has run out — the public game begins!', true);
+    emitLobby(room);
+    mirrorLog(room);
+    emitChat(room);
+    broadcastGame(room);
+    scheduleBots(room);
+  } catch (err) {
+    console.error('[public] failed to start, retrying in 30s:', (err as Error).message);
+    room.startsAt = Date.now() + 30_000;
+    emitLobby(room);
+    armPublicClock(room);
+  }
+}
+
+function schedulePublicReset(): void {
+  if (publicResetTimer) return;
+  publicResetTimer = setTimeout(() => {
+    publicResetTimer = undefined;
+    const room = resetPublicRoom();
+    botMem.delete(room.code);
+    autoSaveTurn.delete(room.code);
+    for (const t of publicDropTimers.values()) clearTimeout(t);
+    publicDropTimers.clear();
+    addChat(room, 'System', 'A new public game is forming — the clock is running.', true);
+    emitLobby(room);
+    emitChat(room);
+    armPublicClock(room);
+  }, PUBLIC_RESET_DELAY);
+}
+
+// ---- public turn clock ----------------------------------------------------------------------
+// A human on the clock in the public game (their own turn, or a suggestion they must answer) has
+// PUBLIC_TURN_MS to act; then the server acts for them so nobody can hold up a 40-seat table.
+let publicTurnTimer: NodeJS.Timeout | undefined;
+
+function clearTurnTimer(room: Room): void {
+  if (publicTurnTimer) clearTimeout(publicTurnTimer);
+  publicTurnTimer = undefined;
+  room.turnDeadline = undefined;
+  room.turnKey = undefined;
+}
+
+function armTurnTimer(room: Room): void {
+  if (!room.isPublic) return;
+  const g = room.game;
+  if (!g || g.phase !== 'play') {
+    clearTurnTimer(room);
+    return;
+  }
+  const sg = g.currentSuggestion;
+  const awaitedId = sg && !sg.resolved && sg.pendingResponderId ? sg.pendingResponderId : currentPlayerId(g);
+  const awaited = getPlayer(g, awaitedId);
+  if (!awaited || awaited.isBot) {
+    clearTurnTimer(room);
+    return;
+  }
+  const key = `${g.round ?? 0}:${g.activeIdx}:${awaitedId}`;
+  if (key === room.turnKey) return; // same wait — the clock keeps running
+  clearTurnTimer(room);
+  room.turnKey = key;
+  room.turnDeadline = Date.now() + PUBLIC_TURN_MS;
+  publicTurnTimer = setTimeout(forcePublicTurn, PUBLIC_TURN_MS);
+}
+
+function forcePublicTurn(): void {
+  publicTurnTimer = undefined;
+  const room = getPublicRoom();
+  const g = room?.game;
+  if (!room || !g || g.phase !== 'play') return;
+  try {
+    const sg = g.currentSuggestion;
+    if (sg && !sg.resolved && sg.pendingResponderId) {
+      const rid = sg.pendingResponderId;
+      const p = getPlayer(g, rid);
+      if (!p || p.isBot) return;
+      const trio = [sg.suspectId, sg.weaponId, sg.roomId];
+      const match = p.hand.find((c) => trio.includes(c));
+      room.game = match ? respondToSuggestion(g, rid, match, RNG) : passSuggestion(g, rid, RNG);
+      addChat(room, 'System', `${p.name} ran out of time — ${match ? 'a card was shown for them' : 'they could not disprove it'}.`, true);
+    } else {
+      const id = currentPlayerId(g);
+      const p = getPlayer(g, id);
+      if (!p || p.isBot) return;
+      room.game = g.turnPhase === 'postMove' ? endTurn(g, id, RNG) : passTurn(g, id, RNG);
+      if (room.accusingId === id) room.accusingId = undefined;
+      addChat(room, 'System', `${p.name} ran out of time — their turn was passed.`, true);
+    }
+    room.turnKey = undefined; // whatever comes next is a fresh wait
+    progress(room);
+  } catch (err) {
+    console.error('[public] turn clock could not act:', (err as Error).message);
+  }
+}
+
+function cancelPublicDrop(clientId: string): void {
+  const t = publicDropTimers.get(clientId);
+  if (t) {
+    clearTimeout(t);
+    publicDropTimers.delete(clientId);
+  }
+}
+
+/** A public player dropped: unless they're back within the grace period, their seat goes to a
+ *  computer so the table never waits on them. (Their id is detached, so a later "Join Public
+ *  Game" lands them on the seat picker like any newcomer.) */
+function schedulePublicDrop(room: Room, clientId: string): void {
+  cancelPublicDrop(clientId);
+  publicDropTimers.set(
+    clientId,
+    setTimeout(() => {
+      publicDropTimers.delete(clientId);
+      const r = getPublicRoom();
+      const occ = r?.slots.find((s) => s.occupant?.id === clientId)?.occupant;
+      if (!r || !occ || occ.isBot || occ.connected) return;
+      const name = occ.name;
+      if (r.game) {
+        leaveGameAsBot(r, clientId);
+        addChat(r, 'System', `${name} didn't come back — a computer is finishing their game.`, true);
+      } else {
+        removeOccupant(clientId); // public: the seat is handed straight back to a computer
+        addChat(r, 'System', `${name} didn't come back — their seat is a computer again.`, true);
+      }
+      electHost(r);
+      emitLobby(r);
+      emitChat(r);
+      if (r.game) {
+        broadcastGame(r);
+        progress(r);
+      }
+    }, PUBLIC_DROP_GRACE),
+  );
 }
 
 // Player identity is a stable clientId (from localStorage), not the socket id — so a refresh keeps
@@ -464,6 +674,7 @@ function cancelCleanup(code: string): void {
   }
 }
 function scheduleCleanupIfEmpty(room: Room): void {
+  if (room.isPublic) return; // the public room is permanent
   if (hasConnectedHuman(room)) {
     cancelCleanup(room.code);
     return;
@@ -527,6 +738,59 @@ io.on('connection', (socket) => {
     }
   });
 
+  // The public room needs no code: in the lobby you take over a computer seat on the spot; once
+  // the game is running you land on the seat picker (take over a computer, or observe).
+  socket.on(SOCKET_EVENTS.JOIN_PUBLIC, (p: JoinPublicPayload) => {
+    try {
+      const clientId = p?.clientId || socket.id;
+      register(clientId);
+      cancelPublicDrop(clientId);
+      const room = ensurePublicRoom();
+      socket.join(room.code);
+      const seated = room.slots.find((s) => s.occupant?.id === clientId)?.occupant;
+      if (room.phase === 'lobby') {
+        if (!seated) {
+          joinPublicLobby(room, clientId, p?.name ?? '');
+          addChat(room, 'System', `${nameOf(room, clientId)} joined the public game.`, true);
+        } else {
+          reconnectOccupant(clientId);
+        }
+        emitLobby(room);
+        emitChat(room);
+        return;
+      }
+      if (room.phase === 'play') {
+        if (seated && !seated.isBot) {
+          // Still holding a seat (e.g. back from a drop within the grace period): resume it.
+          reconnectOccupant(clientId);
+          emitLobby(room);
+          socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: gameView(room, clientId) });
+          emitChat(room);
+          sendNotes(socket, room, clientId);
+          return;
+        }
+        emitLobby(room); // not seated & in play → the client shows the seat picker
+        return;
+      }
+      emitError(socket, 'The public game just ended — a new one forms in a moment. Try again shortly.');
+    } catch (err) {
+      emitError(socket, (err as Error).message);
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.SET_ROOM_SETTINGS, (p: SetRoomSettingsPayload) => {
+    const room = findRoomByOccupant(cid(socket));
+    if (!room) return;
+    try {
+      setRoomSettings(room, cid(socket), Number(p?.totalPlayers));
+      addChat(room, 'System', `${nameOf(room, cid(socket))} set the table to ${room.settings?.totalPlayers} players.`, true);
+      emitLobby(room);
+      emitChat(room);
+    } catch (err) {
+      emitError(socket, (err as Error).message);
+    }
+  });
+
   socket.on(SOCKET_EVENTS.TAKE_SEAT, (p: TakeSeatPayload) => {
     const room = getRoom(p?.code ?? '');
     if (!room) {
@@ -542,6 +806,7 @@ io.on('connection', (socket) => {
         room.paused = false; // first human took a seat — start the loaded game running
         progress(room);
       } else {
+        armTurnTimer(room); // public: if it's already this seat's move, their clock starts now
         broadcastGame(room);
         emitChat(room);
       }
@@ -591,6 +856,20 @@ io.on('connection', (socket) => {
     broadcastGame(room);
   });
 
+  // A player picked new dice colours: remember them on the seat and (if playing) the player.
+  socket.on(SOCKET_EVENTS.SET_DICE, (p: SetDicePayload) => {
+    const room = findRoomByOccupant(cid(socket));
+    if (!room) return;
+    const style = cleanDice(p);
+    if (!style) return;
+    const occ = room.slots.find((s) => s.occupant?.id === cid(socket))?.occupant;
+    if (occ) occ.dice = style;
+    const gp = room.game?.players.find((pl) => pl.id === cid(socket));
+    if (gp) gp.dice = style;
+    if (room.game) broadcastGame(room);
+    else emitLobby(room);
+  });
+
   // A player's Detective Notes changed — keep the server copy current so every save carries them.
   socket.on(SOCKET_EVENTS.SET_NOTES, (p: SetNotesPayload) => {
     const room = findRoomByOccupant(cid(socket));
@@ -608,6 +887,7 @@ io.on('connection', (socket) => {
     register(clientId);
     socket.join(room.code);
     cancelCleanup(room.code);
+    cancelPublicDrop(clientId);
     reconnectOccupant(clientId);
     addChat(room, 'System', `${nameOf(room, clientId)} reconnected.`, true);
     emitLobby(room);
@@ -785,8 +1065,13 @@ io.on('connection', (socket) => {
       scheduleBots(room);
       scheduleCleanupIfEmpty(room);
     } else {
+      const name = nameOf(room, clientId);
       const { deleted } = removeOccupant(clientId);
-      if (!deleted) emitLobby(room);
+      if (!deleted) {
+        if (room.isPublic) addChat(room, 'System', `${name} left the public game.`, true);
+        emitLobby(room);
+        emitChat(room);
+      }
     }
   });
 
@@ -798,16 +1083,26 @@ io.on('connection', (socket) => {
     const room = disconnectOccupant(clientId); // stays human — the table waits for them to return
     if (!room) return;
     if (room.accusingId === clientId) room.accusingId = undefined; // drop a stale "is accusing" warning
-    addChat(room, 'System', `${nameOf(room, clientId)} disconnected — the game waits for them to return.`, true);
+    addChat(
+      room,
+      'System',
+      room.isPublic
+        ? `${nameOf(room, clientId)} disconnected — a computer takes their seat if they're not back in a minute.`
+        : `${nameOf(room, clientId)} disconnected — the game waits for them to return.`,
+      true,
+    );
     emitLobby(room);
     emitChat(room);
     if (room.game) {
       broadcastGame(room);
       scheduleBots(room); // resume any *other* bot whose turn it is; the dropped human is not botted
     }
+    if (room.isPublic) schedulePublicDrop(room, clientId); // …unless it's the public table, after a grace period
     scheduleCleanupIfEmpty(room);
   });
 });
+
+ensurePublicRoom(); // the public table is open from the moment the server is up
 
 if (serveClient) {
   app.use(express.static(clientDist));

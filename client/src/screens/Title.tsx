@@ -6,7 +6,7 @@ import { TitleEnvelope } from '../components/TitleEnvelope';
 import { TitleDice } from '../components/TitleDice';
 import './Title.css';
 
-type Mode = 'menu' | 'start' | 'join';
+type Mode = 'menu' | 'start' | 'join' | 'public';
 
 const TAGLINES = [
   "It's not impossible to solve. Statistically speaking.",
@@ -26,6 +26,7 @@ export function Title() {
   const error = useStore((s) => s.error);
   const createGame = useStore((s) => s.createGame);
   const joinGame = useStore((s) => s.joinGame);
+  const joinPublic = useStore((s) => s.joinPublic);
   const loadGame = useStore((s) => s.loadGame);
   const savedMeta = useStore((s) => s.savedMeta);
   const goto = useStore((s) => s.goto);
@@ -52,8 +53,11 @@ export function Title() {
           <button className="btn btn--primary title__start" disabled={!connected} onClick={() => setMode('start')}>
             Start Game
           </button>
+          <button className="btn title__public" disabled={!connected} onClick={() => setMode('public')}>
+            Join Public Game
+          </button>
           <button className="btn title__join" disabled={!connected} onClick={() => setMode('join')}>
-            Join Game
+            Join Private Game
           </button>
           {savedMeta && (
             <button className="btn" disabled={!connected} onClick={loadGame} title={`Round ${savedMeta.round} · ${savedMeta.players} players`}>
@@ -84,6 +88,33 @@ export function Title() {
             </button>
             <button type="submit" className="btn btn--primary" disabled={!canSubmit}>
               Create Lobby
+            </button>
+          </div>
+        </form>
+      )}
+
+      {mode === 'public' && (
+        <form
+          className="title__form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canSubmit) joinPublic(name);
+          }}
+        >
+          <p className="title__publichint">
+            One big table, open to everyone. Every seat is a computer until a human takes it, and the game
+            starts itself when the clock runs out — or jump into a game already in progress.
+          </p>
+          <label>
+            Your name
+            <input autoFocus value={name} maxLength={20} onChange={(e) => setName(e.target.value)} placeholder="e.g. Jack" />
+          </label>
+          <div className="title__row">
+            <button type="button" className="btn btn--ghost" onClick={() => setMode('menu')}>
+              Back
+            </button>
+            <button type="submit" className="btn btn--primary" disabled={!canSubmit}>
+              Join Public Lobby
             </button>
           </div>
         </form>

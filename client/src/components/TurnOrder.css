@@ -1,0 +1,80 @@
+/* The "…and N more" chip that ends a two-row turn strip. */
+.po--more {
+  cursor: pointer;
+  color: var(--accent, #c8a24a);
+  font-family: 'Georgia', serif;
+  font-weight: 700;
+  border-style: dashed;
+}
+.po--more:hover {
+  border-color: var(--accent, #c8a24a);
+  background: #2a2245;
+}
+
+/* Full roster overlay — the lobby's seat rows, in turn order. */
+.roster__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 16, 0.72);
+  z-index: 320;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.roster {
+  width: min(900px, 96vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #1d1830;
+  border: 2px solid var(--accent, #c8a24a);
+  border-radius: 14px;
+  padding: 1rem 1.2rem 1.2rem;
+}
+.roster__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+  margin-bottom: 0.7rem;
+}
+.roster__head h2 {
+  margin: 0;
+  color: var(--accent, #c8a24a);
+  font-family: var(--font-display, 'Georgia', serif);
+  letter-spacing: 0.06em;
+}
+.roster__count {
+  color: var(--muted, #9a93b3);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+.roster__x {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--muted, #9a93b3);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.roster__x:hover {
+  color: var(--ink, #ece8f5);
+}
+.roster__list {
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.45rem;
+  align-content: start;
+  padding-right: 0.2rem;
+}
+.pseat--active {
+  border-color: var(--accent, #c8a24a);
+  box-shadow: inset 0 0 0 1px var(--accent, #c8a24a);
+}
+.pseat--out {
+  opacity: 0.45;
+}
+.pseat--out .pseat__name {
+  text-decoration: line-through;
+}

@@ -5,6 +5,17 @@
 import type { Coord, FloorId } from './data/board';
 
 export type SlotStatus = 'open' | 'closed' | 'bot';
+
+/** How long the 3D dice roll animation runs on clients (ms). Bots wait it out before acting. */
+export const DICE_ANIM_MS = 2600;
+/** Public games: a human on the clock has this long to act before the turn is passed for them. */
+export const PUBLIC_TURN_MS = 90_000;
+
+/** A player's dice look: body colour and pip colour (hex). Bots default to their character's colour. */
+export interface DiceStyle {
+  color: string;
+  pips: string;
+}
 export type Phase = 'lobby' | 'setup' | 'play' | 'ended';
 
 // Movement sub-state of the current player's turn.
@@ -26,6 +37,8 @@ export interface Player {
   /** Card ids in hand. SERVER-ONLY — never sent to other players. */
   hand: string[];
   eliminated: boolean;
+  /** Dice colours this player rolls with (shown to everyone during their roll animation). */
+  dice?: DiceStyle;
   /** Current board tile. */
   position: Coord;
   /** Room id if the piece is currently inside a room. */
@@ -115,6 +128,7 @@ export interface PlayerView {
   isHost: boolean;
   connected: boolean;
   eliminated: boolean;
+  dice?: DiceStyle;
   /** How many cards this player holds — never the cards themselves. */
   handCount: number;
   position: Coord;
@@ -149,6 +163,10 @@ export interface GameView {
   accusingId?: string;
   /** True when the viewer is watching only (not one of the dealt players). */
   observer?: boolean;
+  /** Public games: epoch ms by which the human on the clock must act (turn passed otherwise). */
+  turnDeadline?: number;
+  /** Server clock when this view was built, to correct the countdown for clock skew. */
+  serverNow?: number;
   /** The viewer's own hand. Empty for spectators / non-players. */
   yourHand: string[];
   currentSuggestion?: SuggestionView;

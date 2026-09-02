@@ -35,6 +35,17 @@
   flex-direction: column;
   gap: 0.4rem;
   margin: 0.3rem 0;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+/* The public table can offer up to 40 seats: widen the dialog and lay the seats out in columns. */
+.seatpick--wide {
+  width: min(760px, 95vw);
+}
+.seatpick--wide .seatpick__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
 }
 .seatpick__empty {
   color: var(--muted, #9a93b3);

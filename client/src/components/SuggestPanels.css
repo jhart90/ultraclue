@@ -34,6 +34,8 @@
 .sp,
 .statpop {
   animation: uc-pop 0.18s ease;
+  /* Every in-game pop-up (and everything inside it) renders at half size so the board stays visible. */
+  zoom: 0.5;
 }
 
 .sp {

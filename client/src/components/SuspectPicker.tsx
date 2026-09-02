@@ -3,11 +3,15 @@ import './SuspectPicker.css';
 
 export function SuspectPicker({
   takenByOthers,
+  heldByComputers,
   mySuspectId,
   onPick,
   onClose,
 }: {
+  /** Characters other humans hold — not selectable. */
   takenByOthers: Set<string>;
+  /** Characters a computer holds — selectable; the computer takes your current one in exchange. */
+  heldByComputers?: Set<string>;
   mySuspectId?: string;
   onPick: (suspectId: string) => void;
   onClose: () => void;
@@ -24,6 +28,7 @@ export function SuspectPicker({
         <div className="picker__grid">
           {SORTED_SUSPECTS_RAINBOW.map((s) => {
             const taken = takenByOthers.has(s.id);
+            const swap = !taken && !!heldByComputers?.has(s.id);
             const mine = s.id === mySuspectId;
             return (
               <button
@@ -34,10 +39,11 @@ export function SuspectPicker({
                   onPick(s.id);
                   onClose();
                 }}
-                title={taken ? 'Taken' : s.title}
+                title={taken ? 'Taken by another player' : swap ? `${s.title} — swap with the computer playing them` : s.title}
               >
                 <span className="picker__swatch" style={{ background: s.color }} />
                 <span className="picker__name">{s.title}</span>
+                {swap && <span className="picker__swap">swap</span>}
               </button>
             );
           })}

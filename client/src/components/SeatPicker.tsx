@@ -1,4 +1,4 @@
-import { getCard } from 'shared';
+import { getCard, PUBLIC_ROOM_CODE } from 'shared';
 import { useStore } from '../store';
 import './SeatPicker.css';
 
@@ -18,12 +18,17 @@ export function SeatPicker() {
   if (!seatPick) return null;
 
   const available = seatPick.slots.filter((s) => s.occupant && s.occupant.isBot && !s.occupant.observer);
+  const isPublic = seatPick.code === PUBLIC_ROOM_CODE;
 
   return (
     <div className="seatpick__backdrop">
-      <div className="seatpick">
-        <h2 className="seatpick__title">Join game · {seatPick.code}</h2>
-        <p className="seatpick__hint">This game is already in progress — choose a player to take over.</p>
+      <div className={`seatpick${available.length > 8 ? ' seatpick--wide' : ''}`}>
+        <h2 className="seatpick__title">{isPublic ? 'Join the public game' : `Join game · ${seatPick.code}`}</h2>
+        <p className="seatpick__hint">
+          {isPublic
+            ? 'The public game is already in progress — take over any computer-controlled player, or just watch.'
+            : 'This game is already in progress — choose a player to take over.'}
+        </p>
         <div className="seatpick__list">
           {available.length === 0 && <div className="seatpick__empty">No seats are open to take over right now.</div>}
           {available.map((slot) => {

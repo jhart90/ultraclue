@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { getCard, shortcutDestForRoom, type Announcement } from 'shared';
-import { useStore } from '../store';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getCard, shortcutDestForRoom, PUBLIC_ROOM_CODE, DICE_ANIM_MS, defaultDice, type Announcement } from 'shared';
+import { useStore, savedDice } from '../store';
+import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
+import { DiceOverlay, type DiceRollShow } from '../components/DiceOverlay';
+import { DiceSettings } from '../components/DiceSettings';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
 import { Board, WALK_STEP_MS } from '../components/Board';
@@ -9,7 +12,7 @@ import { Wordmark } from '../components/Wordmark';
 import { DetectiveNotes } from '../components/DetectiveNotes';
 import { SelectModal, RevealPanel, NoEvidencePanel, EndScreen } from '../components/SuggestPanels';
 import { StatusModal, AnnouncementModal, AccusationFlow, AccusingModal, RevealModal, type StatusButton } from '../components/GamePopups';
-import { playDiceRoll } from '../util/sound';
+import { soundEnabled, setSoundEnabled } from '../util/sound';
 import { contrastInk } from '../render/colorUtils';
 import './Game.css';
 
@@ -17,6 +20,42 @@ function suspectColor(suspectId?: string): string {
   if (!suspectId) return '#555';
   const c = getCard(suspectId);
   return c && c.type === 'suspect' ? c.color : '#555';
+}
+
+/** Public games: the seconds left for the human on the clock — shown only for the last 30s, red
+ *  for the last 10. Everyone sees it, so the table knows a stalled turn is about to be passed. */
+function TurnTimer({ deadline, serverOffset }: { deadline?: number; serverOffset: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!deadline) return;
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [deadline]);
+  if (!deadline) return null;
+  const remaining = Math.max(0, deadline - (now + serverOffset));
+  if (remaining > 30_000) return null;
+  const secs = Math.ceil(remaining / 1000);
+  return (
+    <div className={`game__timer${secs <= 10 ? ' game__timer--red' : ''}`} title="Time left to act">
+      ⏱ {secs}s
+    </div>
+  );
+}
+
+/** Retires the resting dice once a pop-up window is showing — but not before they've landed.
+ *  (A child component, so Game's own hook order stays fixed around its early return.) */
+function DiceRetirer({ active, animUntil, onRetire }: { active: boolean; animUntil: number; onRetire: () => void }) {
+  useEffect(() => {
+    if (!active) return;
+    const wait = animUntil - Date.now();
+    if (wait <= 0) {
+      onRetire();
+      return;
+    }
+    const t = setTimeout(onRetire, wait);
+    return () => clearTimeout(t);
+  }, [active, animUntil, onRetire]);
+  return null;
 }
 
 const FLOOR_LABELS: Record<string, string> = {
@@ -45,7 +84,15 @@ export function Game() {
   const bootPlayer = useStore((s) => s.bootPlayer);
   const saveGame = useStore((s) => s.saveGame);
   const savedAt = useStore((s) => s.savedAt);
+  const serverOffset = useStore((s) => s.serverOffset);
+  const setDice = useStore((s) => s.setDice);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [soundOn, setSoundOn] = useState(soundEnabled);
+  // The 3D dice for the latest roll; they rest on screen until a pop-up, the next roll, or a click.
+  const [diceShow, setDiceShow] = useState<DiceRollShow | null>(null);
+  const animUntilRef = useRef(0);
+  const retireDice = useCallback(() => setDiceShow(null), []);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
   const [dock, setDock] = useState<null | 'map' | 'notes'>(null); // bottom dock: Manor Map / Detective Notes
   const [mapMounted, setMapMounted] = useState(false); // mount the (heavy) second board only once opened
@@ -121,12 +168,26 @@ export function Game() {
     if (iMustRevealNow) setAnnOpen(false);
   }, [iMustRevealNow]);
 
-  // Play the dice sound on every roll (mine or a bot's). rollSeq bumps even when values repeat.
+  // Every roll (mine or a bot's) throws the 3D dice in the roller's colours. rollSeq bumps even
+  // when the values repeat. The overlay plays the sound itself.
   useEffect(() => {
     const rs = game?.rollSeq ?? 0;
-    if (rs > rollSeqRef.current) playDiceRoll();
+    if (rs > rollSeqRef.current && game?.lastRoll) {
+      const roller = game.players.find((p) => p.id === game.turnOrder[game.activeIdx]);
+      const style = roller?.dice ?? defaultDice(roller?.suspectId);
+      animUntilRef.current = Date.now() + DICE_ANIM_MS;
+      setDiceShow({ seq: rs, values: game.lastRoll, color: style.color, pips: style.pips, name: roller?.name ?? 'Someone' });
+    }
     rollSeqRef.current = rs;
   }, [game?.rollSeq]);
+
+  // Any click clears the resting dice (the overlay itself never catches clicks).
+  useEffect(() => {
+    if (!diceShow) return;
+    const clear = () => setDiceShow(null);
+    window.addEventListener('pointerdown', clear, true);
+    return () => window.removeEventListener('pointerdown', clear, true);
+  }, [diceShow]);
 
   // Pop up the big status window whenever my actionable status changes (roll, room entry, etc.).
   useEffect(() => {
@@ -142,12 +203,14 @@ export function Game() {
     // suspect/accuse/end-turn options don't appear while the piece is still mid-move.
     const mv = game.lastMove;
     const tilesToWalk = mv && mv.playerId === myId ? mv.path.length - 1 : 0;
-    if (tilesToWalk <= 0) {
+    // Likewise, if my dice are still tumbling, let them land before the "You rolled N" window.
+    const diceWait = Math.max(0, animUntilRef.current - Date.now());
+    if (tilesToWalk <= 0 && diceWait <= 0) {
       setStatusOpen(true);
       return;
     }
     setStatusOpen(false);
-    const t = setTimeout(() => setStatusOpen(true), tilesToWalk * WALK_STEP_MS + 80);
+    const t = setTimeout(() => setStatusOpen(true), Math.max(tilesToWalk * WALK_STEP_MS + 80, diceWait));
     return () => clearTimeout(t);
     // lastMove is intentionally omitted: it changes in lock-step with turnPhase/inRoomId (which are
     // listed), and including the fresh object each tick would cancel the pending timeout.
@@ -259,12 +322,14 @@ export function Game() {
   // Someone else is composing an accusation — warn this player (not the accuser).
   const accuser = game.accusingId && game.accusingId !== myId ? game.players.find((p) => p.id === game.accusingId) : undefined;
   const showAccusing = !!accuser && !showAccFlow && !showEnd;
+  // A pop-up window opening retires the resting dice (once they've actually landed).
+  const anyPopup = showAccFlow || showEnd || showDisprove || showNoEvidence || showReveal || showAnn || showStatus || showAccusing || !!modal;
 
   return (
     <div className="game">
       <header className="game__top">
         <div className="game__title">
-          <Wordmark size="sm" /> <span className="game__code">Room {game.code}</span>
+          <Wordmark size="sm" /> <span className="game__code">{game.code === PUBLIC_ROOM_CODE ? 'Public Game' : `Room ${game.code}`}</span>
           {observer && <span className="game__obsbadge">👁 Observer</span>}
         </div>
         <div
@@ -273,6 +338,7 @@ export function Game() {
         >
           {turnLabel}
         </div>
+        <TurnTimer deadline={game.turnDeadline} serverOffset={serverOffset} />
         <button className="btn btn--danger" onClick={leave}>
           Leave
         </button>
@@ -280,24 +346,7 @@ export function Game() {
 
       <div className="game__main">
         <div className="game__board">
-          <div className="game__turnorder">
-            {orderedPlayers.map((p) => (
-              <div
-                key={p.id}
-                className={`po${p.id === activeId ? ' po--active' : ''}${p.eliminated ? ' po--out' : ''}`}
-              >
-                <span className="po__sw" style={{ background: suspectColor(p.suspectId) }} />
-                <span className="po__name">
-                  {p.name}
-                  {p.id === myId ? ' (you)' : ''}
-                </span>
-                {getCard(p.suspectId)?.title !== p.name && (
-                  <span className="po__char">{getCard(p.suspectId)?.title}</span>
-                )}
-                {p.id === activeId && <span className="po__tag">to move</span>}
-              </div>
-            ))}
-          </div>
+          <TurnOrder players={orderedPlayers} activeId={activeId} myId={myId} onOpenRoster={() => setRosterOpen(true)} />
 
           <div className="game__controls">
             {game.lastRoll && !suggestionPending && <Dice values={game.lastRoll} />}
@@ -444,6 +493,13 @@ export function Game() {
         />
       )}
 
+      <DiceOverlay roll={diceShow} />
+      <DiceRetirer active={anyPopup && !!diceShow} animUntil={animUntilRef.current} onRetire={retireDice} />
+
+      {rosterOpen && (
+        <PlayerRoster players={orderedPlayers} activeId={activeId} myId={myId} hostId={game.hostId} onClose={() => setRosterOpen(false)} />
+      )}
+
       {showStatus && statusDesc && (
         <StatusModal
           dice={statusDesc.dice}
@@ -557,6 +613,23 @@ export function Game() {
               );
             })}
             {!iAmHost && <div className="game__setnote">Only the host can replace players.</div>}
+
+            <div className="game__settinghead2">Your dice</div>
+            <DiceSettings current={me?.dice ?? savedDice() ?? defaultDice(me?.suspectId)} onChange={setDice} />
+            <div className="game__setnote">Everyone sees these colours when your dice roll. Computers roll their character's colour.</div>
+
+            <div className="game__settinghead2">Sound</div>
+            <label className="game__settoggle">
+              <input
+                type="checkbox"
+                checked={soundOn}
+                onChange={(e) => {
+                  setSoundEnabled(e.target.checked);
+                  setSoundOn(e.target.checked);
+                }}
+              />
+              Dice roll sounds
+            </label>
 
             <div className="game__settinghead2">Save</div>
             <button className="btn game__savebtn" onClick={saveGame}>

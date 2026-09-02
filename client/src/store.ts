@@ -122,12 +122,17 @@ interface StoreState {
   seatPick?: { code: string; slots: Slot[] };
   /** Bumps when the server hands us restored Detective Notes, so the notes sheet re-reads them. */
   notesEpoch: number;
+  /** serverClock - ourClock (ms), from the last lobby view — corrects the public countdown. */
+  serverOffset: number;
 
   // actions
   goto: (screen: Screen) => void;
   syncNotes: (json: string) => void;
   createGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
+  joinPublic: (name: string) => void;
+  setRoomSettings: (totalPlayers: number) => void;
+  setDice: (color: string, pips: string) => void;
   takeSeat: (index: number) => void;
   joinAsObserver: () => void;
   setSlot: (index: number, status: SlotStatus) => void;
@@ -160,6 +165,7 @@ export const useStore = create<StoreState>((set) => ({
   chat: [],
   savedMeta: readSave()?.meta,
   notesEpoch: 0,
+  serverOffset: 0,
 
   goto: (screen) => set({ screen }),
   syncNotes: (json) => socket.emit(SOCKET_EVENTS.SET_NOTES, { notes: json }),
@@ -167,6 +173,19 @@ export const useStore = create<StoreState>((set) => ({
   joinGame: (code, name) => {
     pendingName = name; // remembered in case we land on a seat-picker for an in-progress game
     socket.emit(SOCKET_EVENTS.JOIN_GAME, { code: code.toUpperCase(), name, clientId: CLIENT_ID });
+  },
+  joinPublic: (name) => {
+    pendingName = name; // reused on the seat picker if the public game is already running
+    socket.emit(SOCKET_EVENTS.JOIN_PUBLIC, { name, clientId: CLIENT_ID });
+  },
+  setRoomSettings: (totalPlayers) => socket.emit(SOCKET_EVENTS.SET_ROOM_SETTINGS, { totalPlayers }),
+  setDice: (color, pips) => {
+    try {
+      localStorage.setItem('ultraclue-dice', JSON.stringify({ color, pips }));
+    } catch {
+      /* ignore */
+    }
+    socket.emit(SOCKET_EVENTS.SET_DICE, { color, pips });
   },
   takeSeat: (index) => {
     const { seatPick } = useStore.getState();
@@ -229,17 +248,23 @@ socket.on(SOCKET_EVENTS.YOU_ARE, (p: YouArePayload) => useStore.setState({ myId:
 
 socket.on(SOCKET_EVENTS.LOBBY, (p: LobbyPayload) => {
   const { lobby } = p;
+  const mine = lobby.slots.find((s) => s.occupant?.id === useStore.getState().myId)?.occupant;
+  const chosen = savedDice();
+  if (mine && chosen && (mine.dice?.color !== chosen.color || mine.dice?.pips !== chosen.pips)) {
+    socket.emit(SOCKET_EVENTS.SET_DICE, chosen);
+  }
   useStore.setState((state) => {
     const inRoom = lobby.slots.some((s) => s.occupant?.id === state.myId);
     if (inRoom) saveRoom(lobby.code);
+    const serverOffset = lobby.serverNow ? lobby.serverNow - Date.now() : state.serverOffset;
     // We joined an in-progress (loaded) game but aren't seated yet → pick a seat to take over.
     if (!inRoom && lobby.phase === 'play') {
-      return { lobby, seatPick: { code: lobby.code, slots: lobby.slots }, error: undefined };
+      return { lobby, serverOffset, seatPick: { code: lobby.code, slots: lobby.slots }, error: undefined };
     }
     // Only follow a lobby into its screen if we're actually seated in it — otherwise a stray update
     // (e.g. right after we left) must not drag us back into the game.
     const screen: Screen = inRoom ? (lobby.phase === 'play' ? 'game' : 'lobby') : state.screen;
-    return { lobby, screen, seatPick: undefined, error: undefined };
+    return { lobby, serverOffset, screen, seatPick: undefined, error: undefined };
   });
 });
 
@@ -260,8 +285,23 @@ socket.on(SOCKET_EVENTS.GAME_STARTED, (p: GameStartedPayload) => {
     pendingNotes = null;
   }
   saveRoom(p.view.code);
-  useStore.setState({ game: p.view, screen: 'game', seatPick: undefined });
+  useStore.setState((s) => ({
+    game: p.view,
+    screen: 'game',
+    seatPick: undefined,
+    serverOffset: p.view.serverNow ? p.view.serverNow - Date.now() : s.serverOffset,
+  }));
 });
+
+/** The dice colours this browser chose earlier, if any. */
+export function savedDice(): { color: string; pips: string } | null {
+  try {
+    const s = localStorage.getItem('ultraclue-dice');
+    return s ? (JSON.parse(s) as { color: string; pips: string }) : null;
+  } catch {
+    return null;
+  }
+}
 
 socket.on(SOCKET_EVENTS.REJOIN_FAILED, () => {
   clearRoom();

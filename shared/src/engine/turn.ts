@@ -27,7 +27,11 @@ function autoRoll(state: GameState, rng: RNG): void {
   state.rollSeq = (state.rollSeq ?? 0) + 1;
   state.turnPhase = 'awaitMove';
   const p = requirePlayer(state, currentPlayerId(state));
-  log(state, `${p.name} rolls ${state.lastRoll[0]} + ${state.lastRoll[1]} = ${state.lastRoll[0] + state.lastRoll[1]}.`);
+  log(state, `${p.name} rolls ${state.lastRoll[0]} + ${state.lastRoll[1]} = ${state.lastRoll[0] + state.lastRoll[1]}.`, {
+    kind: 'roll',
+    playerId: p.id,
+    dice: [state.lastRoll[0], state.lastRoll[1]],
+  });
 }
 
 /** Set up the current player's movement phase: auto-roll in the open, or offer the in-room choice. */

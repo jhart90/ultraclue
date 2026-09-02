@@ -340,7 +340,6 @@ function progress(room: Room): void {
   }
   recordSuggestion(room); // log a resolved suggestion so every bot can deduce from it
   updateBotNotes(room); // refresh each bot's Detective Notes from its latest deduction
-  whisperReveal(room); // privately tell the two players which card was shown
   mirrorLog(room); // fold new game events into the chat feed
   armTurnTimer(room); // public: (re)start the 90s clock for whichever human the table waits on
   broadcastGame(room);

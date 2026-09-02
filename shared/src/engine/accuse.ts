@@ -48,6 +48,7 @@ export function makeAccusation(
   log(
     s,
     `${accuser.name} accuses ${getCard(suspectId)?.title} with the ${getCard(weaponId)?.title} in the ${getCard(roomId)?.title}!`,
+    { kind: 'accusation', byId: accuserId, suspectId, weaponId, roomId, correct },
   );
 
   if (correct) {

@@ -408,7 +408,20 @@ export function mirrorLog(room: Room): void {
   if (!room.game) return;
   for (const entry of room.game.log) {
     if (entry.id > room.mirroredLogId) {
-      room.chat.push({ id: room.nextChatId++, from: '', text: entry.text, system: true });
+      const card = entry.card;
+      if (card?.kind === 'reveal' && card.cardId) {
+        // Everyone sees a face-down reveal card; the two players in on it get the face-up version.
+        const humans = room.slots.map((s) => s.occupant).filter((o) => o && !o.isBot).map((o) => o!.id);
+        const insiders = [card.responderId, card.suggesterId];
+        const outsiders = humans.filter((id) => !insiders.includes(id));
+        room.chat.push({
+          id: room.nextChatId++, from: '', text: entry.text, system: true, to: outsiders,
+          card: { kind: 'reveal', responderId: card.responderId, suggesterId: card.suggesterId },
+        });
+        room.chat.push({ id: room.nextChatId++, from: '', text: entry.text, system: true, to: insiders, card });
+      } else {
+        room.chat.push({ id: room.nextChatId++, from: '', text: entry.text, system: true, card });
+      }
       room.mirroredLogId = entry.id;
     }
   }

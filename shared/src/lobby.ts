@@ -1,4 +1,4 @@
-import type { SlotStatus, DiceStyle, BotDifficulty } from './game';
+import type { SlotStatus, DiceStyle, BotDifficulty, LogCard } from './game';
 
 // Lobby / room model. Unlike GameState there is no hidden information here, so a single LobbyView
 // is broadcast to everyone in the room; each client identifies itself by its own socket id.
@@ -12,6 +12,8 @@ export interface ChatMsg {
   to?: string[];
   /** A private "whisper" — rendered in italic grey. */
   whisper?: boolean;
+  /** Structured game event drawn as a card in the chat (roll, suggestion, reveal, accusation). */
+  card?: LogCard;
 }
 
 export interface SlotOccupant {

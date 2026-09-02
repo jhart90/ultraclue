@@ -76,6 +76,7 @@ export function makeSuggestion(
   log(
     s,
     `${name} suggests ${getCard(suspectId)?.title} with the ${getCard(weaponId)?.title} in the ${getCard(roomId)?.title}.`,
+    { kind: 'suggestion', byId: suggesterId, suspectId, weaponId, roomId },
   );
   return progressSuggestion(s, rng);
 }
@@ -140,7 +141,8 @@ export function respondToSuggestion(
 
   const responder = requirePlayer(s, responderId).name;
   const suggester = requirePlayer(s, sg.suggesterId).name;
-  log(s, `${responder} reveals a card to ${suggester}.`);
+  // The shown card rides in the log entry; viewFor strips it for everyone but the two in on it.
+  log(s, `${responder} reveals a card to ${suggester}.`, { kind: 'reveal', responderId, suggesterId: sg.suggesterId, cardId });
   concludeTurn(s, rng);
   return s;
 }

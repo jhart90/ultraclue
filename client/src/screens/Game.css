@@ -2,7 +2,7 @@
   /* Layout vars: a constant-width chat anchored right, the board (and all pop-ups / the dock) filling
      the "map area" to its left. --map-right is the distance from the viewport's right edge to the
      map's right edge, so fixed overlays can stop short of the chat. */
-  --chat-w: 320px;
+  --chat-w: 340px;
   --pad: 1rem;
   --gap: 0.8rem;
   --map-right: calc(var(--pad) + var(--chat-w) + var(--gap));

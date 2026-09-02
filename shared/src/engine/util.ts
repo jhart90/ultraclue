@@ -1,12 +1,12 @@
-import type { GameState, Player } from '../game';
+import type { GameState, LogCard, Player } from '../game';
 
 /** Deep clone of game state. Engine actions clone-then-mutate so they behave as pure functions. */
 export function clone<T>(x: T): T {
   return structuredClone(x);
 }
 
-export function log(state: GameState, text: string): void {
-  state.log.push({ id: state.nextLogId++, text });
+export function log(state: GameState, text: string, card?: LogCard): void {
+  state.log.push(card ? { id: state.nextLogId++, text, card } : { id: state.nextLogId++, text });
 }
 
 export function getPlayer(state: GameState, id: string): Player | undefined {

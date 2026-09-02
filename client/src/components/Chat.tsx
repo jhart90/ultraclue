@@ -1,7 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChatMsg } from 'shared';
 import { highlightChat, type ChatPlayer } from '../util/highlightChat';
+import { ChatCard, type SuggestionResponse } from './ChatCard';
 import './Chat.css';
+
+/** A rendered chat item: a plain message, or an event card with the response lines that belong
+ *  to it (a suggestion's "cannot disprove" / "no one could disprove" lines fold under its card). */
+type Item = { msg: ChatMsg; responses: SuggestionResponse[] };
+
+function responseKind(m: ChatMsg): SuggestionResponse['kind'] | null {
+  if (!m.system || m.card) return null;
+  if (/ cannot disprove it\.$/.test(m.text)) return 'pass';
+  if (/^No one could disprove/.test(m.text)) return 'nobody';
+  return null;
+}
+
+function groupItems(messages: ChatMsg[]): Item[] {
+  const items: Item[] = [];
+  let open: Item | null = null; // the latest suggestion card still collecting responses
+  for (const m of messages) {
+    const kind = responseKind(m);
+    if (open && kind) {
+      open.responses.push({ text: m.text, kind });
+      if (kind === 'nobody') open = null;
+      continue;
+    }
+    if (open && m.card?.kind === 'reveal') {
+      open.responses.push({ text: m.text.replace(/ reveals a card to .*$/, ' showed a card'), kind: 'shown' });
+      open = null;
+    }
+    const item: Item = { msg: m, responses: [] };
+    items.push(item);
+    if (m.card?.kind === 'suggestion') open = item;
+    else if (m.card) open = null;
+  }
+  return items;
+}
 
 export function Chat({
   messages,
@@ -72,8 +106,12 @@ export function Chat({
       <div className="chat__logwrap">
         <div className="chat__log" ref={logRef} onScroll={onScroll}>
           {messages.length === 0 && <div className="chat__empty">No messages yet. Say hello!</div>}
-          {messages.map((m) =>
-            m.whisper ? (
+          {groupItems(messages).map(({ msg: m, responses }) =>
+            m.card ? (
+              <div className="chat__msg chat__msg--card" key={m.id}>
+                <ChatCard card={m.card} caption={highlightChat(m.text, players)} players={players} responses={responses} />
+              </div>
+            ) : m.whisper ? (
               <div className="chat__msg chat__msg--whisper" key={m.id}>
                 {highlightChat(m.text, players)}
               </div>

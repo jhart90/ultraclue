@@ -11,7 +11,7 @@ import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
 import { DetectiveNotes } from '../components/DetectiveNotes';
 import { SelectModal, RevealPanel, NoEvidencePanel, EndScreen } from '../components/SuggestPanels';
-import { StatusModal, AnnouncementModal, AccusationFlow, AccusingModal, RevealModal, type StatusButton } from '../components/GamePopups';
+import { StatusModal, AccusationFlow, AccusingModal, type StatusButton } from '../components/GamePopups';
 import { soundEnabled, setSoundEnabled } from '../util/sound';
 import { contrastInk } from '../render/colorUtils';
 import './Game.css';
@@ -100,8 +100,7 @@ export function Game() {
   // --- pop-up overlays (status / announcement / reveal) ---
   const [statusOpen, setStatusOpen] = useState(false);
   const [elevatorReady, setElevatorReady] = useState(false); // gated until the piece reaches the lift
-  const [annOpen, setAnnOpen] = useState(false);
-  const [revealOpen, setRevealOpen] = useState(false);
+
   // A captured accusation (so its two-step reveal survives later announcements overwriting the live one).
   const [accFlow, setAccFlow] = useState<{
     ann: Announcement;
@@ -111,7 +110,6 @@ export function Game() {
   } | null>(null);
   const accSeqRef = useRef(0);
   const annSeqRef = useRef(0);
-  const revealKeyRef = useRef('');
   const statusSigRef = useRef('');
   const rollSeqRef = useRef(0);
 
@@ -129,9 +127,7 @@ export function Game() {
     const a = game?.announcement;
     if (a && a.kind === 'suggestion' && a.seq !== annSeqRef.current) {
       annSeqRef.current = a.seq;
-      setRevealOpen(false);
       setAccFlow((prev) => (prev && prev.ann.seq < a.seq ? null : prev));
-      if (game?.phase === 'play') setAnnOpen(true);
     }
   }, [game?.announcement?.seq, game?.phase]);
 
@@ -140,8 +136,7 @@ export function Game() {
     const a = game?.announcement;
     if (a && a.kind === 'accusation' && a.seq !== accSeqRef.current) {
       accSeqRef.current = a.seq;
-      setAnnOpen(false);
-      setRevealOpen(false);
+      if (a.byId !== myId) return; // everyone else sees the verdict as a card in the chat
       setAccFlow({
         ann: a,
         envelope: game?.envelope,
@@ -151,22 +146,19 @@ export function Game() {
     }
   }, [game?.announcement?.seq, game?.phase, game?.envelope, game?.winnerId, game?.players]);
 
-  // A card was just revealed -> show the face-down reveal pop-up (replacing the announcement).
+  // Mobile: the chat sits below the board, so announce each new event card in a toast up top.
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+  const lastCardIdRef = useRef(0);
   useEffect(() => {
-    if (sgNow?.resolved && sgNow.anyRevealed && sgNow.responderId) {
-      const key = `${game?.announcement?.seq ?? 0}:${sgNow.responderId}`;
-      if (key !== revealKeyRef.current) {
-        revealKeyRef.current = key;
-        setAnnOpen(false);
-        setRevealOpen(true);
-      }
-    }
-  }, [sgNow?.resolved, sgNow?.anyRevealed, sgNow?.responderId, game?.announcement?.seq]);
-
-  // If I must disprove, the announcement pop-up gives way to the disprove panel.
-  useEffect(() => {
-    if (iMustRevealNow) setAnnOpen(false);
-  }, [iMustRevealNow]);
+    const last = [...chat].reverse().find((m) => m.card && m.card.kind !== 'roll');
+    if (!last || last.id <= lastCardIdRef.current) return;
+    const first = lastCardIdRef.current === 0;
+    lastCardIdRef.current = last.id;
+    if (first) return; // don't toast the backlog on (re)join
+    setToast({ id: last.id, text: last.text });
+    const t = setTimeout(() => setToast((cur) => (cur?.id === last.id ? null : cur)), 4200);
+    return () => clearTimeout(t);
+  }, [chat]);
 
   // Every roll (mine or a bot's) throws the 3D dice in the roller's colours. rollSeq bumps even
   // when the values repeat. The overlay plays the sound itself.
@@ -315,15 +307,13 @@ export function Game() {
   const showEnd = game.phase === 'ended' && !showAccFlow;
   const showDisprove = iMustReveal && !!sug && !showAccFlow;
   const showNoEvidence = iMustPass && !!sug && !showAccFlow;
-  const showReveal = revealOpen && !showAccFlow && !showDisprove && !showNoEvidence && !showEnd && !modal;
-  const showAnn = annOpen && !!game.announcement && !showAccFlow && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal;
   const showStatus =
-    statusOpen && !!statusDesc && !showAccFlow && !showAnn && !showReveal && !showDisprove && !showNoEvidence && !showEnd && !modal && !iAmResponder;
+    statusOpen && !!statusDesc && !showAccFlow && !showDisprove && !showNoEvidence && !showEnd && !modal && !iAmResponder;
   // Someone else is composing an accusation — warn this player (not the accuser).
   const accuser = game.accusingId && game.accusingId !== myId ? game.players.find((p) => p.id === game.accusingId) : undefined;
   const showAccusing = !!accuser && !showAccFlow && !showEnd;
   // A pop-up window opening retires the resting dice (once they've actually landed).
-  const anyPopup = showAccFlow || showEnd || showDisprove || showNoEvidence || showReveal || showAnn || showStatus || showAccusing || !!modal;
+  const anyPopup = showAccFlow || showEnd || showDisprove || showNoEvidence || showStatus || showAccusing || !!modal;
 
   return (
     <div className="game">
@@ -416,7 +406,7 @@ export function Game() {
           <Chat
             messages={chat}
             onSend={sendChat}
-            players={game.players.map((p) => ({ name: p.name, color: suspectColor(p.suspectId) }))}
+            players={game.players.map((p) => ({ id: p.id, name: p.name, color: suspectColor(p.suspectId), suspectId: p.suspectId, dice: p.dice }))}
           />
         </aside>
       </div>
@@ -509,8 +499,10 @@ export function Game() {
         />
       )}
 
-      {showAnn && game.announcement && (
-        <AnnouncementModal announcement={game.announcement} onClose={() => setAnnOpen(false)} />
+      {toast && (
+        <div className="game__toast" key={toast.id} onClick={() => document.querySelector('.game__chat')?.scrollIntoView({ behavior: 'smooth' })}>
+          {toast.text}
+        </div>
       )}
 
       {accFlow && (
@@ -527,14 +519,6 @@ export function Game() {
 
       {showAccusing && accuser && <AccusingModal name={accuser.name} />}
 
-      {showReveal && sug && (
-        <RevealModal
-          responderName={game.players.find((p) => p.id === sug.responderId)?.name ?? 'A player'}
-          suggesterName={game.players.find((p) => p.id === sug.suggesterId)?.name ?? 'the suggester'}
-          revealedCardId={sug.revealedCardId}
-          onClose={() => setRevealOpen(false)}
-        />
-      )}
 
       {showDisprove && sug && (
         <RevealPanel

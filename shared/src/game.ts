@@ -83,9 +83,18 @@ export interface Suggestion {
   resolved: boolean;
 }
 
+/** Structured detail behind a log line, so the chat can draw it as a card instead of a pop-up. */
+export type LogCard =
+  | { kind: 'roll'; playerId: string; dice: [number, number] }
+  | { kind: 'suggestion'; byId: string; suspectId: string; weaponId: string; roomId: string }
+  /** `cardId` is present only for the two players in on the reveal (stripped for everyone else). */
+  | { kind: 'reveal'; responderId: string; suggesterId: string; cardId?: string }
+  | { kind: 'accusation'; byId: string; suspectId: string; weaponId: string; roomId: string; correct: boolean };
+
 export interface LogEntry {
   id: number;
   text: string;
+  card?: LogCard;
 }
 
 /** A suggestion or accusation just made — broadcast so every client can pop up the three cards. */

@@ -34,7 +34,12 @@
 .sp,
 .statpop {
   animation: uc-pop 0.18s ease;
-  /* Every in-game pop-up (and everything inside it) renders at half size so the board stays visible. */
+}
+/* Pop-ups the player only reads (status, announcements, reveals, verdicts, the end screen) render
+   at half size so the board stays visible. The ones the player acts in — choosing what to suggest
+   or accuse, choosing which card to reveal — keep their full size. */
+.statpop,
+.sp--end {
   zoom: 0.5;
 }
 

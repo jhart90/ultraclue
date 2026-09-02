@@ -16,10 +16,12 @@ import {
   type ErrorPayload,
   type SavedGameMeta,
   type SaveGameDataPayload,
+  type PublicStats,
+  type PublicStatsPayload,
 } from 'shared';
 import { socket } from './socket';
 
-export type Screen = 'title' | 'lobby' | 'game' | 'gallery';
+export type Screen = 'title' | 'lobby' | 'game' | 'gallery' | 'stats';
 
 // Stable per-device id so a refresh re-attaches to the same seat; the active room code is saved
 // so we can rejoin it automatically on reconnect.
@@ -129,6 +131,8 @@ interface StoreState {
 
   // actions
   goto: (screen: Screen) => void;
+  /** Fetch the public table's history and all-time numbers (for the Statistics screen). */
+  fetchPublicStats: () => Promise<PublicStats>;
   syncNotes: (json: string) => void;
   createGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
@@ -171,6 +175,14 @@ export const useStore = create<StoreState>((set) => ({
   serverOffset: 0,
 
   goto: (screen) => set({ screen }),
+  fetchPublicStats: () =>
+    new Promise<PublicStats>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('The server did not answer.')), 8000);
+      socket.emit(SOCKET_EVENTS.PUBLIC_STATS, {}, (p: PublicStatsPayload) => {
+        clearTimeout(t);
+        resolve(p.stats);
+      });
+    }),
   syncNotes: (json) => socket.emit(SOCKET_EVENTS.SET_NOTES, { notes: json }),
   createGame: (name) => socket.emit(SOCKET_EVENTS.CREATE_GAME, { name, clientId: CLIENT_ID }),
   joinGame: (code, name) => {

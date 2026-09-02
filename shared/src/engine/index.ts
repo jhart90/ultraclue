@@ -8,3 +8,4 @@ export * from './bot';
 export * from './botNotes';
 export * from './botMind';
 export * from './view';
+export * from './stats';

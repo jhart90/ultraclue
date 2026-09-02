@@ -3,6 +3,7 @@ import type { RNG } from '../rng';
 import type { GameState, Suggestion } from '../game';
 import { clone, currentPlayerId, log, requirePlayer } from './util';
 import { concludeTurn } from './turn';
+import { noteReveal, noteSuggestion } from './stats';
 
 function trioSet(s: Pick<Suggestion, 'suspectId' | 'weaponId' | 'roomId'>): Set<string> {
   return new Set([s.suspectId, s.weaponId, s.roomId]);
@@ -63,6 +64,7 @@ export function makeSuggestion(
     resolved: false,
   };
 
+  noteSuggestion(s, suggesterId, suspectId, weaponId, roomId);
   const name = requirePlayer(s, suggesterId).name;
   s.announcement = {
     seq: (s.announcement?.seq ?? 0) + 1,
@@ -138,6 +140,7 @@ export function respondToSuggestion(
   sg.anyRevealed = true;
   sg.resolved = true;
   sg.pendingResponderId = undefined;
+  noteReveal(s, responderId);
 
   const responder = requirePlayer(s, responderId).name;
   const suggester = requirePlayer(s, sg.suggesterId).name;

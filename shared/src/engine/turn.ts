@@ -4,6 +4,7 @@ import type { GameState } from '../game';
 import { type RNG } from '../rng';
 import { blockedCells, elevatorFloorAt, pathTo, reachableTiles, roomIdAt } from './movement';
 import { advanceTurn, clone, currentPlayerId, getPlayer, log, requirePlayer } from './util';
+import { noteRoomVisit, noteTurn, noteWalk } from './stats';
 
 const FLOOR_NAMES: Record<FloorId, string> = {
   'ground-floor': 'Ground Floor',
@@ -38,6 +39,7 @@ function autoRoll(state: GameState, rng: RNG): void {
 export function beginTurn(state: GameState, rng: RNG): void {
   state.lastMove = undefined;
   const p = requirePlayer(state, currentPlayerId(state));
+  noteTurn(state, p.id);
   if (p.inRoomId) {
     state.turnPhase = 'awaitRoll';
     state.lastRoll = undefined;
@@ -72,10 +74,12 @@ export function takeShortcut(state: GameState, playerId: string): GameState {
   const destRoomId = shortcutDestForRoom(player.inRoomId);
   if (!destRoomId) throw new Error('There is no secret passage from this room.');
   const destRoom = BOARD.rooms[destRoomId];
+  const landing = destRoom.shortcutTile ?? destRoom.tiles[0];
   const before = player.position;
-  player.position = { x: destRoom.tiles[0].x, y: destRoom.tiles[0].y };
+  player.position = { x: landing.x, y: landing.y };
   player.inRoomId = destRoomId;
-  s.lastMove = { playerId, path: [before, { x: destRoom.tiles[0].x, y: destRoom.tiles[0].y }] };
+  noteRoomVisit(s, playerId, destRoomId);
+  s.lastMove = { playerId, path: [before, { x: landing.x, y: landing.y }] };
   s.turnPhase = 'postMove';
   log(s, `${player.name} takes the secret passage to the ${getCard(destRoomId)?.title}.`);
   return s;
@@ -106,6 +110,7 @@ export function moveTo(state: GameState, playerId: string, dest: Coord): GameSta
   const path = pathTo(BOARD, player.position, dest, steps, blocked);
   player.position = { x: dest.x, y: dest.y };
   s.lastMove = { playerId, path };
+  noteWalk(s, playerId, Math.max(0, path.length - 1));
 
   // Stepped into an elevator? Stop, and let them choose a floor to ride to (then continue moving).
   const elevFloor = elevatorFloorAt(BOARD, dest);
@@ -119,6 +124,7 @@ export function moveTo(state: GameState, playerId: string, dest: Coord): GameSta
   }
 
   player.inRoomId = roomIdAt(BOARD, dest);
+  noteRoomVisit(s, playerId, player.inRoomId);
   s.turnPhase = 'postMove';
   const where = player.inRoomId ? `enters the ${getCard(player.inRoomId)?.title}` : 'moves';
   log(s, `${player.name} ${where}.`);
@@ -136,9 +142,12 @@ export function chooseFloor(state: GameState, playerId: string, floor: FloorId, 
   if (!elev) throw new Error('No elevator there.');
   const player = requirePlayer(s, playerId);
   const before = player.position;
-  player.position = { x: elev.exit.x, y: elev.exit.y };
+  // Step out onto the first free hall tile around the lift (nobody gets stacked on an occupied one).
+  const taken = new Set(otherPositions(s, playerId).map(coordKey));
+  const exit = elev.exits.find((e) => !taken.has(coordKey(e))) ?? elev.exit;
+  player.position = { x: exit.x, y: exit.y };
   player.inRoomId = undefined;
-  s.lastMove = { playerId, path: [before, { x: elev.exit.x, y: elev.exit.y }] };
+  s.lastMove = { playerId, path: [before, { x: exit.x, y: exit.y }] };
 
   const stepsLeft = s.elevatorRide.stepsLeft;
   log(s, `${player.name} rides the elevator to the ${FLOOR_NAMES[floor]}.`);

@@ -61,6 +61,7 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     announcement: state.announcement,
     envelope: state.phase === 'ended' ? state.envelope : undefined,
     winnerId: state.winnerId,
+    stats: state.phase === 'ended' ? state.stats : undefined,
     // A reveal's card id is only for the two players who saw it.
     log: state.log.map((e) =>
       e.card?.kind === 'reveal' && e.card.cardId && viewerId !== e.card.responderId && viewerId !== e.card.suggesterId

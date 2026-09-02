@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { getPublicStats, recordPublicGame } from './publicStats';
 import express from 'express';
 import { Server, type Socket } from 'socket.io';
 import {
@@ -65,6 +66,9 @@ import {
   type SetDicePayload,
   type DiceStyle,
   type SetBotDifficultyPayload,
+  syncParticipants,
+  type RosterEntry,
+  type PublicStatsPayload,
 } from 'shared';
 import {
   type Room,
@@ -292,6 +296,7 @@ function gameView(room: Room, id: string) {
     hostId: room.hostId,
     accusingId: room.accusingId,
     turnDeadline: room.turnDeadline,
+    resetsAt: room.resetsAt,
     serverNow: Date.now(),
   };
 }
@@ -300,6 +305,16 @@ function gameView(room: Room, id: string) {
 function broadcastGame(room: Room): void {
   const g = room.game;
   if (!g) return;
+  // Keep the game's who-was-here list current: seats (human or computer) and watchers alike.
+  syncParticipants(
+    g,
+    room.slots.flatMap((sl): RosterEntry[] => {
+      const o = sl.occupant;
+      if (!o) return [];
+      if (o.observer) return [{ name: o.name, kind: 'observer' }];
+      return [{ name: o.name, kind: o.isBot ? 'computer' : 'human', suspectId: o.suspectId }];
+    }),
+  );
   // Note each fresh roll: clients now play the dice animation, so bots hold off until it's done.
   if ((g.rollSeq ?? 0) !== (room.lastRollSeq ?? 0)) {
     room.lastRollSeq = g.rollSeq ?? 0;
@@ -358,7 +373,12 @@ function progress(room: Room): void {
   broadcastGame(room);
   emitChat(room);
   maybeAutoSave(room); // snapshot to browsers after each completed round
-  if (g.phase === 'ended' && room.isPublic) schedulePublicReset(); // the next public lobby forms shortly
+  if (g.phase === 'ended' && room.isPublic && !room.resetsAt) {
+    // File this game in the public history (participants were just synced by broadcastGame).
+    recordPublicGame(viewFor(g, ''), `${room.code}-${g.stats?.startedAt ?? Date.now()}`);
+    schedulePublicReset(); // the next public lobby forms once the details screen has had its 90s
+    broadcastGame(room); // …and everyone gets the countdown right away
+  }
   if (g.phase !== 'play') return;
 
   const sg = g.currentSuggestion;
@@ -561,7 +581,8 @@ function cleanDice(p: Partial<SetDicePayload> | undefined): DiceStyle | undefine
 // One public room always exists. Its lobby runs a server-side clock; when it hits zero the game
 // starts with whoever is seated (computers fill the rest). When that game ends, a fresh lobby forms
 // after a short pause and everyone still connected is carried across.
-const PUBLIC_RESET_DELAY = 60_000;
+// After a public game ends, the details screen stays up this long before the next lobby forms.
+const PUBLIC_RESET_DELAY = 90_000;
 const PUBLIC_DROP_GRACE = 60_000; // a public player who disconnects gets this long to come back
 let publicStartTimer: NodeJS.Timeout | undefined;
 let publicResetTimer: NodeJS.Timeout | undefined;
@@ -608,6 +629,8 @@ function startPublicGame(): void {
 
 function schedulePublicReset(): void {
   if (publicResetTimer) return;
+  const ending = getPublicRoom();
+  if (ending) ending.resetsAt = Date.now() + PUBLIC_RESET_DELAY;
   publicResetTimer = setTimeout(() => {
     publicResetTimer = undefined;
     const room = resetPublicRoom();
@@ -763,6 +786,11 @@ function nameOf(room: Room, id: string): string {
 }
 
 io.on('connection', (socket) => {
+  // The title screen's "Statistics": the public table's last games and all-time numbers.
+  socket.on(SOCKET_EVENTS.PUBLIC_STATS, (_p: unknown, ack?: (p: PublicStatsPayload) => void) => {
+    ack?.({ stats: getPublicStats() });
+  });
+
   const register = (clientId: string) => {
     socketClient.set(socket.id, clientId);
     socket.join(clientId); // per-player address that survives reconnects

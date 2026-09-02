@@ -3,6 +3,7 @@ import type { GameState } from '../game';
 import { type RNG, shuffle } from '../rng';
 import { activePlayers, clone, currentPlayerId, log, requirePlayer } from './util';
 import { concludeTurn } from './turn';
+import { noteAccusation, noteGameEnd } from './stats';
 
 export interface AccusationOutcome {
   state: GameState;
@@ -29,6 +30,7 @@ export function makeAccusation(
   if (currentPlayerId(s) !== accuserId) throw new Error('Not your turn.');
 
   const accuser = requirePlayer(s, accuserId);
+  noteAccusation(s, accuserId);
   const correct =
     s.envelope.suspectId === suspectId &&
     s.envelope.weaponId === weaponId &&
@@ -54,6 +56,7 @@ export function makeAccusation(
   if (correct) {
     s.phase = 'ended';
     s.winnerId = accuserId;
+    noteGameEnd(s);
     log(s, `The accusation is CORRECT. ${accuser.name} has solved the case and wins!`);
     return { state: s, correct: true };
   }
@@ -76,6 +79,7 @@ export function makeAccusation(
   if (remaining.length === 1) {
     s.phase = 'ended';
     s.winnerId = remaining[0].id;
+    noteGameEnd(s);
     log(s, `${remaining[0].name} is the last detective standing and wins by default!`);
     return { state: s, correct: false };
   }

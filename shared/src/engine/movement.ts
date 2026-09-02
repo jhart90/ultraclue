@@ -68,11 +68,9 @@ function buildMoveGraph(board: Board): {
   for (const room of Object.values(board.rooms)) {
     for (const e of room.entrances) link(roomNode(room.id), nodeOf(cellMap, e.doorTile));
   }
-  // Between-floor staircases — cellar (Grounds<->Basement) and grand (Ground<->Upper) — are FREE
-  // teleports: land on one and you cross for nothing, keeping your remaining roll to spend on the
-  // far side.
-  if (board.cellarLink.a && board.cellarLink.b) linkFree(nodeOf(cellMap, board.cellarLink.a), nodeOf(cellMap, board.cellarLink.b));
-  if (board.grandLink.a && board.grandLink.b) linkFree(nodeOf(cellMap, board.grandLink.a), nodeOf(cellMap, board.grandLink.b));
+  // Between-floor staircases are FREE teleports: land on a landing tile and you cross for nothing,
+  // keeping your remaining roll to spend on the far side. Each landing tile pairs with one opposite.
+  for (const st of board.stairs) st.a.forEach((t, i) => linkFree(nodeOf(cellMap, t), nodeOf(cellMap, st.b[i])));
 
   return { graph, freeLinks, cellMap };
 }
@@ -101,7 +99,6 @@ function bfs(board: Board, start: Coord, steps: number, blocked: Set<string>): {
     if (isStopNode(cur) && cur !== startNode) continue;
     // Cross a staircase for free — allowed even with no steps left.
     for (const n of freeLinks.get(cur) ?? []) {
-      if (blocked.has(n)) continue;
       if (!dist.has(n)) {
         dist.set(n, d);
         parent.set(n, cur);
@@ -110,7 +107,8 @@ function bfs(board: Board, start: Coord, steps: number, blocked: Set<string>): {
     }
     if (d >= steps) continue;
     for (const n of graph.get(cur) ?? []) {
-      if (!isStopNode(n) && blocked.has(n)) continue; // corridor occupied by another piece
+      // Other pieces never bar the way: you squeeze past a pawn standing in a corridor, you just
+      // cannot end your move on its tile (reachableTiles filters those out).
       if (!dist.has(n)) {
         dist.set(n, d + 1);
         parent.set(n, cur);
@@ -121,10 +119,12 @@ function bfs(board: Board, start: Coord, steps: number, blocked: Set<string>): {
   return { graph, cellMap, startNode, dist, parent };
 }
 
-/** Shortest dice-step count from one room to another over the collapsed move graph (you can't pass
- *  through a room or elevator). Infinity if unreachable without an elevator ride. For tests/tuning. */
-export function roomToRoomDistance(board: Board, aRoomId: string, bRoomId: string): number {
-  const { graph } = board === BOARD ? CACHE : buildMoveGraph(board);
+/** Shortest dice-step count from one room to another over the collapsed move graph, staircases
+ *  free, the elevator never walked through. With `passThroughRooms` false the route may not cross a
+ *  third room either (the "direct" distance the 4-step rule is measured on). Infinity if unreachable
+ *  without an elevator ride. For tests/tuning. */
+export function roomToRoomDistance(board: Board, aRoomId: string, bRoomId: string, passThroughRooms = true): number {
+  const { graph, freeLinks } = board === BOARD ? CACHE : buildMoveGraph(board);
   const start = roomNode(aRoomId);
   const target = roomNode(bRoomId);
   const dist = new Map<string, number>([[start, 0]]);
@@ -132,7 +132,13 @@ export function roomToRoomDistance(board: Board, aRoomId: string, bRoomId: strin
   while (queue.length) {
     const cur = queue.shift()!;
     const d = dist.get(cur)!;
-    if (isStopNode(cur) && cur !== start) continue; // rooms/elevators end a move — can't pass through
+    if (cur !== start && (isStopNode(cur) || (!passThroughRooms && isRoomNode(cur)))) continue;
+    for (const n of freeLinks.get(cur) ?? []) {
+      if (!dist.has(n)) {
+        dist.set(n, d);
+        queue.unshift(n);
+      }
+    }
     for (const n of graph.get(cur) ?? []) {
       if (!dist.has(n)) {
         dist.set(n, d + 1);
@@ -203,6 +209,7 @@ export function reachableTiles(board: Board, start: Coord, steps: number, blocke
   const out: Coord[] = [];
   for (const [node, d] of dist) {
     if (node === startNode || d === 0) continue;
+    if (blocked.has(node)) continue; // another piece is standing on this corridor tile
     if (isRoomNode(node)) {
       const roomId = node.slice('room:'.length);
       for (const t of board.rooms[roomId].tiles) out.push({ x: t.x, y: t.y });

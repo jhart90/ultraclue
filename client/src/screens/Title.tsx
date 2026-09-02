@@ -68,6 +68,9 @@ export function Title() {
           <button className="btn btn--ghost" onClick={() => goto('gallery')}>
             Browse the Cards
           </button>
+          <button className="btn btn--ghost" onClick={() => goto('stats')}>
+            Statistics
+          </button>
         </div>
       )}
 

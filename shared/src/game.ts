@@ -126,6 +126,46 @@ export interface Announcement {
   correct?: boolean; // accusations only
 }
 
+/** What one player did over the course of a game. */
+export interface PlayerStats {
+  turns: number;
+  /** Corridor tiles walked (staircases are free; lifts and secret passages don't count). */
+  tiles: number;
+  /** Distinct rooms this player has stood in. */
+  roomsVisited: string[];
+  suggestions: number;
+  /** Times this player disproved someone else's suggestion. */
+  reveals: number;
+  accusations: number;
+}
+
+/** Someone who took part in a game at any point: a dealt human, a computer seat, or a watcher. */
+export interface Participant {
+  name: string;
+  kind: 'human' | 'computer' | 'observer';
+  /** The character played (players only). */
+  suspectId?: string;
+  joinedAt: number;
+  /** Set once they left, dropped, or were replaced by a computer. */
+  leftAt?: number;
+}
+
+/** Running tallies for the end-of-game details screen. */
+export interface GameStats {
+  /** Epoch ms when the game began / ended. */
+  startedAt?: number;
+  endedAt?: number;
+  /** Everyone who played, ran as a computer, or watched, in order of arrival. */
+  participants?: Participant[];
+  turnsPlayed: number;
+  suggestionCount: number;
+  /** How often each suspect / weapon / room card was named in a suggestion. */
+  suspects: Record<string, number>;
+  weapons: Record<string, number>;
+  rooms: Record<string, number>;
+  players: Record<string, PlayerStats>;
+}
+
 export interface GameState {
   code: string;
   phase: Phase;
@@ -141,6 +181,8 @@ export interface GameState {
   currentSuggestion?: Suggestion;
   announcement?: Announcement;
   winnerId?: string;
+  /** Tallies for the details screen (absent on games saved before they were tracked). */
+  stats?: GameStats;
   log: LogEntry[];
   nextLogId: number;
   /** Where each weapon token currently sits: weaponId -> roomId. Updated when a suggestion summons one. */
@@ -216,6 +258,10 @@ export interface GameView {
   /** Only present once the game has ended. */
   envelope?: Envelope;
   winnerId?: string;
+  /** Game statistics, for the details screen once the game has ended. */
+  stats?: GameStats;
+  /** Public games: epoch ms at which the finished game gives way to the next lobby. */
+  resetsAt?: number;
   log: LogEntry[];
   weaponLocations: Record<string, string>;
   // ---- movement ----

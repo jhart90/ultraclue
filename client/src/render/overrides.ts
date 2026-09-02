@@ -30,8 +30,10 @@ export function resolveOverride(cardId: string, type: CardType, title?: string):
   const folder = TYPE_FOLDER[type];
   const needles = [`/overrides/${folder}/${cardId}.`];
   if (title) needles.push(`/overrides/${folder}/${slug(title)}.`);
+  // Case-insensitive so art dropped in as `Boat_House.webp` still matches the slug `boat_house`.
   for (const [path, url] of Object.entries(overrideUrls)) {
-    if (needles.some((n) => path.includes(n))) return url;
+    const lower = path.toLowerCase();
+    if (needles.some((n) => lower.includes(n.toLowerCase()))) return url;
   }
   return undefined;
 }

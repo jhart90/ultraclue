@@ -125,6 +125,139 @@ function roomOutline(tiles: Coord[]): string {
 
 type TipFn = (t: { x: number; y: number; text: string } | null) => void;
 
+/** Hover helpers shared by the staircase graphics. */
+function tipProps(label: string | undefined, onTip: TipFn | undefined) {
+  return label && onTip
+    ? {
+        style: { cursor: 'help' as const },
+        onMouseEnter: (e: React.MouseEvent) => onTip({ x: e.clientX, y: e.clientY, text: label }),
+        onMouseMove: (e: React.MouseEvent) => onTip({ x: e.clientX, y: e.clientY, text: label }),
+        onMouseLeave: () => onTip(null),
+      }
+    : {};
+}
+
+/** Mahogany tread colour: deep red-brown, a touch lighter towards the ends of a flight so the middle
+ *  reads as the drop. `t` is 0 at the middle of the flight and 1 at either end. */
+const mahogany = (t: number, base = 20) => `hsl(12 52% ${base + t * 9}%)`;
+
+/** A straight flight of stairs drawn as ONE piece across the gap between two sections: it starts on
+ *  the landing tiles of one floor, spans the void, and ends on the landing tiles of the other, with
+ *  mahogany treads all the way. `carpet` lays a red velvet runner down the middle, held by brass
+ *  stair rods (the grand staircase). */
+function StairRun({ a, b, label, carpet, onTip }: { a: Coord[]; b: Coord[]; label?: string; carpet?: boolean; onTip?: TipFn }) {
+  const tiles = [...a, ...b];
+  const minX = Math.min(...tiles.map((t) => t.x));
+  const maxX = Math.max(...tiles.map((t) => t.x));
+  const minY = Math.min(...tiles.map((t) => t.y));
+  const maxY = Math.max(...tiles.map((t) => t.y));
+  const x = minX * TS + 2;
+  const y = minY * TS + 3;
+  const w = (maxX - minX + 1) * TS - 4;
+  const h = (maxY - minY + 1) * TS - 6;
+  const treadW = 7;
+  const n = Math.floor((w - 4) / treadW);
+  const treads = Array.from({ length: n }, (_, i) => i);
+  const mid = (n - 1) / 2;
+  const tx = (i: number) => x + 2 + i * treadW;
+  const runInset = Math.max(4, Math.round(h * 0.2)); // wood showing either side of the runner
+  return (
+    <g {...tipProps(label, onTip)}>
+      {/* stringers */}
+      <rect x={x} y={y} width={w} height={h} rx="3" fill="#2a120c" stroke="#5a2a1a" strokeWidth="1.2" />
+      {/* mahogany treads */}
+      {treads.map((i) => (
+        <rect key={i} x={tx(i)} y={y + 3} width={treadW - 1} height={h - 6} fill={mahogany(Math.abs(i - mid) / Math.max(1, mid))} />
+      ))}
+      {/* wood grain: a few faint lines running along the flight */}
+      {[0.3, 0.55, 0.78].map((f) => (
+        <line key={f} x1={x + 2} y1={y + 3 + (h - 6) * f} x2={x + w - 2} y2={y + 3 + (h - 6) * f + 1.5} stroke="rgba(255,190,150,0.10)" strokeWidth="0.8" />
+      ))}
+      {/* nosings */}
+      {treads.map((i) => (
+        <line key={`n${i}`} x1={tx(i)} y1={y + 3} x2={tx(i)} y2={y + h - 3} stroke="rgba(0,0,0,0.55)" strokeWidth="0.9" />
+      ))}
+      {treads.map((i) => (
+        <line key={`h${i}`} x1={tx(i) + 1} y1={y + 3} x2={tx(i) + 1} y2={y + h - 3} stroke="rgba(255,170,120,0.18)" strokeWidth="0.6" />
+      ))}
+      {carpet && (
+        <>
+          {/* red velvet runner down the middle of the flight */}
+          <rect x={x + 1.5} y={y + runInset} width={w - 3} height={h - runInset * 2} fill="#8e1526" />
+          {treads.map((i) => (
+            <rect key={`c${i}`} x={tx(i)} y={y + runInset} width={treadW - 1} height={h - runInset * 2} fill={`hsl(350 68% ${24 + (Math.abs(i - mid) / Math.max(1, mid)) * 8}%)`} />
+          ))}
+          {/* the fold of the carpet over each nosing, and the brass rod holding it */}
+          {treads.map((i) => (
+            <line key={`cf${i}`} x1={tx(i)} y1={y + runInset} x2={tx(i)} y2={y + h - runInset} stroke="rgba(40,0,10,0.55)" strokeWidth="1" />
+          ))}
+          {treads.map((i) => (
+            <line key={`rod${i}`} x1={tx(i) + 1.2} y1={y + runInset - 1} x2={tx(i) + 1.2} y2={y + h - runInset + 1} stroke="#e7c66a" strokeWidth="0.9" opacity="0.85" />
+          ))}
+          {/* velvet sheen along the centre line */}
+          <rect x={x + 1.5} y={y + h / 2 - 2} width={w - 3} height={4} fill="rgba(255,120,140,0.10)" />
+        </>
+      )}
+      {/* polished mahogany handrails with a brass top */}
+      <line x1={x + 1} y1={y + 1.5} x2={x + w - 1} y2={y + 1.5} stroke="#3c1a10" strokeWidth="2.6" strokeLinecap="round" />
+      <line x1={x + 1} y1={y + h - 1.5} x2={x + w - 1} y2={y + h - 1.5} stroke="#3c1a10" strokeWidth="2.6" strokeLinecap="round" />
+      <line x1={x + 1} y1={y + 1.2} x2={x + w - 1} y2={y + 1.2} stroke="#c9a85a" strokeWidth="0.8" strokeLinecap="round" />
+      <line x1={x + 1} y1={y + h - 1.2} x2={x + w - 1} y2={y + h - 1.2} stroke="#c9a85a" strokeWidth="0.8" strokeLinecap="round" />
+    </g>
+  );
+}
+
+/** A spiral stair: a round well centred in the gap with wedge-shaped mahogany steps winding round a
+ *  newel post, plus a short tread onto each of the two landing tiles it joins. */
+function SpiralStair({ a, b, label, onTip }: { a: Coord; b: Coord; label?: string; onTip?: TipFn }) {
+  const x0 = cx(a);
+  const x1 = cx(b);
+  const yc = cy(a);
+  const xc = (x0 + x1) / 2;
+  const r = Math.min(TS * 1.35, Math.abs(x1 - x0) / 2 - 2);
+  const steps = 12;
+  const wedges = Array.from({ length: steps }, (_, i) => {
+    const a0 = (i / steps) * Math.PI * 2;
+    const a1 = ((i + 1) / steps) * Math.PI * 2;
+    const px0 = xc + Math.cos(a0) * r;
+    const py0 = yc + Math.sin(a0) * r;
+    const px1 = xc + Math.cos(a1) * r;
+    const py1 = yc + Math.sin(a1) * r;
+    return <path key={i} d={`M${xc} ${yc}L${px0} ${py0}A${r} ${r} 0 0 1 ${px1} ${py1}Z`} fill={mahogany(i / steps, 17)} stroke="rgba(0,0,0,0.55)" strokeWidth="0.8" />;
+  });
+  const left = Math.min(x0, x1);
+  const right = Math.max(x0, x1);
+  const treadLine = (xx: number, k: string) => (
+    <g key={k}>
+      <line x1={xx} y1={yc - TS / 2 + 6} x2={xx} y2={yc + TS / 2 - 6} stroke="rgba(0,0,0,0.55)" strokeWidth="1" />
+      <line x1={xx + 1} y1={yc - TS / 2 + 6} x2={xx + 1} y2={yc + TS / 2 - 6} stroke="rgba(255,170,120,0.2)" strokeWidth="0.6" />
+    </g>
+  );
+  return (
+    <g {...tipProps(label, onTip)}>
+      {/* short straight treads from each landing tile into the well */}
+      <rect x={left - TS / 2 + 2} y={yc - TS / 2 + 4} width={right - left + TS - 4} height={TS - 8} rx="3" fill={mahogany(0.6)} stroke="#5a2a1a" strokeWidth="1" />
+      {[0, 1, 2].map((i) => treadLine(left - TS / 2 + 7 + i * 5, `l${i}`))}
+      {[0, 1, 2].map((i) => treadLine(right + TS / 2 - 7 - i * 5, `r${i}`))}
+      {/* the well */}
+      <circle cx={xc} cy={yc} r={r + 2} fill="#2a120c" stroke="#5a2a1a" strokeWidth="1.6" />
+      <circle cx={xc} cy={yc} r={r + 2} fill="none" stroke="#c9a85a" strokeWidth="0.8" />
+      {wedges}
+      {/* the newel post, turned mahogany with a brass finial */}
+      <circle cx={xc} cy={yc} r={4} fill="#3c1a10" stroke="#1a0a06" strokeWidth="1" />
+      <circle cx={xc} cy={yc} r={1.8} fill="#e7c66a" />
+    </g>
+  );
+}
+
+/** True when a staircase's two landing groups sit on the same rows facing each other across a
+ *  section gap, so it can be drawn as one continuous flight. */
+function spansGap(st: { a: Coord[]; b: Coord[] }): boolean {
+  if (st.a.length !== st.b.length) return false;
+  const dx = Math.abs(st.a[0].x - st.b[0].x);
+  return dx > 1 && dx <= 5 && st.a.every((t, i) => t.y === st.b[i].y);
+}
+
 function Staircase({ at, label, onTip }: { at: Coord; label?: string; onTip?: TipFn }) {
   const x = at.x * TS;
   const y = at.y * TS;
@@ -451,23 +584,31 @@ export function Board({
             return <rect key={`p${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={t.path} stroke="rgba(0,0,0,0.18)" strokeWidth="0.5" />;
           })}
 
-          {/* obstacles — impassable blocks (basement foundations, grounds hedges) pieces walk around */}
+          {/* obstacles — things pieces walk around: lawns and the pond outdoors, hedge walls in the
+              maze, graves in the Cemetery, pillars and blocked stubs indoors */}
           {(() => {
             const obstacles = BOARD.cells.filter((c) => c.type === 'obstacle');
             if (!obstacles.length) return null;
+            const kind = (k: string) => obstacles.filter((c) => c.obstacleKind === k);
+            const FILL: Record<string, string> = { water: '#2a6f8c', lawn: '#3d6b3b', hedge: '#1e3d21', wall: '#4a4356' };
             return (
               <g style={{ pointerEvents: 'none' }}>
-                {obstacles.map((c) => {
-                  const theme = BOARD.sections.find((s) => s.id === c.sectionId)?.theme;
-                  const fill = theme === 'grounds' ? '#2f4a30' : '#322c3a';
-                  return <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={fill} />;
-                })}
-                <path d={roomOutline(obstacles)} fill="none" stroke="#5a5266" strokeWidth="2" strokeLinejoin="round" />
+                {obstacles.map((c) => (
+                  <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={FILL[c.obstacleKind ?? 'wall']} />
+                ))}
+                {kind('water').length > 0 && <path d={roomOutline(kind('water'))} fill="none" stroke="#9fd6e6" strokeWidth="1.5" strokeLinejoin="round" />}
+                {kind('hedge').length > 0 && <path d={roomOutline(kind('hedge'))} fill="none" stroke="#6f9a5a" strokeWidth="2" strokeLinejoin="round" />}
+                {kind('wall').map((c) => (
+                  <rect key={`w${c.x}-${c.y}`} x={c.x * TS + 4} y={c.y * TS + 4} width={TS - 8} height={TS - 8} rx="3" fill="none" stroke="#8a8398" strokeWidth="1.5" />
+                ))}
+                {kind('water').map((c) => (
+                  <path key={`r${c.x}-${c.y}`} d={`M${c.x * TS + 5} ${c.y * TS + TS / 2} q${TS / 4} -3 ${TS / 2} 0 t${TS / 2 - 10} 0`} fill="none" stroke="rgba(190,230,245,0.45)" strokeWidth="1" />
+                ))}
               </g>
             );
           })()}
 
-          {/* central fountain — an impassable obstacle in the Grounds */}
+          {/* the Courtyard fountain — an impassable obstacle in the middle of the Ground Floor */}
           {BOARD.fountain.length > 0 &&
             (() => {
               const xs = BOARD.fountain.map((t) => t.x);
@@ -507,37 +648,31 @@ export function Board({
             );
           })}
 
-          {/* cellar stairs: Grounds <-> Basement link */}
-          <g>
-            <line
-              x1={cx(BOARD.cellarLink.a)}
-              y1={cy(BOARD.cellarLink.a)}
-              x2={cx(BOARD.cellarLink.b)}
-              y2={cy(BOARD.cellarLink.b)}
-              stroke="#9aa0a6"
-              strokeWidth="1.5"
-              strokeDasharray="2 4"
-              opacity="0.3"
-            />
-            <Staircase at={BOARD.cellarLink.a} label="Cellar stairs — down to the Basement" onTip={setTip} />
-            <Staircase at={BOARD.cellarLink.b} label="Cellar stairs — up to the Grounds" onTip={setTip} />
-          </g>
-
-          {/* grand staircase: Ground Floor <-> Upper Floor link */}
-          <g>
-            <line
-              x1={cx(BOARD.grandLink.a)}
-              y1={cy(BOARD.grandLink.a)}
-              x2={cx(BOARD.grandLink.b)}
-              y2={cy(BOARD.grandLink.b)}
-              stroke="#9aa0a6"
-              strokeWidth="1.5"
-              strokeDasharray="2 4"
-              opacity="0.3"
-            />
-            <Staircase at={BOARD.grandLink.a} label="Grand staircase — up to the Upper Floor" onTip={setTip} />
-            <Staircase at={BOARD.grandLink.b} label="Grand staircase — down to the Ground Floor" onTip={setTip} />
-          </g>
+          {/* staircases between sections: each landing tile is a free hop to its twin. Flights whose
+              landings face each other across a gap are drawn as one continuous staircase bridging the
+              floors (the Clock Tower's as a spiral); the rest get a marker at each end. */}
+          {BOARD.stairs.map((st) => {
+            const name = (id: string) => BOARD.sections.find((s) => s.id === id)?.title ?? id;
+            const label = `${st.title} — ${name(st.from)} ↔ ${name(st.to)}`;
+            if (spansGap(st)) {
+              return st.id === 'stairs-spiral' ? (
+                <SpiralStair key={st.id} a={st.a[0]} b={st.b[0]} label={label} onTip={setTip} />
+              ) : (
+                <StairRun key={st.id} a={st.a} b={st.b} label={label} carpet={st.id === 'stairs-grand'} onTip={setTip} />
+              );
+            }
+            return (
+              <g key={st.id}>
+                <line x1={cx(st.a[0])} y1={cy(st.a[0])} x2={cx(st.b[0])} y2={cy(st.b[0])} stroke="#9aa0a6" strokeWidth="1.5" strokeDasharray="2 4" opacity="0.3" />
+                {st.a.map((t, i) => (
+                  <Staircase key={`a${i}`} at={t} label={`${st.title} — to the ${name(st.to)}`} onTip={setTip} />
+                ))}
+                {st.b.map((t, i) => (
+                  <Staircase key={`b${i}`} at={t} label={`${st.title} — to the ${name(st.from)}`} onTip={setTip} />
+                ))}
+              </g>
+            );
+          })}
 
           {/* rooms */}
           {Object.values(BOARD.rooms).map((room) => {
@@ -546,7 +681,6 @@ export function Board({
             const t = THEME[theme];
             const title = getCard(room.id)?.title ?? room.id;
             const art = resolveOverride(room.id, 'room', title);
-            const gate = theme === 'grounds' && room.id !== 'room-walk-in-closet';
             // A room whose tiles fill its whole bounding box is a plain rectangle; otherwise it has
             // a notch and must be drawn from its actual tiles so the L-shape shows.
             const isRect = room.tiles.length === (b.w / TS) * (b.h / TS);
@@ -597,9 +731,6 @@ export function Board({
                 <text x={cxr} y={cyr - bubbleH / 2 - 3} textAnchor="middle" fontSize="13" style={{ pointerEvents: 'none' }}>
                   {EMOJI[room.id] ?? ''}
                 </text>
-                {room.entrances.map((e, i) => (
-                  <Door key={i} rt={e.roomTile} dt={e.doorTile} gate={gate} />
-                ))}
                 {/* room name, in a white bubble */}
                 <g style={{ pointerEvents: 'none' }}>
                   <rect x={cxr - bubbleW / 2} y={cyr - bubbleH / 2} width={bubbleW} height={bubbleH} rx={bubbleH / 2} fill="#f4efe1" stroke="#2a2018" strokeWidth="1" />
@@ -609,6 +740,14 @@ export function Board({
                 </g>
               </g>
             );
+          })}
+
+          {/* doors, drawn above every room outline so a connecting door between two rooms is never
+              hidden under the neighbour's border */}
+          {Object.values(BOARD.rooms).flatMap((room) => {
+            const theme = BOARD.sections.find((s) => s.id === room.sectionId)?.theme ?? 'ground-floor';
+            const gate = theme === 'grounds';
+            return room.entrances.map((e, i) => <Door key={`${room.id}-${i}`} rt={e.roomTile} dt={e.doorTile} gate={gate} />);
           })}
 
           {/* weapon tokens, grouped by their current room (a suggestion summons them) */}
@@ -642,10 +781,8 @@ export function Board({
 
           {/* secret-passage staircases */}
           {BOARD.shortcuts.flatMap((sc) => {
-            const aLabel =
-              sc.kind === 'room' ? `Secret passage to the ${getCard(sc.bRoomId!)?.title ?? 'unknown'}` : 'Secret passage';
-            const bLabel =
-              sc.kind === 'room' ? `Secret passage to the ${getCard(sc.aRoomId!)?.title ?? 'unknown'}` : 'Secret passage';
+            const aLabel = `${sc.story} — secret passage to the ${getCard(sc.bRoomId)?.title ?? 'unknown'}`;
+            const bLabel = `${sc.story} — secret passage to the ${getCard(sc.aRoomId)?.title ?? 'unknown'}`;
             return [
               <Staircase key={`${sc.id}a`} at={sc.a} label={aLabel} onTip={setTip} />,
               <Staircase key={`${sc.id}b`} at={sc.b} label={bLabel} onTip={setTip} />,

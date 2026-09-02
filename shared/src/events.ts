@@ -1,5 +1,6 @@
 import type { SlotStatus, GameView, BotDifficulty, BotSpeed } from './game';
 import type { LobbyView, ChatMsg } from './lobby';
+import type { PublicStats } from './publicStats';
 import type { Coord } from './data/board';
 
 // The socket protocol shared by client and server. Every client->server intent and
@@ -43,6 +44,7 @@ export const SOCKET_EVENTS = {
   SET_ACCUSING: 'setAccusing', // a player opened/closed the accusation picker (warn the table)
   SET_NOTES: 'setNotes', // client pushes its Detective Notes so they ride along in every save
   SET_DICE: 'setDice', // a human picks the colours of their dice
+  PUBLIC_STATS: 'publicStats', // ask for the public table's history + all-time numbers (answered via ack)
 
   // --- server -> client ---
   YOU_ARE: 'youAre',
@@ -58,6 +60,10 @@ export const SOCKET_EVENTS = {
 export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
 
 // ---- payloads ----------------------------------------------------------------------------
+
+export interface PublicStatsPayload {
+  stats: PublicStats;
+}
 
 export interface HelloPayload {
   name: string;

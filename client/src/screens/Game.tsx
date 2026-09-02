@@ -10,7 +10,8 @@ import { Board, WALK_STEP_MS } from '../components/Board';
 import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
 import { DetectiveNotes } from '../components/DetectiveNotes';
-import { SelectModal, RevealPanel, NoEvidencePanel, EndScreen } from '../components/SuggestPanels';
+import { SelectModal, RevealPanel, NoEvidencePanel } from '../components/SuggestPanels';
+import { EndScreen } from '../components/EndScreen';
 import { StatusModal, AccusationFlow, AccusingModal, type StatusButton } from '../components/GamePopups';
 import { soundEnabled, setSoundEnabled } from '../util/sound';
 import { contrastInk } from '../render/colorUtils';
@@ -582,7 +583,7 @@ export function Game() {
         </div>
       )}
 
-      {showEnd && <EndScreen game={game} myId={myId} onLeave={leave} />}
+      {showEnd && <EndScreen game={game} myId={myId} serverOffset={serverOffset} onLeave={leave} />}
 
       {/* The table waits indefinitely for a dropped human; the host can replace them with a bot. */}
       {blockingPlayer && (

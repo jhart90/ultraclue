@@ -7,3 +7,4 @@ export * from './lobby';
 export * from './dice';
 export * from './rng';
 export * from './engine';
+export * from './publicStats';

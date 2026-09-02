@@ -3,6 +3,7 @@ import type { Envelope, GameState, Player } from '../game';
 import { type RNG, shuffle, pick } from '../rng';
 import { log } from './util';
 import { beginTurn, startTileOf } from './turn';
+import { newStats, syncParticipants } from './stats';
 
 /** Pick the hidden solution: one random suspect, weapon, and room. */
 export function buildEnvelope(rng: RNG): Envelope {
@@ -65,7 +66,13 @@ export function startGame(code: string, lobbyPlayers: Player[], rng: RNG): GameS
     nextLogId: 1,
     weaponLocations,
     turnPhase: 'awaitRoll',
+    stats: newStats(players.map((p) => p.id)),
   };
+  syncParticipants(
+    state,
+    players.map((p) => ({ name: p.name, kind: p.isBot ? ('computer' as const) : ('human' as const), suspectId: p.suspectId })),
+    state.stats!.startedAt,
+  );
 
   log(state, 'The CLASSIFIED envelope is sealed. The cards are dealt. The investigation begins.');
   const first = players.find((p) => p.id === state.turnOrder[0])!;

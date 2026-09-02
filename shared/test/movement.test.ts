@@ -62,7 +62,7 @@ describe('movement', () => {
     expect(() => moveTo(s, 'p2', activeReachable(s)[0])).toThrow(); // not p2's turn
   });
 
-  it('treats corridor cells occupied by other pieces as impassable', () => {
+  it('lets a piece squeeze past another pawn in a corridor but not stop on its tile', () => {
     const s = newGame();
     const steps = (s.lastRoll![0] + s.lastRoll![1]);
     const open = reachableTiles(BOARD, s.players[0].position, steps, new Set());
@@ -70,7 +70,12 @@ describe('movement', () => {
     if (!corridorTarget) return; // all reachable were rooms; nothing to assert
     const blocked = blockedCells(BOARD, [corridorTarget]);
     const withBlock = reachableTiles(BOARD, s.players[0].position, steps, blocked);
+    // the occupied tile itself is never a destination…
     expect(withBlock.some((t) => coordKey(t) === coordKey(corridorTarget))).toBe(false);
+    // …but nothing beyond it is cut off: every other destination is still reachable
+    const before = new Set(open.map(coordKey));
+    before.delete(coordKey(corridorTarget));
+    expect(new Set(withBlock.map(coordKey))).toEqual(before);
   });
 
   it('only lets an in-room player roll via rollAndMove (not the auto-roll path)', () => {
@@ -80,8 +85,9 @@ describe('movement', () => {
   });
 
   it('between-floor staircases are a free teleport: from one landing, a roll of 1 reaches a tile next to the far landing', () => {
-    const a = BOARD.cellarLink.a; // Grounds landing
-    const b = BOARD.cellarLink.b; // Basement landing
+    const cellar = BOARD.stairs.find((st) => st.id === 'stairs-cellar')!;
+    const a = cellar.a[0]; // Grounds landing
+    const b = cellar.b[0]; // Basement landing
     const reach = new Set(reachableTiles(BOARD, a, 1, new Set()).map(coordKey));
     const ortho = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
     const bNeighbour = ortho

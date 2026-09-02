@@ -50,6 +50,8 @@ export interface Room {
   accusingId?: string;
   /** announcement.seq of a winning accusation already handled, so its delayed reveal fires once. */
   winAnnounced?: number;
+  /** Public room: epoch ms when the finished game hands over to the next lobby (details screen countdown). */
+  resetsAt?: number;
   /** The single always-on public room (code PUBLIC_ROOM_CODE): never deleted, every seat a computer
    *  until a human takes it, host = longest-tenured human, game auto-starts at `startsAt`. */
   isPublic?: boolean;

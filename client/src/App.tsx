@@ -3,6 +3,7 @@ import { Title } from './screens/Title';
 import { Lobby } from './screens/Lobby';
 import { Game } from './screens/Game';
 import { Gallery } from './screens/Gallery';
+import { StatsScreen } from './screens/StatsScreen';
 import { SeatPicker } from './components/SeatPicker';
 
 export function App() {
@@ -17,6 +18,8 @@ export function App() {
         return <Game />;
       case 'gallery':
         return <Gallery />;
+      case 'stats':
+        return <StatsScreen />;
       default:
         return <Title />;
     }

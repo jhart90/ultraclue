@@ -1,0 +1,288 @@
+/* End-of-game details screen. Sits in the same transparent backdrop as the other pop-ups (centred on
+   the map, stops before the chat) but at full size, scrolling inside itself. */
+.end {
+  width: min(980px, 100%);
+  /* leave the turn pill along the top edge uncovered */
+  margin-top: 2.4rem;
+  max-height: calc(100vh - 4.6rem);
+  display: flex;
+  flex-direction: column;
+  background: #181426;
+  border: 2px solid var(--accent, #c8a24a);
+  border-radius: 14px;
+  overflow: hidden;
+  font-family: 'Georgia', serif;
+  color: #e8e2f2;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  animation: uc-pop 0.18s ease;
+}
+
+.end__banner {
+  position: relative;
+  padding: 1.1rem 1.4rem 1rem;
+  text-align: center;
+  border-bottom: 2px solid var(--accent, #c8a24a);
+}
+.end__confetti {
+  position: absolute;
+  left: 1rem;
+  top: 0.6rem;
+  font-size: 2rem;
+  opacity: 0.9;
+}
+.end__headline {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.end__sub {
+  margin-top: 0.25rem;
+  font-size: 0.95rem;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.end__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.9rem 1.2rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.end__section {
+  border: 1px solid rgba(200, 162, 74, 0.25);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem 0.8rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+.end__sectiontitle {
+  color: var(--accent, #c8a24a);
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 0.55rem;
+}
+
+/* the three envelope cards, at 60% so the whole screen fits without scrolling on a laptop */
+.end__cards {
+  display: flex;
+  justify-content: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  zoom: 0.6;
+}
+
+.end__numbers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.end__number {
+  text-align: center;
+  padding: 0.5rem 0.3rem;
+  border-radius: 8px;
+  background: rgba(200, 162, 74, 0.08);
+}
+.end__numberval {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #fff;
+}
+.end__numberlbl {
+  font-size: 0.75rem;
+  color: var(--muted, #9a93b3);
+  letter-spacing: 0.04em;
+}
+
+.end__tops {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.end__top {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+}
+.end__toptitle {
+  font-weight: 700;
+  color: #f0e9d2;
+  margin-bottom: 0.3rem;
+}
+.end__toplist {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.end__topitem {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #d9d2e8;
+  padding: 0.1rem 0;
+}
+.end__topitem--lead {
+  color: #fff;
+  font-weight: 700;
+}
+.end__topcount {
+  color: var(--accent, #c8a24a);
+  font-variant-numeric: tabular-nums;
+}
+.end__topnone {
+  font-style: italic;
+  color: var(--muted, #9a93b3);
+  font-size: 0.85rem;
+}
+
+.end__honours {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.6rem;
+}
+.end__honour {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+.end__honouricon {
+  font-size: 1.5rem;
+  line-height: 1;
+  padding-top: 0.1rem;
+}
+.end__honourtitle {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #9a93b3);
+}
+.end__honourwho {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.2rem 0;
+}
+.end__honourcount {
+  font-size: 0.85rem;
+  color: #f0e9d2;
+}
+
+.end__name {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.end__tablewrap {
+  overflow-x: auto;
+}
+.end__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.end__table th {
+  text-align: right;
+  font-weight: 400;
+  color: var(--muted, #9a93b3);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-bottom: 1px solid rgba(200, 162, 74, 0.25);
+}
+.end__table th:first-child {
+  text-align: left;
+}
+.end__table td {
+  text-align: right;
+  padding: 0.28rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #d9d2e8;
+}
+.end__cellname {
+  text-align: left !important;
+  white-space: nowrap;
+}
+.end__row--winner td {
+  background: rgba(200, 162, 74, 0.1);
+  color: #fff;
+}
+.end__out {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  color: #d26a6a;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.end__about {
+  padding: 0.5rem 1.2rem 0.55rem;
+  border-top: 1px solid rgba(200, 162, 74, 0.18);
+  font-size: 0.74rem;
+  color: var(--muted, #9a93b3);
+  line-height: 1.45;
+}
+.end__aboutrow {
+  display: flex;
+  gap: 0.6rem;
+}
+.end__aboutlbl {
+  flex: 0 0 5.2rem;
+  color: var(--accent, #c8a24a);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.66rem;
+  padding-top: 0.1rem;
+}
+.end__aboutwho {
+  color: #d9d2e8;
+}
+
+.end__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.2rem;
+  border-top: 1px solid rgba(200, 162, 74, 0.25);
+  background: rgba(0, 0, 0, 0.2);
+}
+.end__countdown {
+  color: #f0e9d2;
+  font-size: 0.95rem;
+}
+.end__countdown strong {
+  color: var(--accent, #c8a24a);
+  font-variant-numeric: tabular-nums;
+}
+.end__countdown--quiet {
+  color: var(--muted, #9a93b3);
+  font-style: italic;
+}
+
+@media (max-width: 820px) {
+  .end__numbers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .end__tops {
+    grid-template-columns: 1fr;
+  }
+  .end__headline {
+    font-size: 1.5rem;
+  }
+  .end__footer {
+    flex-direction: column;
+  }
+}

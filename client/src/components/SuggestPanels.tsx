@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getCard, type GameView } from 'shared';
+import { getCard } from 'shared';
 import { SORTED_SUSPECTS, SORTED_WEAPONS, SORTED_ROOMS } from '../util/cardSort';
 import { highlightChat } from '../util/highlightChat';
 import { Card } from './Card';
@@ -161,27 +161,3 @@ export function NoEvidencePanel({ trio, onPass }: { trio: string[]; onPass: () =
   );
 }
 
-/** Game-over overlay: winner + the revealed envelope. */
-export function EndScreen({ game, myId, onLeave }: { game: GameView; myId: string; onLeave: () => void }) {
-  const winner = game.players.find((p) => p.id === game.winnerId);
-  const won = game.winnerId === myId;
-  const env = game.envelope;
-  return (
-    <div className="sp__backdrop">
-      <div className="sp sp--end">
-        <div className="sp__endtitle">{won ? '🎉 You solved the case!' : highlightChat(`${winner?.name ?? 'Someone'} wins!`)}</div>
-        <div className="sp__hint">The CLASSIFIED envelope contained:</div>
-        <div className="sp__cards">
-          {env &&
-            [env.suspectId, env.weaponId, env.roomId].map((id) => {
-              const card = getCard(id);
-              return card ? <Card key={id} card={card} /> : null;
-            })}
-        </div>
-        <button className="btn btn--primary" onClick={onLeave}>
-          Back to Title
-        </button>
-      </div>
-    </div>
-  );
-}

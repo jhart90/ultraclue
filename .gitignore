@@ -8,3 +8,7 @@ dist/
 
 # local Claude Code tooling (preview launch config, etc.)
 .claude/
+
+# public-table history written by the server at runtime
+server/data/
+/data/

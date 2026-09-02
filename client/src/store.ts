@@ -3,6 +3,7 @@ import {
   SOCKET_EVENTS,
   type ChatMsg,
   type Coord,
+  type BotDifficulty,
   type GameView,
   type LobbyView,
   type Slot,
@@ -131,7 +132,8 @@ interface StoreState {
   createGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
   joinPublic: (name: string) => void;
-  setRoomSettings: (totalPlayers: number) => void;
+  setRoomSettings: (patch: { totalPlayers?: number; botDifficulty?: BotDifficulty }) => void;
+  setBotDifficulty: (index: number, difficulty: BotDifficulty) => void;
   setDice: (color: string, pips: string) => void;
   takeSeat: (index: number) => void;
   joinAsObserver: () => void;
@@ -178,7 +180,8 @@ export const useStore = create<StoreState>((set) => ({
     pendingName = name; // reused on the seat picker if the public game is already running
     socket.emit(SOCKET_EVENTS.JOIN_PUBLIC, { name, clientId: CLIENT_ID });
   },
-  setRoomSettings: (totalPlayers) => socket.emit(SOCKET_EVENTS.SET_ROOM_SETTINGS, { totalPlayers }),
+  setRoomSettings: (patch) => socket.emit(SOCKET_EVENTS.SET_ROOM_SETTINGS, patch),
+  setBotDifficulty: (index, difficulty) => socket.emit(SOCKET_EVENTS.SET_BOT_DIFFICULTY, { index, difficulty }),
   setDice: (color, pips) => {
     try {
       localStorage.setItem('ultraclue-dice', JSON.stringify({ color, pips }));

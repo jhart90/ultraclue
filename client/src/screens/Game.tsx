@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getCard, shortcutDestForRoom, PUBLIC_ROOM_CODE, DICE_ANIM_MS, defaultDice, type Announcement } from 'shared';
+import { getCard, shortcutDestForRoom, PUBLIC_ROOM_CODE, DICE_ANIM_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
 import { useStore, savedDice } from '../store';
 import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
 import { DiceOverlay, type DiceRollShow } from '../components/DiceOverlay';
@@ -594,7 +594,7 @@ export function Game() {
           <div className="game__settings">
             <div className="game__settingshead">Players</div>
             {orderedPlayers.map((p) => {
-              const status = p.isBot ? 'Bot' : p.isHost ? 'Host' : p.connected ? 'Online' : 'Disconnected';
+              const status = p.isBot ? `Bot · ${BOT_DIFFICULTY_LABEL[p.difficulty ?? 'medium']}` : p.isHost ? 'Host' : p.connected ? 'Online' : 'Disconnected';
               const off = !p.isBot && !p.connected;
               return (
                 <div className="game__setrow" key={p.id}>

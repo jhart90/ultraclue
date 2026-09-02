@@ -1,4 +1,4 @@
-import type { SlotStatus, GameView } from './game';
+import type { SlotStatus, GameView, BotDifficulty } from './game';
 import type { LobbyView, ChatMsg } from './lobby';
 import type { Coord } from './data/board';
 
@@ -14,7 +14,8 @@ export const SOCKET_EVENTS = {
   CREATE_GAME: 'createGame',
   JOIN_GAME: 'joinGame',
   JOIN_PUBLIC: 'joinPublic', // join the always-on public room (no code): take a seat, or pick one mid-game
-  SET_ROOM_SETTINGS: 'setRoomSettings', // host adjusts the room's settings (public room: total players)
+  SET_ROOM_SETTINGS: 'setRoomSettings', // host adjusts the room's settings (table size, computer difficulty)
+  SET_BOT_DIFFICULTY: 'setBotDifficulty', // host changes one computer seat's difficulty
   REJOIN: 'rejoin', // reconnect to an existing seat after a refresh/drop
   SET_SLOT: 'setSlot',
   SET_OBSERVER: 'setObserver', // a human toggles watch-only mode for their own seat
@@ -83,7 +84,12 @@ export interface JoinPublicPayload {
   clientId: string;
 }
 export interface SetRoomSettingsPayload {
-  totalPlayers: number;
+  totalPlayers?: number;
+  botDifficulty?: BotDifficulty;
+}
+export interface SetBotDifficultyPayload {
+  index: number; // seat index of the computer
+  difficulty: BotDifficulty;
 }
 export interface SetSlotPayload {
   index: number;

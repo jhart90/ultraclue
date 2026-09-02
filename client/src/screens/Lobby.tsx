@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { getCard, MIN_PLAYERS, type Slot, type SlotStatus } from 'shared';
+import { getCard, MIN_PLAYERS, DEFAULT_BOT_DIFFICULTY, type Slot, type SlotStatus } from 'shared';
+import { DifficultyPicker } from '../components/DifficultyPicker';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
@@ -52,6 +53,8 @@ export function Lobby() {
   const pickSuspect = useStore((s) => s.pickSuspect);
   const sendChat = useStore((s) => s.sendChat);
   const startGame = useStore((s) => s.startGame);
+  const setRoomSettings = useStore((s) => s.setRoomSettings);
+  const setBotDifficulty = useStore((s) => s.setBotDifficulty);
   const leave = useStore((s) => s.leave);
 
   const [picking, setPicking] = useState(false);
@@ -67,6 +70,8 @@ export function Lobby() {
   const playerCount = lobby.slots.filter((s) => s.occupant && !s.occupant.observer).length;
   const observerCount = lobby.slots.filter((s) => s.occupant?.observer).length;
   const canStart = amHost && playerCount >= MIN_PLAYERS;
+  const botDifficulty = lobby.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
+  const botCount = lobby.slots.filter((s) => s.occupant?.isBot).length;
 
   // Only other humans' characters are off-limits; a computer's character can be swapped for yours.
   const takenByOthers = new Set(
@@ -112,6 +117,23 @@ export function Lobby() {
         </div>
       </header>
 
+      <div className="lobby__settings">
+        <span className="lobby__settingslabel">Computers</span>
+        <DifficultyPicker
+          value={botDifficulty}
+          readOnly={!amHost}
+          onChange={(d) => setRoomSettings({ botDifficulty: d })}
+          title="Difficulty for every computer seat (each seat can still be changed on its own)"
+        />
+        <span className="lobby__settingsnote">
+          {amHost
+            ? botCount
+              ? 'Applies to every computer; change one on its seat below.'
+              : 'Set a seat to Bot to add a computer player.'
+            : 'The host chooses how well the computers play.'}
+        </span>
+      </div>
+
       <div className="lobby__body">
         <div className="lobby__seats">
           {lobby.slots.map((slot) => {
@@ -149,6 +171,17 @@ export function Lobby() {
                           <button className="seat__pick" onClick={() => setPicking(true)}>
                             Change character
                           </button>
+                        )}
+                        {occ.isBot && (
+                          <div className="seat__diff">
+                            <DifficultyPicker
+                              compact
+                              readOnly={!amHost}
+                              value={occ.difficulty ?? botDifficulty}
+                              onChange={(d) => setBotDifficulty(slot.index, d)}
+                              title="This computer's difficulty"
+                            />
+                          </div>
                         )}
                         {amHost && occ.isBot && (
                           <button className="seat__pick" onClick={() => setSlot(slot.index, 'open')}>

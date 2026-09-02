@@ -50,14 +50,14 @@ export function Title() {
 
       {mode === 'menu' && (
         <div className="title__menu">
-          <button className="btn btn--primary title__start" disabled={!connected} onClick={() => setMode('start')}>
-            Start Game
-          </button>
-          <button className="btn title__public" disabled={!connected} onClick={() => setMode('public')}>
+          <button className="btn btn--primary title__start" disabled={!connected} onClick={() => setMode('public')}>
             Join Public Game
           </button>
           <button className="btn title__join" disabled={!connected} onClick={() => setMode('join')}>
             Join Private Game
+          </button>
+          <button className="btn title__public" disabled={!connected} onClick={() => setMode('start')}>
+            Start Game
           </button>
           {savedMeta && (
             <button className="btn" disabled={!connected} onClick={loadGame} title={`Round ${savedMeta.round} · ${savedMeta.players} players`}>

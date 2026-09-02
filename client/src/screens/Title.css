@@ -18,14 +18,13 @@
   border-radius: 999px;
   letter-spacing: 0.04em;
 }
-/* The Start Game button is the headline action — noticeably larger than the rest. */
+/* The headline action (Join Public Game) — noticeably larger than the rest. */
 .title .btn.title__start {
   font-size: 1.5rem;
   padding: 1rem 2rem;
   letter-spacing: 0.06em;
 }
-/* Join Public Game: the same gold-on-black as the private join, a touch larger — it's the quickest
-   way into a game. */
+/* Start Game (a private table): gold-on-black like the private join, a touch larger. */
 .title .btn.title__public {
   background: #1a1622;
   color: var(--accent, #c8a24a);

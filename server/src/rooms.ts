@@ -10,6 +10,9 @@ import {
   PUBLIC_MAX_PLAYERS,
   PUBLIC_DEFAULT_PLAYERS,
   PUBLIC_ROOM_CODE,
+  BOT_DIFFICULTIES,
+  DEFAULT_BOT_DIFFICULTY,
+  type BotDifficulty,
   type RoomSettings,
   type SlotOccupant,
   type ChatMsg,
@@ -85,14 +88,24 @@ function randomFreeSuspect(slots: Slot[]): string | undefined {
 
 /** A fresh computer occupant for a seat. Bot ids embed the seat index; a seat's previous bot is
  *  always remapped away (to the human who took it) before a new one is minted, so ids stay unique. */
-function botOccupant(room: Pick<Room, 'code' | 'slots'>, index: number): SlotOccupant {
+function botOccupant(room: Pick<Room, 'code' | 'slots' | 'settings'>, index: number): SlotOccupant {
   return {
     id: `bot-${room.code}-${index}`,
     name: `Computer ${index + 1}`,
     isBot: true,
     connected: true,
     suspectId: randomFreeSuspect(room.slots),
+    difficulty: room.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY,
   };
+}
+
+/** The difficulty new computers get in this room. */
+export function roomBotDifficulty(room: Pick<Room, 'settings'>): BotDifficulty {
+  return room.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
+}
+
+function cleanDifficulty(d: unknown): BotDifficulty | undefined {
+  return BOT_DIFFICULTIES.includes(d as BotDifficulty) ? (d as BotDifficulty) : undefined;
 }
 
 // ---- the public room --------------------------------------------------------------------------
@@ -117,7 +130,7 @@ export function getPublicRoom(): Room | undefined {
 }
 
 /** Build the public lobby: `totalPlayers` seats, every one a computer, clock already running. */
-export function createPublicRoom(totalPlayers = PUBLIC_DEFAULT_PLAYERS): Room {
+export function createPublicRoom(totalPlayers = PUBLIC_DEFAULT_PLAYERS, botDifficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY): Room {
   const room: Room = {
     code: PUBLIC_ROOM_CODE,
     hostId: '',
@@ -129,10 +142,10 @@ export function createPublicRoom(totalPlayers = PUBLIC_DEFAULT_PLAYERS): Room {
     suggestionLog: [],
     notes: {},
     isPublic: true,
-    settings: { totalPlayers: clampTotal(totalPlayers) },
+    settings: { totalPlayers: clampTotal(totalPlayers), botDifficulty },
     startsAt: publicStartTime(),
   };
-  for (let i = 0; i < room.settings!.totalPlayers; i++) {
+  for (let i = 0; i < room.settings!.totalPlayers!; i++) {
     room.slots.push({ index: i, status: 'bot', occupant: botOccupant(room, i) });
   }
   rooms.set(room.code, room);
@@ -173,13 +186,25 @@ export function joinPublicLobby(room: Room, id: string, name: string): number {
   return slot.index;
 }
 
-/** Host resizes the public table. Growing appends computer seats; shrinking drops computer seats
- *  from the end, moving any human sitting past the new size into a freed computer seat. */
-export function setRoomSettings(room: Room, requesterId: string, totalPlayers: number): void {
-  if (!room.isPublic) throw new Error('Only the public room has settings.');
+/** Host changes the room's settings. Computer difficulty applies to every computer seat now and to
+ *  any added later (the host can still override one seat with setBotDifficulty). Resizing is public
+ *  only: growing appends computer seats; shrinking drops computer seats from the end, moving any
+ *  human sitting past the new size into a freed computer seat. */
+export function setRoomSettings(
+  room: Room,
+  requesterId: string,
+  patch: { totalPlayers?: number; botDifficulty?: unknown },
+): void {
   if (room.hostId !== requesterId) throw new Error('Only the host can change the settings.');
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
-  const n = clampTotal(totalPlayers);
+  const d = cleanDifficulty(patch.botDifficulty);
+  if (d) {
+    room.settings = { ...(room.settings ?? {}), botDifficulty: d };
+    for (const s of room.slots) if (s.occupant?.isBot) s.occupant.difficulty = d;
+  }
+  if (patch.totalPlayers == null) return;
+  if (!room.isPublic) throw new Error('Only the public table can be resized.');
+  const n = clampTotal(patch.totalPlayers);
   const humans = room.slots.filter((s) => s.occupant && !s.occupant.isBot).length;
   if (n < humans) throw new Error(`${humans} people are already seated — the table can't be smaller than that.`);
   if (n < room.slots.length) {
@@ -200,7 +225,19 @@ export function setRoomSettings(room: Room, requesterId: string, totalPlayers: n
       room.slots.push({ index: i, status: 'bot', occupant: botOccupant(room, i) });
     }
   }
-  room.settings = { totalPlayers: n };
+  room.settings = { ...(room.settings ?? { botDifficulty: DEFAULT_BOT_DIFFICULTY }), totalPlayers: n };
+}
+
+/** Host sets one computer seat's difficulty (lobby or mid-game). */
+export function setBotDifficulty(room: Room, requesterId: string, index: number, difficulty: unknown): void {
+  if (room.hostId !== requesterId) throw new Error('Only the host can change a computer\'s difficulty.');
+  const d = cleanDifficulty(difficulty);
+  if (!d) throw new Error('Unknown difficulty.');
+  const occ = room.slots[index]?.occupant;
+  if (!occ || !occ.isBot) throw new Error('That seat is not a computer.');
+  occ.difficulty = d;
+  const gp = room.game?.players.find((p) => p.id === occ.id);
+  if (gp) gp.difficulty = d;
 }
 
 /** After a public game ends: tear it down and form the next lobby (same table size, clock reset),
@@ -208,11 +245,12 @@ export function setRoomSettings(room: Room, requesterId: string, totalPlayers: n
 export function resetPublicRoom(): Room {
   const old = getPublicRoom();
   const total = old?.settings?.totalPlayers ?? PUBLIC_DEFAULT_PLAYERS;
+  const difficulty = old ? roomBotDifficulty(old) : DEFAULT_BOT_DIFFICULTY;
   const humans = old
     ? old.slots.map((s) => s.occupant).filter((o): o is SlotOccupant => !!o && !o.isBot && o.connected)
     : [];
   rooms.delete(PUBLIC_ROOM_CODE);
-  const room = createPublicRoom(total);
+  const room = createPublicRoom(total, difficulty);
   for (const h of humans) {
     const slot = room.slots.find((s) => s.occupant?.isBot);
     if (!slot?.occupant) break;
@@ -253,6 +291,7 @@ export function createRoom(hostId: string, hostName: string): Room {
     mirroredLogId: 0,
     suggestionLog: [],
     notes: {},
+    settings: { botDifficulty: DEFAULT_BOT_DIFFICULTY },
   };
   rooms.set(room.code, room);
   return room;
@@ -384,12 +423,18 @@ export function disconnectOccupant(id: string, botTakeover = false): Room | unde
   const occ = room.slots.find((s) => s.occupant?.id === id)?.occupant;
   if (occ) {
     occ.connected = false;
-    if (botTakeover) occ.isBot = true;
+    if (botTakeover) {
+      occ.isBot = true;
+      occ.difficulty = roomBotDifficulty(room);
+    }
   }
   const gp = room.game?.players.find((p) => p.id === id);
   if (gp && !gp.eliminated) {
     gp.connected = false;
-    if (botTakeover) gp.isBot = true;
+    if (botTakeover) {
+      gp.isBot = true;
+      gp.difficulty = roomBotDifficulty(room);
+    }
   }
   return room;
 }
@@ -415,10 +460,12 @@ export function bootPlayer(room: Room, requesterId: string, targetId: string): v
   if (occ.isBot) throw new Error('That seat is already a bot.');
   occ.isBot = true;
   occ.connected = true;
+  occ.difficulty = roomBotDifficulty(room);
   const gp = room.game?.players.find((p) => p.id === targetId);
   if (gp && !gp.eliminated) {
     gp.isBot = true;
     gp.connected = true;
+    gp.difficulty = roomBotDifficulty(room);
   }
 }
 
@@ -474,11 +521,11 @@ export function toLobbyView(room: Room): LobbyView {
     slots: room.slots,
     phase: room.phase,
   };
+  view.settings = room.settings ?? { botDifficulty: DEFAULT_BOT_DIFFICULTY };
   if (room.isPublic) {
     view.isPublic = true;
     view.startsAt = room.startsAt;
     view.serverNow = Date.now();
-    view.settings = room.settings;
   }
   return view;
 }
@@ -499,6 +546,7 @@ export function serializeRoom(room: Room): unknown {
     mirroredLogId: room.mirroredLogId,
     suggestionLog: room.suggestionLog ?? [], // bot deductions survive a save/load
     notes: room.notes ?? {}, // every player's notes, so any save carries them all
+    settings: room.settings,
   });
 }
 
@@ -549,6 +597,7 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
     mirroredLogId: saved.mirroredLogId ?? 0,
     suggestionLog: saved.suggestionLog ?? [],
     notes: saved.notes ?? {}, // restore everyone's Detective Notes from the snapshot
+    settings: saved.settings ?? { botDifficulty: DEFAULT_BOT_DIFFICULTY },
   };
   room.game!.code = room.code;
 
@@ -581,12 +630,14 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
     occ.observer = false;
     occ.suspectId = gp.suspectId;
     occ.name = suspectTitle(gp.suspectId) ?? `Computer ${slot.index + 1}`;
+    occ.difficulty = occ.difficulty ?? roomBotDifficulty(room);
   }
   for (const p of room.game!.players) {
     p.isBot = true;
     p.connected = true;
     p.isHost = false;
     p.name = suspectTitle(p.suspectId) ?? p.name;
+    p.difficulty = p.difficulty ?? roomBotDifficulty(room);
   }
 
   rooms.set(room.code, room);
@@ -606,12 +657,14 @@ export function leaveGameAsBot(room: Room, clientId: string): void {
   if (occ) {
     occ.isBot = true;
     occ.connected = true;
+    occ.difficulty = roomBotDifficulty(room);
   }
   const gp = room.game?.players.find((p) => p.id === botId);
   if (gp) {
     gp.isBot = true;
     gp.connected = true;
     gp.isHost = false;
+    gp.difficulty = roomBotDifficulty(room);
   }
   // A public observer seat was appended past the table size just for them — drop it again so the
   // seat list doesn't fill with ghost observers. (Player seats stay: the bot finishes their game.)
@@ -648,6 +701,7 @@ export function takeSeat(room: Room, joinerId: string, name: string, index: numb
     occ.connected = true;
     occ.name = name.trim() || occ.name;
     occ.joinedAt = Date.now();
+    occ.difficulty = undefined;
   }
   if (room.isPublic) electHost(room); // an empty public table makes its first human the host
   const gp = room.game?.players.find((p) => p.id === joinerId);
@@ -655,6 +709,7 @@ export function takeSeat(room: Room, joinerId: string, name: string, index: numb
     gp.isBot = false;
     gp.connected = true;
     gp.isHost = joinerId === room.hostId;
+    gp.difficulty = undefined;
     if (name.trim()) gp.name = name.trim();
     // A seat inherits its character's dice; a returning human's own choice comes via SET_DICE.
   }
@@ -732,6 +787,7 @@ export function startGameInRoom(room: Room, requesterId: string, opts: { force?:
       isHost: o.id === room.hostId,
       connected: o.connected,
       dice: o.dice ?? defaultDice(suspectId),
+      difficulty: o.isBot ? (o.difficulty ?? roomBotDifficulty(room)) : undefined,
       hand: [],
       eliminated: false,
       position: { x: 0, y: 0 }, // real start tile assigned inside startGame()

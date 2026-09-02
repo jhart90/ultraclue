@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getCard, PUBLIC_MIN_PLAYERS, PUBLIC_MAX_PLAYERS } from 'shared';
+import { getCard, PUBLIC_MIN_PLAYERS, PUBLIC_MAX_PLAYERS, DEFAULT_BOT_DIFFICULTY } from 'shared';
+import { DifficultyPicker } from '../components/DifficultyPicker';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
@@ -35,6 +36,7 @@ export function PublicLobby() {
   const pickSuspect = useStore((s) => s.pickSuspect);
   const sendChat = useStore((s) => s.sendChat);
   const setRoomSettings = useStore((s) => s.setRoomSettings);
+  const setBotDifficulty = useStore((s) => s.setBotDifficulty);
   const leave = useStore((s) => s.leave);
 
   const [picking, setPicking] = useState(false);
@@ -53,6 +55,7 @@ export function PublicLobby() {
   const total = lobby.settings?.totalPlayers ?? lobby.slots.length;
   const humans = lobby.slots.filter((s) => s.occupant && !s.occupant.isBot).length;
   const cpus = lobby.slots.filter((s) => s.occupant?.isBot).length;
+  const botDifficulty = lobby.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
   // The server's clock drives the start; correct for our own clock's skew so everyone agrees.
   const remaining = Math.max(0, (lobby.startsAt ?? now) - (now + serverOffset));
   const soon = remaining < 60_000;
@@ -87,7 +90,7 @@ export function PublicLobby() {
         <label>
           Total players
           {amHost ? (
-            <select value={total} onChange={(e) => setRoomSettings(Number(e.target.value))}>
+            <select value={total} onChange={(e) => setRoomSettings({ totalPlayers: Number(e.target.value) })}>
               {TABLE_SIZES.map((n) => (
                 <option key={n} value={n}>
                   {n}
@@ -98,11 +101,20 @@ export function PublicLobby() {
             <strong>{total}</strong>
           )}
         </label>
+        <label>
+          Computers
+          <DifficultyPicker
+            value={botDifficulty}
+            readOnly={!amHost}
+            onChange={(d) => setRoomSettings({ botDifficulty: d })}
+            title="Difficulty for every computer seat (click a seat to change just that one)"
+          />
+        </label>
         <span className="plobby__hostnote">
           {amHost
-            ? 'You are the host — you set the table size. Humans and computers always add up to it.'
+            ? 'You are the host — you set the table size and how well the computers play.'
             : host
-              ? `${host.name} is the host and sets the table size.`
+              ? `${host.name} is the host and sets the table size and computer difficulty.`
               : 'The first human to join becomes the host.'}
         </span>
       </div>
@@ -141,6 +153,15 @@ export function PublicLobby() {
                   {isHostSeat && <span className="tag tag--host">HOST</span>}
                   {isMe && <span className="tag tag--you">YOU</span>}
                   {!occ.isBot && !occ.connected && <span className="tag tag--off">OFFLINE</span>}
+                  {occ.isBot && (
+                    <DifficultyPicker
+                      compact
+                      readOnly={!amHost}
+                      value={occ.difficulty ?? botDifficulty}
+                      onChange={(d) => setBotDifficulty(slot.index, d)}
+                      title="This computer's difficulty"
+                    />
+                  )}
                 </div>
               </div>
             );

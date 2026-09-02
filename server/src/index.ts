@@ -26,14 +26,16 @@ import {
   endTurn,
   passTurn,
   activeReachable,
-  botAccusation,
-  botSuggestion,
   botRevealCard,
-  botMoveTarget,
-  botShouldStay,
-  deduceBotKnowledge,
+  botMind,
+  botDecideAccusation,
+  botDecideSuggestion,
+  botDecideStay,
+  botDecideShortcut,
+  botDecideMove,
+  botDecideFloor,
   botNotesGrid,
-  type BotKnowledge,
+  type BotMind,
   type SuggestionEvent,
   type GameState,
   type CreateGamePayload,
@@ -59,6 +61,7 @@ import {
   type SetRoomSettingsPayload,
   type SetDicePayload,
   type DiceStyle,
+  type SetBotDifficultyPayload,
 } from 'shared';
 import {
   type Room,
@@ -90,6 +93,8 @@ import {
   createPublicRoom,
   joinPublicLobby,
   setRoomSettings,
+  setBotDifficulty,
+  roomBotDifficulty,
   resetPublicRoom,
   electHost,
 } from './rooms';
@@ -169,11 +174,14 @@ function botWait(room: Room): number {
 // Per-room bot memory: rooms each bot has already suggested in (so it explores), and — keyed by
 // `${responderId}|${recipientId}` — which of its own cards it has already shown to each player.
 // (Card deductions live in room.suggestionLog, replayed per-bot; see deductionFor.)
-const botMem = new Map<string, { visited: Map<string, Set<string>>; shown: Map<string, Set<string>> }>();
+const botMem = new Map<
+  string,
+  { visited: Map<string, Set<string>>; shown: Map<string, Set<string>>; stays: Map<string, { room: string; n: number }> }
+>();
 function memFor(room: Room) {
   let m = botMem.get(room.code);
   if (!m) {
-    m = { visited: new Map(), shown: new Map() };
+    m = { visited: new Map(), shown: new Map(), stays: new Map() };
     botMem.set(room.code, m);
   }
   return m;
@@ -189,14 +197,22 @@ function eventsForPlayer(room: Room, playerId: string): SuggestionEvent[] {
     revealedCardId: e.suggesterId === playerId ? e.revealedCardId : undefined,
   }));
 }
-/** A player's full Clue deduction from what they've witnessed (their hand + the suggestion log). */
-function deductionFor(g: GameState, playerId: string, room: Room): BotKnowledge {
-  const hand = getPlayer(g, playerId)?.hand ?? [];
-  return deduceBotKnowledge(playerId, hand, g.turnOrder, eventsForPlayer(room, playerId));
+/** A bot's current understanding of the game, as good as its difficulty allows. */
+function mindFor(g: GameState, playerId: string, room: Room): BotMind {
+  const p = getPlayer(g, playerId);
+  const handCounts = new Map(g.players.map((pl) => [pl.id, pl.hand.length]));
+  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, eventsForPlayer(room, playerId), handCounts);
 }
-/** Cards a bot knows are not in the envelope: everything its deduction places in someone's hand. */
-function ruledOutFor(g: GameState, botId: string, room: Room): Set<string> {
-  return deductionFor(g, botId, room).ruledOut;
+/** The order in which the other players would be asked to disprove this player's suggestion. */
+function responderQueue(g: GameState, suggesterId: string): string[] {
+  const order = g.turnOrder;
+  const start = order.indexOf(suggesterId);
+  const q: string[] = [];
+  for (let k = 1; k < order.length; k++) {
+    const id = order[(start + k) % order.length];
+    if (!getPlayer(g, id)?.eliminated) q.push(id);
+  }
+  return q;
 }
 /** Append a resolved suggestion to the room's log (once), so every bot can deduce from it. */
 function recordSuggestion(room: Room): void {
@@ -225,7 +241,7 @@ function updateBotNotes(room: Room): void {
   if (!g) return;
   for (const p of g.players) {
     if (!p.isBot) continue;
-    const grid = botNotesGrid(deductionFor(g, p.id, room), g.turnOrder);
+    const grid = botNotesGrid(mindFor(g, p.id, room).k, g.turnOrder);
     room.notes[p.id] = JSON.stringify(grid);
   }
 }
@@ -402,19 +418,31 @@ function scheduleBots(room: Room): void {
       return;
     }
     try {
-      const ruled = ruledOutFor(s, cur.id, room);
+      const mind = mindFor(s, cur.id, room);
+      const mem = memFor(room);
       for (let step = 0; step < 4; step++) {
         if (s.turnPhase === 'awaitRoll') {
           const me = getPlayer(s, cur.id);
-          const visited = memFor(room).visited.get(cur.id) ?? new Set<string>();
-          s = botShouldStay(me?.inRoomId, ruled, visited) ? skipMovement(s, cur.id) : rollAndMove(s, cur.id, RNG);
+          const visited = mem.visited.get(cur.id) ?? new Set<string>();
+          const st = mem.stays.get(cur.id);
+          const staysHere = st && st.room === me?.inRoomId ? st.n : 0;
+          if (botDecideShortcut(mind, me?.inRoomId)) {
+            s = takeShortcut(s, cur.id);
+            mem.stays.delete(cur.id);
+          } else if (botDecideStay(mind, me?.inRoomId, staysHere, visited)) {
+            s = skipMovement(s, cur.id);
+            mem.stays.set(cur.id, { room: me!.inRoomId!, n: staysHere + 1 });
+          } else {
+            s = rollAndMove(s, cur.id, RNG);
+            mem.stays.delete(cur.id);
+          }
         } else if (s.turnPhase === 'awaitMove') {
-          const dest = botMoveTarget(activeReachable(s), ruled, RNG);
+          const dest = botDecideMove(mind, activeReachable(s), RNG, responderQueue(s, cur.id));
           if (!dest) break;
           s = moveTo(s, cur.id, dest);
         } else if (s.turnPhase === 'awaitElevator' && s.elevatorRide) {
           const opts = elevatorOptions(s.elevatorRide.fromFloor);
-          s = chooseFloor(s, cur.id, opts[Math.floor(RNG() * opts.length)], RNG);
+          s = chooseFloor(s, cur.id, botDecideFloor(mind, opts, RNG), RNG);
         } else {
           break;
         }
@@ -438,11 +466,11 @@ function scheduleBots(room: Room): void {
         return;
       }
       try {
-        const ruled = ruledOutFor(s2, cur.id, room);
+        const mind = mindFor(s2, cur.id, room);
         const me = getPlayer(s2, cur.id);
 
         if (s2.turnPhase === 'postMove') {
-          const accusation = botAccusation(ruled);
+          const accusation = botDecideAccusation(mind, RNG);
           if (accusation) {
             s2 = makeAccusation(s2, cur.id, accusation.suspectId, accusation.weaponId, accusation.roomId, RNG).state;
             room.game = s2;
@@ -450,7 +478,7 @@ function scheduleBots(room: Room): void {
             return;
           }
           if (me?.inRoomId) {
-            const sugg = botSuggestion(ruled, me.hand, me.inRoomId, RNG);
+            const sugg = botDecideSuggestion(mind, me.inRoomId, responderQueue(s2, cur.id), RNG);
             const visited = memFor(room).visited.get(cur.id) ?? new Set<string>();
             visited.add(me.inRoomId);
             memFor(room).visited.set(cur.id, visited);
@@ -782,9 +810,34 @@ io.on('connection', (socket) => {
     const room = findRoomByOccupant(cid(socket));
     if (!room) return;
     try {
-      setRoomSettings(room, cid(socket), Number(p?.totalPlayers));
-      addChat(room, 'System', `${nameOf(room, cid(socket))} set the table to ${room.settings?.totalPlayers} players.`, true);
+      const before = { ...(room.settings ?? {}) };
+      setRoomSettings(room, cid(socket), {
+        totalPlayers: p?.totalPlayers == null ? undefined : Number(p.totalPlayers),
+        botDifficulty: p?.botDifficulty,
+      });
+      const who = nameOf(room, cid(socket));
+      if (room.settings?.totalPlayers !== before.totalPlayers) {
+        addChat(room, 'System', `${who} set the table to ${room.settings?.totalPlayers} players.`, true);
+      }
+      if (room.settings?.botDifficulty !== before.botDifficulty) {
+        addChat(room, 'System', `${who} set the computers to ${room.settings?.botDifficulty} difficulty.`, true);
+      }
       emitLobby(room);
+      emitChat(room);
+    } catch (err) {
+      emitError(socket, (err as Error).message);
+    }
+  });
+
+  socket.on(SOCKET_EVENTS.SET_BOT_DIFFICULTY, (p: SetBotDifficultyPayload) => {
+    const room = findRoomByOccupant(cid(socket));
+    if (!room) return;
+    try {
+      setBotDifficulty(room, cid(socket), Number(p?.index), p?.difficulty);
+      const occ = room.slots[Number(p?.index)]?.occupant;
+      addChat(room, 'System', `${nameOf(room, cid(socket))} set ${occ?.name ?? 'a computer'} to ${p?.difficulty} difficulty.`, true);
+      emitLobby(room);
+      if (room.game) broadcastGame(room);
       emitChat(room);
     } catch (err) {
       emitError(socket, (err as Error).message);

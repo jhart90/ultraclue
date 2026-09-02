@@ -11,6 +11,17 @@ export const DICE_ANIM_MS = 2600;
 /** Public games: a human on the clock has this long to act before the turn is passed for them. */
 export const PUBLIC_TURN_MS = 90_000;
 
+/** How well a computer player plays. Set per seat by the host; a room-wide default applies to new bots. */
+export type BotDifficulty = 'easy' | 'medium' | 'hard';
+export const BOT_DIFFICULTIES: readonly BotDifficulty[] = ['easy', 'medium', 'hard'];
+export const DEFAULT_BOT_DIFFICULTY: BotDifficulty = 'medium';
+export const BOT_DIFFICULTY_LABEL: Record<BotDifficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+export const BOT_DIFFICULTY_BLURB: Record<BotDifficulty, string> = {
+  easy: 'Short memory, random guesses, and it will gamble on an accusation.',
+  medium: 'Keeps proper notes and only accuses when sure, but probes carelessly.',
+  hard: 'Full deduction, targeted probes, and it heads straight for useful rooms.',
+};
+
 /** A player's dice look: body colour and pip colour (hex). Bots default to their character's colour. */
 export interface DiceStyle {
   color: string;
@@ -39,6 +50,8 @@ export interface Player {
   eliminated: boolean;
   /** Dice colours this player rolls with (shown to everyone during their roll animation). */
   dice?: DiceStyle;
+  /** Computer players only: how well this seat plays. */
+  difficulty?: BotDifficulty;
   /** Current board tile. */
   position: Coord;
   /** Room id if the piece is currently inside a room. */
@@ -129,6 +142,7 @@ export interface PlayerView {
   connected: boolean;
   eliminated: boolean;
   dice?: DiceStyle;
+  difficulty?: BotDifficulty;
   /** How many cards this player holds — never the cards themselves. */
   handCount: number;
   position: Coord;

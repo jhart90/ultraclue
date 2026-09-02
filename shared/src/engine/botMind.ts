@@ -1,0 +1,271 @@
+import { SUSPECTS, WEAPONS, ROOMS, BOARD, getCard } from '../data';
+import type { Coord, FloorId } from '../data/board';
+import { type BotDifficulty, DEFAULT_BOT_DIFFICULTY } from '../game';
+import { type RNG, pick } from '../rng';
+import { roomIdAt, stepsToRooms } from './movement';
+import { shortcutDestForRoom } from './turn';
+import { deduceBotKnowledge, type BotKnowledge, type SuggestionEvent } from './botNotes';
+import { botCandidates, botMoveTarget, botShouldStay, botSuggestion, type BotAccusation, type BotSuggestion } from './bot';
+
+// A computer player's "mind" for one decision: its deduction (as good as its difficulty allows) plus
+// the choices built on it. Three tiers:
+//   hard   — full deduction incl. hand-size counting and confirmed-envelope cards; accuses as soon
+//            as every category is pinned; isolates suspects/weapons as well as rooms; picks probe
+//            pairs by who will have to answer; heads for useful rooms, using shortcuts and choosing
+//            elevator floors by destination.
+//   medium — today's bot: sound deduction, room isolation, random probe pairs, wanders when no room
+//            is in reach. It does at least learn which cards are confirmed in the envelope, so it
+//            stops walking back into the solution room.
+//   easy   — remembers only the last few dozen suggestions, probes at random, never lingers in a
+//            room, and gambles on an accusation once the field looks small.
+
+export interface BotMind {
+  difficulty: BotDifficulty;
+  botId: string;
+  hand: string[];
+  k: BotKnowledge;
+  /** Cards nobody can hold — i.e. confirmed in the envelope (empty for easy bots). */
+  envelope: Set<string>;
+}
+
+const EASY_MEMORY = 30; // suggestions an easy bot keeps in its head
+const EASY_GAMBLE_COMBOS = 6; // easy guesses once (#suspects × #weapons × #rooms) left is this small
+const ALL_IDS = [...SUSPECTS, ...WEAPONS, ...ROOMS].map((c) => c.id);
+
+/** Cards that must be in the envelope: no player (me included) can hold them. */
+function envelopeKnown(k: BotKnowledge, botId: string, playerIds: string[], hand: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const id of ALL_IDS) {
+    if (k.ruledOut.has(id) || hand.includes(id)) continue;
+    if (playerIds.every((p) => p === botId || k.hasnt.get(p)?.has(id))) out.add(id);
+  }
+  return out;
+}
+
+/** Build a bot's current understanding of the game. `handCounts` (cards each player holds) lets a
+ *  hard bot conclude that a player whose whole hand is known holds nothing else. */
+export function botMind(
+  difficulty: BotDifficulty | undefined,
+  botId: string,
+  hand: string[],
+  playerIds: string[],
+  events: SuggestionEvent[],
+  handCounts?: Map<string, number>,
+): BotMind {
+  const d = difficulty ?? DEFAULT_BOT_DIFFICULTY;
+  let evs = d === 'easy' ? events.slice(-EASY_MEMORY) : events;
+  let k = deduceBotKnowledge(botId, hand, playerIds, evs);
+  if (d === 'hard' && handCounts) {
+    // Hand-size counting, fed back as synthetic "passes" until nothing new falls out.
+    for (let guard = 0; guard < 8; guard++) {
+      const extra: SuggestionEvent[] = [];
+      for (const p of playerIds) {
+        const n = handCounts.get(p);
+        const has = k.has.get(p);
+        const hasnt = k.hasnt.get(p);
+        if (n == null || !has || !hasnt || has.size < n) continue;
+        const rest = ALL_IDS.filter((c) => !has.has(c) && !hasnt.has(c));
+        if (rest.length) extra.push({ suggesterId: '', trio: rest, passers: [p] });
+      }
+      if (!extra.length) break;
+      evs = [...evs, ...extra];
+      k = deduceBotKnowledge(botId, hand, playerIds, evs);
+    }
+  }
+  const envelope = d === 'easy' ? new Set<string>() : envelopeKnown(k, botId, playerIds, hand);
+  return { difficulty: d, botId, hand, k, envelope };
+}
+
+/** Rooms still worth visiting to learn about: not held by anyone, not confirmed in the envelope. */
+export function botUnknownRooms(m: BotMind): Set<string> {
+  return new Set(ROOMS.filter((r) => !m.k.ruledOut.has(r.id) && !m.envelope.has(r.id)).map((r) => r.id));
+}
+
+/** Rooms where nobody can answer a suggestion with the room card: ones I hold, or the envelope's.
+ *  Standing there, a bot can isolate a single suspect or weapon per suggestion. */
+export function botProbeRooms(m: BotMind): Set<string> {
+  return new Set(ROOMS.filter((r) => m.hand.includes(r.id) || m.envelope.has(r.id)).map((r) => r.id));
+}
+
+export function botDecideAccusation(m: BotMind, rng: RNG): BotAccusation | null {
+  const c = botCandidates(m.k.ruledOut);
+  if (m.difficulty === 'easy') {
+    if (c.suspects.length === 1 && c.weapons.length === 1 && c.rooms.length === 1) {
+      return { suspectId: c.suspects[0].id, weaponId: c.weapons[0].id, roomId: c.rooms[0].id };
+    }
+    // Feeling lucky: once the field is small, guess rather than keep grinding.
+    const combos = c.suspects.length * c.weapons.length * c.rooms.length;
+    if (combos > 0 && combos <= EASY_GAMBLE_COMBOS) {
+      return { suspectId: pick(c.suspects, rng).id, weaponId: pick(c.weapons, rng).id, roomId: pick(c.rooms, rng).id };
+    }
+    return null;
+  }
+  // Medium/hard: each category pinned either by elimination or by a confirmed envelope card.
+  const one = (cands: { id: string }[]): string | null => {
+    const confirmed = cands.find((x) => m.envelope.has(x.id));
+    if (confirmed) return confirmed.id;
+    return cands.length === 1 ? cands[0].id : null;
+  };
+  const s = one(c.suspects);
+  const w = one(c.weapons);
+  const r = one(c.rooms);
+  return s && w && r ? { suspectId: s, weaponId: w, roomId: r } : null;
+}
+
+/**
+ * What to suggest from `roomId`. `queue` is the order in which the other players will be asked.
+ */
+export function botDecideSuggestion(m: BotMind, roomId: string, queue: string[], rng: RNG): BotSuggestion {
+  const c = botCandidates(m.k.ruledOut);
+  if (m.difficulty === 'easy') {
+    return {
+      suspectId: pick(c.suspects.length ? c.suspects : SUSPECTS, rng).id,
+      weaponId: pick(c.weapons.length ? c.weapons : WEAPONS, rng).id,
+    };
+  }
+  if (m.difficulty === 'medium') return botSuggestion(m.k.ruledOut, m.hand, roomId, rng);
+
+  // ---- hard ----
+  const heldSuspects = m.hand.filter((id) => getCard(id)?.type === 'suspect');
+  const heldWeapons = m.hand.filter((id) => getCard(id)?.type === 'weapon');
+  const roomUnknown = !m.k.ruledOut.has(roomId) && !m.envelope.has(roomId);
+  // Isolate the room: only the room card could be shown.
+  if (roomUnknown && heldSuspects.length && heldWeapons.length) {
+    return { suspectId: pick(heldSuspects, rng), weaponId: pick(heldWeapons, rng) };
+  }
+  // In a room nobody can show, isolate a suspect or a weapon with one of my own cards.
+  const roomSafe = m.hand.includes(roomId) || m.envelope.has(roomId);
+  const openSus = c.suspects.filter((x) => !m.envelope.has(x.id));
+  const openWea = c.weapons.filter((x) => !m.envelope.has(x.id));
+  if (roomSafe) {
+    if (openSus.length > 1 && heldWeapons.length && (openSus.length >= openWea.length || !heldSuspects.length)) {
+      return { suspectId: pick(openSus, rng).id, weaponId: pick(heldWeapons, rng) };
+    }
+    if (openWea.length > 1 && heldSuspects.length) {
+      return { suspectId: pick(heldSuspects, rng), weaponId: pick(openWea, rng).id };
+    }
+  }
+  // Otherwise score probe pairs by walking the responders: a player known to hold one of the three
+  // ends the walk (they'll show a card I already know); a player who might hold an unknown card is
+  // a chance to learn something.
+  const sus = openSus.length ? openSus : c.suspects.length ? c.suspects : SUSPECTS;
+  const wea = openWea.length ? openWea : c.weapons.length ? c.weapons : WEAPONS;
+  const tries = Math.min(80, sus.length * wea.length);
+  let best: BotSuggestion[] = [];
+  let bestScore = -Infinity;
+  for (let i = 0; i < tries; i++) {
+    const s = pick(sus, rng).id;
+    const w = pick(wea, rng).id;
+    let score = 0;
+    for (const p of queue) {
+      const has = m.k.has.get(p);
+      const hasnt = m.k.hasnt.get(p);
+      if (has?.has(s) || has?.has(w) || has?.has(roomId)) {
+        score -= 0.5;
+        break;
+      }
+      const maybe = [s, w, roomId].filter((x) => !hasnt?.has(x) && !m.k.ruledOut.has(x)).length;
+      score += maybe + (maybe > 0 ? 0.25 : 0);
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = [{ suspectId: s, weaponId: w }];
+    } else if (score === bestScore) best.push({ suspectId: s, weaponId: w });
+  }
+  return pick(best, rng);
+}
+
+/** Whether an in-room bot should skip moving and suggest again from here. `staysHere` counts the
+ *  turns it has already stayed in this room in a row; `visited` is the rooms it has suggested in. */
+export function botDecideStay(m: BotMind, roomId: string | undefined, staysHere: number, visited: Set<string>): boolean {
+  if (!roomId) return false;
+  if (m.difficulty === 'easy') return false;
+  if (m.difficulty === 'medium') return botShouldStay(roomId, m.k.ruledOut, visited) && !m.envelope.has(roomId);
+  if (!m.k.ruledOut.has(roomId) && !m.envelope.has(roomId)) return staysHere < 2; // keep probing it
+  const c = botCandidates(m.k.ruledOut);
+  const stillOpen = c.suspects.length > 1 || c.weapons.length > 1;
+  return botProbeRooms(m).has(roomId) && stillOpen && staysHere < 2;
+}
+
+/** Hard bots take a secret passage when it leads somewhere more useful than rolling would. */
+export function botDecideShortcut(m: BotMind, roomId: string | undefined): boolean {
+  if (m.difficulty !== 'hard' || !roomId) return false;
+  const dest = shortcutDestForRoom(roomId);
+  if (!dest) return false;
+  const unknown = botUnknownRooms(m);
+  if (unknown.has(dest)) return true;
+  return unknown.size === 0 && botProbeRooms(m).has(dest) && !botProbeRooms(m).has(roomId);
+}
+
+/** Pick a destination among the reachable tiles. `queue` (the order others would answer a
+ *  suggestion) lets a hard bot judge whether a known room is still worth suggesting from. */
+export function botDecideMove(m: BotMind, reach: Coord[], rng: RNG, queue: string[] = []): Coord | null {
+  if (!reach.length) return null;
+  if (m.difficulty === 'easy') {
+    const roomTiles = reach.filter((t) => roomIdAt(BOARD, t));
+    return roomTiles.length && rng() < 0.7 ? pick(roomTiles, rng) : pick(reach, rng);
+  }
+  const unknown = botUnknownRooms(m);
+  if (m.difficulty === 'medium') {
+    // Today's rule, but "unknown" excludes the confirmed envelope room.
+    const ruled = new Set([...m.k.ruledOut, ...m.envelope]);
+    return botMoveTarget(reach, ruled, rng);
+  }
+  // ---- hard ----
+  const probe = botProbeRooms(m);
+  const roomTiles = reach.filter((t) => roomIdAt(BOARD, t));
+  const unknownTiles = roomTiles.filter((t) => unknown.has(roomIdAt(BOARD, t)!));
+  if (unknownTiles.length) return pick(unknownTiles, rng);
+  const probeTiles = roomTiles.filter((t) => probe.has(roomIdAt(BOARD, t)!));
+  if (probeTiles.length) return pick(probeTiles, rng);
+  // A known room is still worth a suggestion if its holder answers late: everyone asked before
+  // them might have to show the suspect or weapon instead. Prefer the room with the longest run of
+  // askers ahead of its holder, as long as at least two players are asked first.
+  if (roomTiles.length && queue.length) {
+    let bestTiles: Coord[] = [];
+    let bestAhead = 1;
+    for (const t of roomTiles) {
+      const r = roomIdAt(BOARD, t)!;
+      const holderIdx = queue.findIndex((p) => m.k.has.get(p)?.has(r));
+      const ahead = holderIdx < 0 ? queue.length : holderIdx;
+      if (ahead > bestAhead) {
+        bestAhead = ahead;
+        bestTiles = [t];
+      } else if (ahead === bestAhead && bestAhead > 1) bestTiles.push(t);
+    }
+    if (bestTiles.length) return pick(bestTiles, rng);
+  }
+  const targets = unknown.size ? unknown : probe;
+  const corridor = reach.filter((t) => !roomIdAt(BOARD, t));
+  if (corridor.length && targets.size) {
+    let best: Coord[] = [];
+    let bestD = Infinity;
+    for (const t of corridor) {
+      const d = stepsToRooms(BOARD, t, targets);
+      if (d < bestD) {
+        bestD = d;
+        best = [t];
+      } else if (d === bestD) best.push(t);
+    }
+    if (best.length) return pick(best, rng);
+  }
+  return pick(roomTiles.length ? roomTiles : reach, rng);
+}
+
+/** Which floor to ride the elevator to. Hard bots pick the floor whose exit is nearest a useful room. */
+export function botDecideFloor(m: BotMind, options: FloorId[], rng: RNG): FloorId {
+  if (m.difficulty !== 'hard') return pick(options, rng);
+  const unknown = botUnknownRooms(m);
+  const targets = unknown.size ? unknown : botProbeRooms(m);
+  let best: FloorId[] = [];
+  let bestD = Infinity;
+  for (const f of options) {
+    const elev = BOARD.elevators.find((e) => e.floor === f);
+    const d = elev ? stepsToRooms(BOARD, elev.exit, targets) : Infinity;
+    if (d < bestD) {
+      bestD = d;
+      best = [f];
+    } else if (d === bestD) best.push(f);
+  }
+  return pick(best.length ? best : options, rng);
+}

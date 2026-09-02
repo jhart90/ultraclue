@@ -1,0 +1,75 @@
+/* Easy / Medium / Hard segmented control (host) or a single tinted pill (everyone else). */
+.diff {
+  display: inline-flex;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-radius: 999px;
+  overflow: hidden;
+  background: #14111f;
+  vertical-align: middle;
+}
+.diff__opt {
+  background: none;
+  border: none;
+  color: var(--muted, #9a93b3);
+  font-family: 'Georgia', serif;
+  font-size: 0.78rem;
+  padding: 0.22rem 0.6rem;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.diff__opt + .diff__opt {
+  border-left: 1px solid rgba(200, 162, 74, 0.2);
+}
+.diff__opt:hover {
+  color: var(--ink, #ece8f5);
+}
+.diff__opt--on {
+  font-weight: 700;
+  color: #1a1622;
+}
+.diff__opt--easy.diff__opt--on {
+  background: #2f9e54;
+}
+.diff__opt--medium.diff__opt--on {
+  background: #d9a441;
+}
+.diff__opt--hard.diff__opt--on {
+  background: #c2435a;
+  color: #fff;
+}
+
+.diff--compact .diff__opt {
+  font-size: 0.62rem;
+  padding: 0.08rem 0.42rem;
+  font-weight: 700;
+}
+
+/* Read-only pill, tinted like the matching option. */
+.diff--ro {
+  display: inline-block;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  font-weight: 700;
+  border: none;
+  color: #1a1622;
+}
+.diff--ro.diff--easy {
+  background: #2f9e54;
+}
+.diff--ro.diff--medium {
+  background: #d9a441;
+}
+.diff--ro.diff--hard {
+  background: #c2435a;
+  color: #fff;
+}
+.diff--ro:not(.diff--compact) {
+  font-size: 0.78rem;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  padding: 0.22rem 0.7rem;
+  border-radius: 999px;
+}

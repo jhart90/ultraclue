@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { getCard, type PlayerView } from 'shared';
+import { getCard, BOT_DIFFICULTY_LABEL, type PlayerView } from 'shared';
 import { SuspectThumb } from './SuspectThumb';
 import '../screens/PublicLobby.css';
 import './TurnOrder.css';
@@ -130,8 +130,7 @@ export function PlayerRoster({
                 <div className="pseat__text">
                   <div className="pseat__name">{p.name}</div>
                   <div className="pseat__sub">
-                    {p.isBot ? 'Computer' : character}
-                    {!p.isBot && character !== p.name ? '' : ''}
+                    {p.isBot ? `Computer · ${BOT_DIFFICULTY_LABEL[p.difficulty ?? 'medium']}` : character}
                     {isMe && ' · you'}
                   </div>
                 </div>

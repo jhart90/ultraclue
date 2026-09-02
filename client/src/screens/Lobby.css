@@ -74,6 +74,34 @@
   }
 }
 
+/* Room-wide computer difficulty, between the header and the seats. */
+.lobby__settings {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+  padding: 0.5rem 0.8rem;
+  background: #1a1630;
+  border: 1px solid rgba(200, 162, 74, 0.18);
+  border-radius: 10px;
+}
+.lobby__settingslabel {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted, #9a93b3);
+}
+.lobby__settingsnote {
+  color: var(--muted, #9a93b3);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+.seat__diff {
+  display: flex;
+  justify-content: center;
+}
+
 .lobby__body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;

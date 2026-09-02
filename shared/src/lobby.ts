@@ -1,4 +1,4 @@
-import type { SlotStatus, DiceStyle } from './game';
+import type { SlotStatus, DiceStyle, BotDifficulty } from './game';
 
 // Lobby / room model. Unlike GameState there is no hidden information here, so a single LobbyView
 // is broadcast to everyone in the room; each client identifies itself by its own socket id.
@@ -29,6 +29,8 @@ export interface SlotOccupant {
   joinedAt?: number;
   /** Dice colours chosen by this human (bots use their character's colour by default). */
   dice?: DiceStyle;
+  /** Computer seats: how well this bot plays (defaults to the room's setting). */
+  difficulty?: BotDifficulty;
 }
 
 export interface Slot {
@@ -39,10 +41,12 @@ export interface Slot {
 
 export type RoomPhase = 'lobby' | 'play' | 'ended';
 
-/** Host-adjustable room settings. Only the public room exposes any today. */
+/** Host-adjustable room settings. */
 export interface RoomSettings {
-  /** Seats at the table (humans + computers always sum to this). Public room: 8..40. */
-  totalPlayers: number;
+  /** Public room only: seats at the table (humans + computers always sum to this), 8..40. */
+  totalPlayers?: number;
+  /** Difficulty given to computer seats (the host can still override any one seat). */
+  botDifficulty: BotDifficulty;
 }
 
 export interface LobbyView {

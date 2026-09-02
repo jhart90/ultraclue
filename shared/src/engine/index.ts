@@ -6,4 +6,5 @@ export * from './suggest';
 export * from './accuse';
 export * from './bot';
 export * from './botNotes';
+export * from './botMind';
 export * from './view';

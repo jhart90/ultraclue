@@ -143,6 +143,35 @@ export function roomToRoomDistance(board: Board, aRoomId: string, bRoomId: strin
   return dist.has(target) ? dist.get(target)! : Infinity;
 }
 
+/** Fewest dice steps from `start` to any room in `targets`, ignoring other pieces (a planning
+ *  estimate for bots). Staircases are free, the elevator is not walked through. Infinity if none. */
+export function stepsToRooms(board: Board, start: Coord, targets: Set<string>): number {
+  if (!targets.size) return Infinity;
+  const { graph, freeLinks, cellMap } = board === BOARD ? CACHE : buildMoveGraph(board);
+  const startNode = nodeOf(cellMap, start);
+  const dist = new Map<string, number>([[startNode, 0]]);
+  const queue: string[] = [startNode];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    const d = dist.get(cur)!;
+    if (isRoomNode(cur) && targets.has(cur.slice('room:'.length))) return d;
+    if (isStopNode(cur) && cur !== startNode) continue;
+    for (const n of freeLinks.get(cur) ?? []) {
+      if (!dist.has(n)) {
+        dist.set(n, d);
+        queue.unshift(n);
+      }
+    }
+    for (const n of graph.get(cur) ?? []) {
+      if (!dist.has(n)) {
+        dist.set(n, d + 1);
+        queue.push(n);
+      }
+    }
+  }
+  return Infinity;
+}
+
 /** The room id at a tile, or undefined if it is a corridor / off-board. */
 export function roomIdAt(board: Board, tile: Coord): string | undefined {
   const cellMap = board === BOARD ? CACHE.cellMap : buildCellMap(board);

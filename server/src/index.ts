@@ -435,45 +435,64 @@ function scheduleBots(room: Room): void {
       emitChat(room);
       return;
     }
-    try {
-      const mind = mindFor(s, cur.id, room);
-      const mem = memFor(room);
-      for (let step = 0; step < 4; step++) {
-        if (s.turnPhase === 'awaitRoll') {
-          const me = getPlayer(s, cur.id);
-          const visited = mem.visited.get(cur.id) ?? new Set<string>();
-          const st = mem.stays.get(cur.id);
-          const staysHere = st && st.room === me?.inRoomId ? st.n : 0;
-          if (botDecideShortcut(mind, me?.inRoomId)) {
-            s = takeShortcut(s, cur.id);
-            mem.stays.delete(cur.id);
-          } else if (botDecideStay(mind, me?.inRoomId, staysHere, visited)) {
-            s = skipMovement(s, cur.id);
-            mem.stays.set(cur.id, { room: me!.inRoomId!, n: staysHere + 1 });
-          } else {
-            s = rollAndMove(s, cur.id, RNG);
-            mem.stays.delete(cur.id);
-          }
-        } else if (s.turnPhase === 'awaitMove') {
-          const dest = botDecideMove(mind, activeReachable(s), RNG, responderQueue(s, cur.id));
-          if (!dest) break;
-          s = moveTo(s, cur.id, dest);
-        } else if (s.turnPhase === 'awaitElevator' && s.elevatorRide) {
-          const opts = elevatorOptions(s.elevatorRide.fromFloor);
-          s = chooseFloor(s, cur.id, botDecideFloor(mind, opts, RNG), RNG);
-        } else {
-          break;
-        }
+    // The movement runs as a series of steps. A roll the bot makes itself (it was in a room) is
+    // broadcast on its own, and the token only moves once the dice have finished tumbling on every
+    // screen (DICE_ANIM_MS) plus a short beat. A turn-opening roll was broadcast with the previous
+    // turn's end, and botWait() already holds the whole movement phase until that animation is over.
+    const mem = memFor(room);
+    const movementStep = (): void => {
+      let s = room.game;
+      if (!s || s.phase !== 'play' || currentPlayerId(s) !== cur.id || !getPlayer(s, cur.id)?.isBot) {
+        emitChat(room);
+        return;
       }
-      room.game = s;
-      mirrorLog(room);
-      broadcastGame(room);
-      emitChat(room);
-    } catch {
-      /* fall through to the decision phase */
-    }
+      try {
+        const mind = mindFor(s, cur.id, room);
+        for (let step = 0; step < 4; step++) {
+          if (s.turnPhase === 'awaitRoll') {
+            const me = getPlayer(s, cur.id);
+            const visited = mem.visited.get(cur.id) ?? new Set<string>();
+            const st = mem.stays.get(cur.id);
+            const staysHere = st && st.room === me?.inRoomId ? st.n : 0;
+            if (botDecideShortcut(mind, me?.inRoomId)) {
+              s = takeShortcut(s, cur.id);
+              mem.stays.delete(cur.id);
+            } else if (botDecideStay(mind, me?.inRoomId, staysHere, visited)) {
+              s = skipMovement(s, cur.id);
+              mem.stays.set(cur.id, { room: me!.inRoomId!, n: staysHere + 1 });
+            } else {
+              s = rollAndMove(s, cur.id, RNG);
+              mem.stays.delete(cur.id);
+              room.game = s;
+              mirrorLog(room);
+              broadcastGame(room); // everyone sees the dice fly…
+              emitChat(room);
+              setTimeout(movementStep, DICE_ANIM_MS + 300); // …and only then does the token move
+              return;
+            }
+          } else if (s.turnPhase === 'awaitMove') {
+            const dest = botDecideMove(mind, activeReachable(s), RNG, responderQueue(s, cur.id));
+            if (!dest) break;
+            s = moveTo(s, cur.id, dest);
+          } else if (s.turnPhase === 'awaitElevator' && s.elevatorRide) {
+            const opts = elevatorOptions(s.elevatorRide.fromFloor);
+            s = chooseFloor(s, cur.id, botDecideFloor(mind, opts, RNG), RNG);
+          } else {
+            break;
+          }
+        }
+        room.game = s;
+        mirrorLog(room);
+        broadcastGame(room);
+        emitChat(room);
+      } catch {
+        /* fall through to the decision phase */
+      }
+      decide();
+    };
 
     // --- decision phase: accuse if certain, else suggest from a room, else end ---
+    const decide = (): void => {
     setThinking(room, cur.name);
     emitChat(room);
     setTimeout(() => {
@@ -522,6 +541,8 @@ function scheduleBots(room: Room): void {
         }
       }
     }, botWait(room));
+    };
+    movementStep();
   }, botWait(room));
 }
 

@@ -168,9 +168,11 @@ export function Game() {
   const turnKey = game ? `${game.round ?? 0}:${game.activeIdx}` : '';
   const turnKeyRef = useRef(turnKey);
   const [turnFlash, setTurnFlash] = useState<{ key: string; name: string; color: string } | null>(null);
+  const flashAtRef = useRef(0);
   useEffect(() => {
     if (!game || game.phase !== 'play' || turnKey === turnKeyRef.current) return;
     turnKeyRef.current = turnKey;
+    flashAtRef.current = Date.now();
     const active = game.players.find((p) => p.id === game.turnOrder[game.activeIdx]);
     if (!active) return;
     setTurnFlash({ key: turnKey, name: active.id === myId ? 'Your turn' : `${active.name}'s turn`, color: suspectColor(active.suspectId) });
@@ -183,8 +185,9 @@ export function Game() {
     if (rs > rollSeqRef.current && game?.lastRoll) {
       const roller = game.players.find((p) => p.id === game.turnOrder[game.activeIdx]);
       const style = roller?.dice ?? defaultDice(roller?.suspectId);
-      const opensTurn = rollSeqRef.current > 0 && game.turnPhase === 'awaitMove' && (game.lastMove == null || game.lastMove.playerId !== roller?.id);
-      const wait = opensTurn ? TURN_FLASH_MS : 0;
+      // A roll that arrived together with the turn flash waits for it; a mid-turn roll shows at once.
+      const flashing = Date.now() - flashAtRef.current < TURN_FLASH_MS;
+      const wait = rollSeqRef.current > 0 && flashing ? TURN_FLASH_MS : 0;
       animUntilRef.current = Date.now() + wait + DICE_ANIM_MS;
       const show = { seq: rs, values: game.lastRoll, color: style.color, pips: style.pips, name: roller?.name ?? 'Someone' };
       rollSeqRef.current = rs;

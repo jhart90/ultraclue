@@ -7,7 +7,10 @@ import { Server, type Socket } from 'socket.io';
 import {
   SOCKET_EVENTS,
   DICE_ANIM_MS,
+  TURN_FLASH_MS,
   PUBLIC_TURN_MS,
+  BOT_SPEED_PACE,
+  BOT_SPEED_PASS_PACE,
   viewFor,
   makeRng,
   currentPlayerId,
@@ -95,6 +98,7 @@ import {
   setRoomSettings,
   setBotDifficulty,
   roomBotDifficulty,
+  roomBotSpeed,
   resetPublicRoom,
   electHost,
 } from './rooms';
@@ -163,12 +167,21 @@ const RNG = makeRng(Math.floor(Math.random() * 0x7fffffff) + 1);
 // up to 40 (mostly computers), so its bots move faster or a single round would take a quarter hour.
 const BOT_DELAY = 10000;
 const PUBLIC_BOT_DELAY = 5000;
-const botDelay = (room: Room): number => (room.isPublic ? PUBLIC_BOT_DELAY : BOT_DELAY);
+/** The table's base pause, scaled by the host's computer-speed setting (slow ×1.33, fast ×0.5). */
+const botDelay = (room: Room): number => (room.isPublic ? PUBLIC_BOT_DELAY : BOT_DELAY) * BOT_SPEED_PACE[roomBotSpeed(room)];
 /** How long a bot waits before its next action: its pacing delay, stretched so a dice roll that is
  *  still animating on players' screens finishes first. */
 function botWait(room: Room): number {
-  const animEnds = (room.lastRollAt ?? 0) + DICE_ANIM_MS + 400;
+  const animEnds = (room.lastRollAt ?? 0) + TURN_FLASH_MS + DICE_ANIM_MS + 400;
   return Math.max(botDelay(room), animEnds - Date.now());
+}
+/** A bot answering a suggestion: the usual pause, but a bot with nothing to show answers much
+ *  faster on the Fast setting (there's nothing to think about). Always at least a second, so a
+ *  human reading the reveal card before it gets a beat. */
+function botRevealWait(room: Room, willPass: boolean): number {
+  const base = room.isPublic ? PUBLIC_BOT_DELAY : BOT_DELAY;
+  const pace = willPass ? BOT_SPEED_PASS_PACE[roomBotSpeed(room)] : BOT_SPEED_PACE[roomBotSpeed(room)];
+  return Math.max(1000, base * pace);
 }
 
 // Per-room bot memory: rooms each bot has already suggested in (so it explores), and — keyed by
@@ -361,9 +374,15 @@ function progress(room: Room): void {
  *  holds none, passes ("cannot disprove it"). Either way it spends the same time deliberating. */
 function scheduleBotReveal(room: Room, botId: string): void {
   const g = room.game;
+  let willPass = false;
   if (g) {
     setThinking(room, getPlayer(g, botId)?.name ?? 'Someone');
     emitChat(room);
+    const sg = g.currentSuggestion;
+    if (sg) {
+      const trio = [sg.suspectId, sg.weaponId, sg.roomId];
+      willPass = !(getPlayer(g, botId)?.hand ?? []).some((c) => trio.includes(c));
+    }
   }
   setTimeout(() => {
     const s = room.game;
@@ -395,7 +414,7 @@ function scheduleBotReveal(room: Room, botId: string): void {
     } catch {
       /* ignore */
     }
-  }, botWait(room));
+  }, botRevealWait(room, willPass));
 }
 
 /** A bot's turn: deduce, move toward a useful room, suggest, and accuse when confident. */
@@ -822,6 +841,7 @@ io.on('connection', (socket) => {
       setRoomSettings(room, cid(socket), {
         totalPlayers: p?.totalPlayers == null ? undefined : Number(p.totalPlayers),
         botDifficulty: p?.botDifficulty,
+        botSpeed: p?.botSpeed,
       });
       const who = nameOf(room, cid(socket));
       if (room.settings?.totalPlayers !== before.totalPlayers) {
@@ -829,6 +849,9 @@ io.on('connection', (socket) => {
       }
       if (room.settings?.botDifficulty !== before.botDifficulty) {
         addChat(room, 'System', `${who} set the computers to ${room.settings?.botDifficulty} difficulty.`, true);
+      }
+      if (room.settings?.botSpeed !== before.botSpeed) {
+        addChat(room, 'System', `${who} set the computer speed to ${room.settings?.botSpeed}.`, true);
       }
       emitLobby(room);
       emitChat(room);

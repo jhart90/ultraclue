@@ -1,4 +1,4 @@
-import type { SlotStatus, GameView, BotDifficulty } from './game';
+import type { SlotStatus, GameView, BotDifficulty, BotSpeed } from './game';
 import type { LobbyView, ChatMsg } from './lobby';
 import type { Coord } from './data/board';
 
@@ -88,6 +88,7 @@ export interface JoinPublicPayload {
 export interface SetRoomSettingsPayload {
   totalPlayers?: number;
   botDifficulty?: BotDifficulty;
+  botSpeed?: BotSpeed;
 }
 export interface SetBotDifficultyPayload {
   index: number; // seat index of the computer

@@ -1,4 +1,4 @@
-import type { SlotStatus, DiceStyle, BotDifficulty, LogCard } from './game';
+import type { SlotStatus, DiceStyle, BotDifficulty, BotSpeed, LogCard } from './game';
 
 // Lobby / room model. Unlike GameState there is no hidden information here, so a single LobbyView
 // is broadcast to everyone in the room; each client identifies itself by its own socket id.
@@ -49,6 +49,8 @@ export interface RoomSettings {
   totalPlayers?: number;
   /** Difficulty given to computer seats (the host can still override any one seat). */
   botDifficulty: BotDifficulty;
+  /** How quickly every computer at the table acts. */
+  botSpeed?: BotSpeed;
 }
 
 export interface LobbyView {

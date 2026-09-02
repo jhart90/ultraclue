@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { getCard, MIN_PLAYERS, DEFAULT_BOT_DIFFICULTY, type Slot, type SlotStatus } from 'shared';
-import { DifficultyPicker } from '../components/DifficultyPicker';
+import { getCard, MIN_PLAYERS, DEFAULT_BOT_DIFFICULTY, DEFAULT_BOT_SPEED, type Slot, type SlotStatus } from 'shared';
+import { DifficultyPicker, SpeedPicker } from '../components/DifficultyPicker';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
@@ -71,6 +71,7 @@ export function Lobby() {
   const observerCount = lobby.slots.filter((s) => s.occupant?.observer).length;
   const canStart = amHost && playerCount >= MIN_PLAYERS;
   const botDifficulty = lobby.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
+  const botSpeed = lobby.settings?.botSpeed ?? DEFAULT_BOT_SPEED;
   const botCount = lobby.slots.filter((s) => s.occupant?.isBot).length;
 
   // Only other humans' characters are off-limits; a computer's character can be swapped for yours.
@@ -125,12 +126,19 @@ export function Lobby() {
           onChange={(d) => setRoomSettings({ botDifficulty: d })}
           title="Difficulty for every computer seat (each seat can still be changed on its own)"
         />
+        <span className="lobby__settingslabel lobby__settingslabel--gap">Speed</span>
+        <SpeedPicker
+          value={botSpeed}
+          readOnly={!amHost}
+          onChange={(s) => setRoomSettings({ botSpeed: s })}
+          title="How quickly every computer at the table acts"
+        />
         <span className="lobby__settingsnote">
           {amHost
             ? botCount
-              ? 'Applies to every computer; change one on its seat below.'
+              ? 'Difficulty applies to every computer (change one on its seat below); speed is for the whole table.'
               : 'Set a seat to Bot to add a computer player.'
-            : 'The host chooses how well the computers play.'}
+            : 'The host chooses how well, and how quickly, the computers play.'}
         </span>
       </div>
 

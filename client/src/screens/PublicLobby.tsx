@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getCard, PUBLIC_MIN_PLAYERS, PUBLIC_MAX_PLAYERS, DEFAULT_BOT_DIFFICULTY } from 'shared';
-import { DifficultyPicker } from '../components/DifficultyPicker';
+import { getCard, PUBLIC_MIN_PLAYERS, PUBLIC_MAX_PLAYERS, DEFAULT_BOT_DIFFICULTY, DEFAULT_BOT_SPEED } from 'shared';
+import { DifficultyPicker, SpeedPicker } from '../components/DifficultyPicker';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
@@ -59,6 +59,7 @@ export function PublicLobby() {
   const cpus = lobby.slots.filter((s) => s.occupant?.isBot).length;
   const amObserver = !!mySlot?.occupant?.observer;
   const botDifficulty = lobby.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
+  const botSpeed = lobby.settings?.botSpeed ?? DEFAULT_BOT_SPEED;
   // The server's clock drives the start; correct for our own clock's skew so everyone agrees.
   const remaining = Math.max(0, (lobby.startsAt ?? now) - (now + serverOffset));
   const soon = remaining < 60_000;
@@ -113,11 +114,15 @@ export function PublicLobby() {
             title="Difficulty for every computer seat (click a seat to change just that one)"
           />
         </label>
+        <label>
+          Speed
+          <SpeedPicker value={botSpeed} readOnly={!amHost} onChange={(s) => setRoomSettings({ botSpeed: s })} title="How quickly every computer acts" />
+        </label>
         <span className="plobby__hostnote">
           {amHost
-            ? 'You are the host — you set the table size and how well the computers play.'
+            ? 'You are the host — you set the table size and how well and how fast the computers play.'
             : host
-              ? `${host.name} is the host and sets the table size and computer difficulty.`
+              ? `${host.name} is the host and sets the table size, computer difficulty and speed.`
               : 'The first human to join becomes the host.'}
         </span>
       </div>

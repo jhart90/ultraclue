@@ -52,6 +52,7 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     players,
     turnOrder: state.turnOrder,
     activeIdx: state.activeIdx,
+    round: state.round,
     yourId: viewerId,
     // A viewer who isn't one of the dealt players is watching in observer mode.
     observer: !state.players.some((p) => p.id === viewerId),

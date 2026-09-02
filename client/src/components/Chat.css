@@ -28,26 +28,28 @@
   display: flex;
   flex-direction: column;
 }
+/* Same pill family as the on-screen notices (see Game.css .pill), scaled for the chat column. */
 .chat__newpill {
   position: absolute;
   left: 50%;
   bottom: 0.5rem;
   transform: translateX(-50%);
-  background: var(--accent, #c8a24a);
-  color: #1a1622;
-  border: none;
+  background: #1a1622;
+  color: var(--accent, #c8a24a);
+  border: 2px solid var(--accent, #c8a24a);
   border-radius: 999px;
-  padding: 0.28rem 0.85rem;
+  padding: 0.3rem 1rem;
   font-family: 'Georgia', serif;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
   opacity: 1;
 }
 .chat__newpill:hover {
-  background: #e6c46a;
+  background: #2a2245;
+  color: #e6c46a;
 }
 .chat__newarrow {
   display: inline-block;

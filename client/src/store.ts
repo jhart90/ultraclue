@@ -4,6 +4,7 @@ import {
   type ChatMsg,
   type Coord,
   type BotDifficulty,
+  type BotSpeed,
   type GameView,
   type LobbyView,
   type Slot,
@@ -132,7 +133,7 @@ interface StoreState {
   createGame: (name: string) => void;
   joinGame: (code: string, name: string) => void;
   joinPublic: (name: string, observer?: boolean) => void;
-  setRoomSettings: (patch: { totalPlayers?: number; botDifficulty?: BotDifficulty }) => void;
+  setRoomSettings: (patch: { totalPlayers?: number; botDifficulty?: BotDifficulty; botSpeed?: BotSpeed }) => void;
   setBotDifficulty: (index: number, difficulty: BotDifficulty) => void;
   setDice: (color: string, pips: string) => void;
   takeSeat: (index: number) => void;

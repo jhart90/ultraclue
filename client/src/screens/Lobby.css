@@ -92,6 +92,9 @@
   text-transform: uppercase;
   color: var(--muted, #9a93b3);
 }
+.lobby__settingslabel--gap {
+  margin-left: 0.6rem;
+}
 .lobby__settingsnote {
   color: var(--muted, #9a93b3);
   font-style: italic;

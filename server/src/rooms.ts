@@ -12,7 +12,10 @@ import {
   PUBLIC_ROOM_CODE,
   BOT_DIFFICULTIES,
   DEFAULT_BOT_DIFFICULTY,
+  BOT_SPEEDS,
+  DEFAULT_BOT_SPEED,
   type BotDifficulty,
+  type BotSpeed,
   type RoomSettings,
   type SlotOccupant,
   type ChatMsg,
@@ -107,6 +110,13 @@ export function roomBotDifficulty(room: Pick<Room, 'settings'>): BotDifficulty {
 function cleanDifficulty(d: unknown): BotDifficulty | undefined {
   return BOT_DIFFICULTIES.includes(d as BotDifficulty) ? (d as BotDifficulty) : undefined;
 }
+function cleanSpeed(d: unknown): BotSpeed | undefined {
+  return BOT_SPEEDS.includes(d as BotSpeed) ? (d as BotSpeed) : undefined;
+}
+/** How quickly this room's computers act. */
+export function roomBotSpeed(room: Pick<Room, 'settings'>): BotSpeed {
+  return room.settings?.botSpeed ?? DEFAULT_BOT_SPEED;
+}
 
 // ---- the public room --------------------------------------------------------------------------
 
@@ -130,7 +140,11 @@ export function getPublicRoom(): Room | undefined {
 }
 
 /** Build the public lobby: `totalPlayers` seats, every one a computer, clock already running. */
-export function createPublicRoom(totalPlayers = PUBLIC_DEFAULT_PLAYERS, botDifficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY): Room {
+export function createPublicRoom(
+  totalPlayers = PUBLIC_DEFAULT_PLAYERS,
+  botDifficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY,
+  botSpeed: BotSpeed = DEFAULT_BOT_SPEED,
+): Room {
   const room: Room = {
     code: PUBLIC_ROOM_CODE,
     hostId: '',
@@ -142,7 +156,7 @@ export function createPublicRoom(totalPlayers = PUBLIC_DEFAULT_PLAYERS, botDiffi
     suggestionLog: [],
     notes: {},
     isPublic: true,
-    settings: { totalPlayers: clampTotal(totalPlayers), botDifficulty },
+    settings: { totalPlayers: clampTotal(totalPlayers), botDifficulty, botSpeed },
     startsAt: publicStartTime(),
   };
   for (let i = 0; i < room.settings!.totalPlayers!; i++) {
@@ -214,7 +228,7 @@ export function joinPublicLobby(room: Room, id: string, name: string, observer =
 export function setRoomSettings(
   room: Room,
   requesterId: string,
-  patch: { totalPlayers?: number; botDifficulty?: unknown },
+  patch: { totalPlayers?: number; botDifficulty?: unknown; botSpeed?: unknown },
 ): void {
   if (room.hostId !== requesterId) throw new Error('Only the host can change the settings.');
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
@@ -223,6 +237,8 @@ export function setRoomSettings(
     room.settings = { ...(room.settings ?? {}), botDifficulty: d };
     for (const s of room.slots) if (s.occupant?.isBot) s.occupant.difficulty = d;
   }
+  const sp = cleanSpeed(patch.botSpeed);
+  if (sp) room.settings = { ...(room.settings ?? { botDifficulty: DEFAULT_BOT_DIFFICULTY }), botSpeed: sp };
   if (patch.totalPlayers == null) return;
   if (!room.isPublic) throw new Error('Only the public table can be resized.');
   const n = clampTotal(patch.totalPlayers);
@@ -272,11 +288,12 @@ export function resetPublicRoom(): Room {
   const old = getPublicRoom();
   const total = old?.settings?.totalPlayers ?? PUBLIC_DEFAULT_PLAYERS;
   const difficulty = old ? roomBotDifficulty(old) : DEFAULT_BOT_DIFFICULTY;
+  const speed = old ? roomBotSpeed(old) : DEFAULT_BOT_SPEED;
   const humans = old
     ? old.slots.map((s) => s.occupant).filter((o): o is SlotOccupant => !!o && !o.isBot && o.connected)
     : [];
   rooms.delete(PUBLIC_ROOM_CODE);
-  const room = createPublicRoom(total, difficulty);
+  const room = createPublicRoom(total, difficulty, speed);
   for (const h of humans) {
     if (h.observer) {
       appendObserverSlot(room, { ...h, connected: true });

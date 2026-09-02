@@ -37,6 +37,15 @@
   background: #c2435a;
   color: #fff;
 }
+/* Speed options share the palette: slow = calm blue, medium = gold, fast = hot orange. */
+.diff__opt--slow.diff__opt--on {
+  background: #4f8fd6;
+  color: #fff;
+}
+.diff__opt--fast.diff__opt--on {
+  background: #e8732a;
+  color: #1a1622;
+}
 
 .diff--compact .diff__opt {
   font-size: 0.62rem;
@@ -65,6 +74,13 @@
 .diff--ro.diff--hard {
   background: #c2435a;
   color: #fff;
+}
+.diff--ro.diff--slow {
+  background: #4f8fd6;
+  color: #fff;
+}
+.diff--ro.diff--fast {
+  background: #e8732a;
 }
 .diff--ro:not(.diff--compact) {
   font-size: 0.78rem;

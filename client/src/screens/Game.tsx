@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getCard, shortcutDestForRoom, PUBLIC_ROOM_CODE, DICE_ANIM_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
+import { getCard, shortcutDestForRoom, PUBLIC_ROOM_CODE, DICE_ANIM_MS, TURN_FLASH_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
 import { useStore, savedDice } from '../store';
 import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
 import { DiceOverlay, type DiceRollShow } from '../components/DiceOverlay';
@@ -36,7 +36,7 @@ function TurnTimer({ deadline, serverOffset }: { deadline?: number; serverOffset
   if (remaining > 30_000) return null;
   const secs = Math.ceil(remaining / 1000);
   return (
-    <div className={`game__timer${secs <= 10 ? ' game__timer--red' : ''}`} title="Time left to act">
+    <div className={`pill pill--timer${secs <= 10 ? ' pill--timer-red' : ''}`} title="Time left to act">
       ⏱ {secs}s
     </div>
   );
@@ -162,13 +162,38 @@ export function Game() {
 
   // Every roll (mine or a bot's) throws the 3D dice in the roller's colours. rollSeq bumps even
   // when the values repeat. The overlay plays the sound itself.
+  // Each new turn flashes "<name>'s turn" in the character's colours for a beat before anything else
+  // happens; a roll that opens the turn waits for that beat, so a reveal or a move never runs
+  // straight into the next player's dice.
+  const turnKey = game ? `${game.round ?? 0}:${game.activeIdx}` : '';
+  const turnKeyRef = useRef(turnKey);
+  const [turnFlash, setTurnFlash] = useState<{ key: string; name: string; color: string } | null>(null);
+  useEffect(() => {
+    if (!game || game.phase !== 'play' || turnKey === turnKeyRef.current) return;
+    turnKeyRef.current = turnKey;
+    const active = game.players.find((p) => p.id === game.turnOrder[game.activeIdx]);
+    if (!active) return;
+    setTurnFlash({ key: turnKey, name: active.id === myId ? 'Your turn' : `${active.name}'s turn`, color: suspectColor(active.suspectId) });
+    const t = setTimeout(() => setTurnFlash((cur) => (cur?.key === turnKey ? null : cur)), TURN_FLASH_MS + 400);
+    return () => clearTimeout(t);
+  }, [turnKey, game?.phase]);
+
   useEffect(() => {
     const rs = game?.rollSeq ?? 0;
     if (rs > rollSeqRef.current && game?.lastRoll) {
       const roller = game.players.find((p) => p.id === game.turnOrder[game.activeIdx]);
       const style = roller?.dice ?? defaultDice(roller?.suspectId);
-      animUntilRef.current = Date.now() + DICE_ANIM_MS;
-      setDiceShow({ seq: rs, values: game.lastRoll, color: style.color, pips: style.pips, name: roller?.name ?? 'Someone' });
+      const opensTurn = rollSeqRef.current > 0 && game.turnPhase === 'awaitMove' && (game.lastMove == null || game.lastMove.playerId !== roller?.id);
+      const wait = opensTurn ? TURN_FLASH_MS : 0;
+      animUntilRef.current = Date.now() + wait + DICE_ANIM_MS;
+      const show = { seq: rs, values: game.lastRoll, color: style.color, pips: style.pips, name: roller?.name ?? 'Someone' };
+      rollSeqRef.current = rs;
+      if (!wait) {
+        setDiceShow(show);
+        return;
+      }
+      const t = setTimeout(() => setDiceShow(show), wait);
+      return () => clearTimeout(t);
     }
     rollSeqRef.current = rs;
   }, [game?.rollSeq]);
@@ -483,6 +508,11 @@ export function Game() {
         />
       )}
 
+      {turnFlash && (
+        <div className="pill pill--flash" key={turnFlash.key} style={{ background: turnFlash.color, color: contrastInk(turnFlash.color), borderColor: contrastInk(turnFlash.color) }}>
+          {turnFlash.name}
+        </div>
+      )}
       <DiceOverlay roll={diceShow} />
       <DiceRetirer active={anyPopup && !!diceShow} animUntil={animUntilRef.current} onRetire={retireDice} />
 
@@ -500,7 +530,7 @@ export function Game() {
       )}
 
       {toast && (
-        <div className="game__toast" key={toast.id} onClick={() => document.querySelector('.game__chat')?.scrollIntoView({ behavior: 'smooth' })}>
+        <div className={`pill pill--toast${game.turnDeadline ? ' pill--toast-below' : ''}`} key={toast.id} onClick={() => document.querySelector('.game__chat')?.scrollIntoView({ behavior: 'smooth' })}>
           {toast.text}
         </div>
       )}

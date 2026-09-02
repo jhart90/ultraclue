@@ -8,6 +8,8 @@ export type SlotStatus = 'open' | 'closed' | 'bot';
 
 /** How long the 3D dice roll animation runs on clients (ms). Bots wait it out before acting. */
 export const DICE_ANIM_MS = 2600;
+/** Beat at the start of every turn ("X's turn" flashes on screen) before that turn's dice roll shows. */
+export const TURN_FLASH_MS = 1000;
 /** Public games: a human on the clock has this long to act before the turn is passed for them. */
 export const PUBLIC_TURN_MS = 90_000;
 
@@ -21,6 +23,21 @@ export const BOT_DIFFICULTY_BLURB: Record<BotDifficulty, string> = {
   medium: 'Keeps proper notes and only accuses when sure, but probes carelessly.',
   hard: 'Full deduction, targeted probes, and it heads straight for useful rooms.',
 };
+
+/** How quickly the computers act. One setting for the whole table, chosen by the host. */
+export type BotSpeed = 'slow' | 'medium' | 'fast';
+export const BOT_SPEEDS: readonly BotSpeed[] = ['slow', 'medium', 'fast'];
+export const DEFAULT_BOT_SPEED: BotSpeed = 'medium';
+export const BOT_SPEED_LABEL: Record<BotSpeed, string> = { slow: 'Slow', medium: 'Medium', fast: 'Fast' };
+export const BOT_SPEED_BLURB: Record<BotSpeed, string> = {
+  slow: 'A third longer between computer actions — time to take notes.',
+  medium: 'The standard pace.',
+  fast: 'Half the wait between actions; computers with nothing to show answer almost at once.',
+};
+/** Multiplier on every computer pause. */
+export const BOT_SPEED_PACE: Record<BotSpeed, number> = { slow: 4 / 3, medium: 1, fast: 0.5 };
+/** Multiplier on the time a computer takes to answer "nothing" to a suggestion. */
+export const BOT_SPEED_PASS_PACE: Record<BotSpeed, number> = { slow: 4 / 3, medium: 1, fast: 0.2 };
 
 /** A player's dice look: body colour and pip colour (hex). Bots default to their character's colour. */
 export interface DiceStyle {
@@ -179,6 +196,8 @@ export interface GameView {
   players: PlayerView[];
   turnOrder: string[];
   activeIdx: number;
+  /** Completed full rounds so far. */
+  round?: number;
   yourId: string;
   /** Room host's id, so an observing host still gets host-only controls (set by the server). */
   hostId?: string;

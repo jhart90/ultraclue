@@ -4,7 +4,7 @@ import type { GameState } from '../game';
 import { type RNG } from '../rng';
 import { blockedCells, elevatorFloorAt, pathTo, reachableTiles, roomIdAt } from './movement';
 import { advanceTurn, clone, currentPlayerId, getPlayer, log, requirePlayer } from './util';
-import { noteRoomVisit, noteTurn, noteWalk } from './stats';
+import { noteRoomVisit, noteTurn, noteWalk, playerStats, statsOf } from './stats';
 
 const FLOOR_NAMES: Record<FloorId, string> = {
   'ground-floor': 'Ground Floor',
@@ -23,7 +23,7 @@ function otherPositions(state: GameState, exceptId: string): Coord[] {
   return state.players.filter((p) => p.id !== exceptId && !p.eliminated).map((p) => p.position);
 }
 
-function autoRoll(state: GameState, rng: RNG): void {
+function autoRoll(state: GameState, rng: RNG, opensTurn = false): void {
   state.lastRoll = [die(rng), die(rng)];
   state.rollSeq = (state.rollSeq ?? 0) + 1;
   state.turnPhase = 'awaitMove';
@@ -32,6 +32,7 @@ function autoRoll(state: GameState, rng: RNG): void {
     kind: 'roll',
     playerId: p.id,
     dice: [state.lastRoll[0], state.lastRoll[1]],
+    ...(opensTurn ? { opensTurn: true } : {}),
   });
 }
 
@@ -40,11 +41,18 @@ export function beginTurn(state: GameState, rng: RNG): void {
   state.lastMove = undefined;
   const p = requirePlayer(state, currentPlayerId(state));
   noteTurn(state, p.id);
+  // Announce the turn in the log (drawn as a header in the chat) ahead of anything the turn does.
+  log(state, `${p.name}'s Turn`, {
+    kind: 'turn',
+    playerId: p.id,
+    playerTurn: playerStats(state, p.id).turns,
+    overallTurn: statsOf(state).turnsPlayed,
+  });
   if (p.inRoomId) {
     state.turnPhase = 'awaitRoll';
     state.lastRoll = undefined;
   } else {
-    autoRoll(state, rng);
+    autoRoll(state, rng, true);
   }
 }
 

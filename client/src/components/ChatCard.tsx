@@ -29,6 +29,13 @@ function MiniDie({ value, color, pips }: { value: number; color: string; pips: s
   );
 }
 
+/** 1 -> "1st", 22 -> "22nd", 113 -> "113th". */
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13 ? 'th' : n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th';
+  return `${n}${suffix}`;
+}
+
 function Mini({ id }: { id: string }) {
   const card = getCard(id);
   if (!card) return null;
@@ -57,6 +64,17 @@ export function ChatCard({
   responses?: SuggestionResponse[];
 }) {
   const playerById = (id: string) => players.find((p) => p.id === id);
+
+  if (card.kind === 'turn') {
+    return (
+      <div className="chatcard chatcard--turn">
+        <div className="chatcard__turnname">{caption}</div>
+        <div className="chatcard__turnsub">
+          {ordinal(card.playerTurn)} turn individually, {ordinal(card.overallTurn)} turn overall
+        </div>
+      </div>
+    );
+  }
 
   if (card.kind === 'roll') {
     const p = playerById(card.playerId);

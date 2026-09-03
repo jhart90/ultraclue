@@ -26,6 +26,8 @@ import {
   type Slot,
   type SlotStatus,
   type SuggestionEvent,
+  DICE_ANIM_MS,
+  TURN_FLASH_MS,
 } from 'shared';
 
 export interface Room {
@@ -471,12 +473,29 @@ export function clearThinking(room: Room): void {
 
 /** Copy any new game-log entries into the chat as system narration, so the chat is the single
  *  chronological feed of game events interspersed with player messages. */
-export function mirrorLog(room: Room): void {
+/** Fold new game-log entries into the chat feed. A roll is held back while the dice tumble on
+ *  everyone's screen: a transient "<name> is rolling…" line keeps its place in the feed and, once
+ *  the animation has landed, is swapped in place for the roll card via `defer` (which also
+ *  re-emits the chat). Without `defer` the roll card is posted at once. */
+export function mirrorLog(room: Room, defer?: (apply: () => boolean, ms: number) => void): void {
   if (!room.game) return;
   for (const entry of room.game.log) {
     if (entry.id > room.mirroredLogId) {
       const card = entry.card;
-      if (card?.kind === 'reveal' && card.cardId) {
+      if (card?.kind === 'roll' && defer) {
+        const id = room.nextChatId++;
+        const name = room.game.players.find((p) => p.id === card.playerId)?.name ?? 'Someone';
+        room.chat.push({ id, from: '', text: `${name} is rolling…`, system: true });
+        // A roll that opens a turn shows on clients only after the "<name>'s turn" beat.
+        const ms = (card.opensTurn ? TURN_FLASH_MS : 0) + DICE_ANIM_MS + 250;
+        const text = entry.text;
+        defer(() => {
+          const i = room.chat.findIndex((m) => m.id === id);
+          if (i === -1) return false; // trimmed away, or the room has since been reset
+          room.chat[i] = { id, from: '', text, system: true, card };
+          return true;
+        }, ms);
+      } else if (card?.kind === 'reveal' && card.cardId) {
         // Everyone sees a face-down reveal card; the two players in on it get the face-up version.
         const humans = room.slots.map((s) => s.occupant).filter((o) => o && !o.isBot).map((o) => o!.id);
         const insiders = [card.responderId, card.suggesterId];

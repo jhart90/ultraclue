@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCard, summarizeStats, PUBLIC_ROOM_CODE, type GameView, type Ranked } from 'shared';
 import { Card } from './Card';
 import { contrastInk } from '../render/colorUtils';
@@ -128,9 +128,47 @@ export function EndScreen({
   }, [game.resetsAt]);
   const remaining = game.resetsAt ? game.resetsAt - (now + serverOffset) : undefined;
 
+  // "Download PDF": rasterise the panel (html2canvas) and lay the image across A4 pages (jsPDF).
+  // Both libraries load on demand so they never weigh on the game bundle. While capturing, the
+  // panel drops its scroll cap and hides the footer so the whole report is in the picture.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState(false);
+  const downloadPdf = async () => {
+    const el = panelRef.current;
+    if (!el || saving) return;
+    setSaving(true);
+    el.classList.add('end--capture');
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#181426', useCORS: true, logging: false });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      const margin = 24;
+      const pageW = pdf.internal.pageSize.getWidth() - margin * 2;
+      const pageH = pdf.internal.pageSize.getHeight() - margin * 2;
+      const ratio = pageW / canvas.width; // pt per canvas px
+      const sliceH = Math.floor(pageH / ratio); // canvas px that fit on one page
+      for (let y = 0, page = 0; y < canvas.height; y += sliceH, page++) {
+        const h = Math.min(sliceH, canvas.height - y);
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width;
+        slice.height = h;
+        slice.getContext('2d')!.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        if (page > 0) pdf.addPage();
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, pageW, h * ratio);
+      }
+      const stamp = new Date(game.stats?.endedAt ?? Date.now()).toISOString().slice(0, 10);
+      pdf.save(`ultra-clue-${game.code}-${stamp}.pdf`);
+    } catch (err) {
+      console.error('PDF export failed', err);
+    } finally {
+      el.classList.remove('end--capture');
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="sp__backdrop">
-      <div className="end" role="dialog" aria-label="Game over">
+      <div className="end" role="dialog" aria-label="Game over" ref={panelRef}>
         <div className="end__banner" style={{ background: winColor, color: contrastInk(winColor) }}>
           <div className="end__confetti" aria-hidden>
             🎉
@@ -283,9 +321,14 @@ export function EndScreen({
           ) : (
             <div className="end__countdown end__countdown--quiet">Thanks for playing ULTRA CLUE!</div>
           )}
-          <button className="btn btn--primary" onClick={onLeave}>
-            {closeLabel ?? (isPublic ? 'Leave the table' : 'Back to Title')}
-          </button>
+          <div className="end__actions">
+            <button className="btn end__pdf" onClick={downloadPdf} disabled={saving} title="Save this report as a PDF">
+              {saving ? 'Preparing PDF…' : '⬇ Download PDF'}
+            </button>
+            <button className="btn btn--primary" onClick={onLeave}>
+              {closeLabel ?? (isPublic ? 'Leave the table' : 'Back to Title')}
+            </button>
+          </div>
         </div>
       </div>
     </div>

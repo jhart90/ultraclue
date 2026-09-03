@@ -102,7 +102,10 @@ export interface Suggestion {
 
 /** Structured detail behind a log line, so the chat can draw it as a card instead of a pop-up. */
 export type LogCard =
-  | { kind: 'roll'; playerId: string; dice: [number, number] }
+  /** Posted at the start of every turn, before that turn's roll: whose turn, and the running counts. */
+  | { kind: 'turn'; playerId: string; playerTurn: number; overallTurn: number }
+  /** `opensTurn` marks the automatic roll that starts a turn in the open (clients show it after the turn flash). */
+  | { kind: 'roll'; playerId: string; dice: [number, number]; opensTurn?: boolean }
   | { kind: 'suggestion'; byId: string; suspectId: string; weaponId: string; roomId: string }
   /** `cardId` is present only for the two players in on the reveal (stripped for everyone else). */
   | { kind: 'reveal'; responderId: string; suggesterId: string; cardId?: string }

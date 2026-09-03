@@ -382,12 +382,20 @@ export function Board({
   // *other* players' moves we also lock the camera, zoom to 80%, and keep their pawn centred.
   const [anim, setAnim] = useState<{ playerId: string; tile: Coord } | null>(null);
   const animSig = useRef<string>('');
+  // The effect is keyed on this string, not on `lastMove` itself: every server broadcast delivers a
+  // fresh lastMove object, and re-running the effect on identity alone would clear the step timer
+  // mid-walk without restarting it — leaving the pawn stranded on a corridor tile while the game
+  // state (and the chat) already had it inside the room.
+  const moveSig = lastMove && lastMove.path.length >= 2 ? `${lastMove.playerId}:${lastMove.path.map(coordKey).join('>')}` : '';
+  const lastMoveRef = useRef(lastMove);
+  lastMoveRef.current = lastMove;
   useEffect(() => {
-    if (!lastMove || lastMove.path.length < 2) {
+    const lastMove = lastMoveRef.current;
+    if (!moveSig || !lastMove || lastMove.path.length < 2) {
       setAnim(null);
       return;
     }
-    const sig = `${lastMove.playerId}:${lastMove.path.map(coordKey).join('>')}`;
+    const sig = moveSig;
     if (sig === animSig.current) return;
     animSig.current = sig;
     const follow = !!myId && lastMove.playerId !== myId;
@@ -427,7 +435,7 @@ export function Board({
       step(lastMove.path[i]);
     }, WALK_STEP_MS);
     return () => clearInterval(timer);
-  }, [lastMove, myId]);
+  }, [moveSig, myId]);
 
   // When the turn passes to a new player, recentre the camera on them at the follow zoom — but leave
   // it unlocked, so the viewer can immediately pan/zoom away.

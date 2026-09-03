@@ -134,3 +134,24 @@
   border-style: dashed;
 }
 
+
+/* Turn header: a quiet rule with the player's name, and the running turn counts in muted text under it. */
+.chatcard--turn {
+  background: transparent;
+  border: none;
+  border-top: 1px solid rgba(200, 162, 74, 0.35);
+  border-radius: 0;
+  padding: 0.5rem 0 0.15rem;
+  margin: 0.75rem 0 0.35rem;
+  animation: none;
+}
+.chatcard__turnname {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #e8e2f2;
+}
+.chatcard__turnsub {
+  margin-top: 0.1rem;
+  font-size: 0.74rem;
+  color: #7f8aa0;
+}

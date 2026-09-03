@@ -301,6 +301,13 @@ function gameView(room: Room, id: string) {
   };
 }
 
+/** Lets mirrorLog hold a chat line back — the roll card waits until the dice have landed on
+ *  every screen — and re-sends the chat once the held line is swapped in. */
+const deferChat = (room: Room) => (apply: () => boolean, ms: number) =>
+  setTimeout(() => {
+    if (apply()) emitChat(room);
+  }, ms);
+
 /** Push each human their own tailored game view (observers included — they watch). */
 function broadcastGame(room: Room): void {
   const g = room.game;
@@ -368,7 +375,7 @@ function progress(room: Room): void {
   }
   recordSuggestion(room); // log a resolved suggestion so every bot can deduce from it
   updateBotNotes(room); // refresh each bot's Detective Notes from its latest deduction
-  mirrorLog(room); // fold new game events into the chat feed
+  mirrorLog(room, deferChat(room)); // fold new game events into the chat feed
   armTurnTimer(room); // public: (re)start the 90s clock for whichever human the table waits on
   broadcastGame(room);
   emitChat(room);
@@ -484,7 +491,7 @@ function scheduleBots(room: Room): void {
               s = rollAndMove(s, cur.id, RNG);
               mem.stays.delete(cur.id);
               room.game = s;
-              mirrorLog(room);
+              mirrorLog(room, deferChat(room));
               broadcastGame(room); // everyone sees the dice fly…
               emitChat(room);
               setTimeout(movementStep, DICE_ANIM_MS + 300); // …and only then does the token move
@@ -502,7 +509,7 @@ function scheduleBots(room: Room): void {
           }
         }
         room.game = s;
-        mirrorLog(room);
+        mirrorLog(room, deferChat(room));
         broadcastGame(room);
         emitChat(room);
       } catch {
@@ -615,7 +622,7 @@ function startPublicGame(): void {
     startGameInRoom(room, room.hostId, { force: true });
     addChat(room, 'System', 'The clock has run out — the public game begins!', true);
     emitLobby(room);
-    mirrorLog(room);
+    mirrorLog(room, deferChat(room));
     emitChat(room);
     broadcastGame(room);
     scheduleBots(room);
@@ -1099,7 +1106,7 @@ io.on('connection', (socket) => {
       botMem.delete(room.code); // fresh deductions for a new game
       startGameInRoom(room, cid(socket));
       emitLobby(room); // phase is now 'play'
-      mirrorLog(room); // seed the chat with the opening game-log lines
+      mirrorLog(room, deferChat(room)); // seed the chat with the opening game-log lines
       emitChat(room); // so the in-game chat panel carries the lobby history
       broadcastGame(room); // each human their own tailored view
       scheduleBots(room); // in case the first player is a bot

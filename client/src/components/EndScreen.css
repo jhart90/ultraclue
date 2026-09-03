@@ -271,6 +271,45 @@
   color: var(--muted, #9a93b3);
   font-style: italic;
 }
+.end__actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+.end__pdf {
+  white-space: nowrap;
+}
+
+/* While the report is being rasterised for the PDF: no scroll cap, no footer, and the envelope
+   cards shrink by width instead of `zoom` (which the rasteriser doesn't understand). */
+.end--capture {
+  max-height: none;
+  animation: none;
+  box-shadow: none;
+}
+.end--capture .end__body,
+.end--capture .end__tablewrap {
+  overflow: visible;
+}
+.end--capture .end__footer {
+  display: none;
+}
+.end--capture .end__cards {
+  zoom: 1;
+}
+.end--capture .end__cards .card {
+  width: 120px;
+  box-shadow: none;
+}
+.end--capture .end__cards .card__type {
+  font-size: 0.4rem;
+}
+.end--capture .end__cards .card__title {
+  font-size: 0.66rem;
+}
+.end--capture .end__cards .card__phrase {
+  font-size: 0.48rem;
+}
 
 @media (max-width: 820px) {
   .end__numbers {
@@ -284,5 +323,9 @@
   }
   .end__footer {
     flex-direction: column;
+  }
+  .end__actions {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }

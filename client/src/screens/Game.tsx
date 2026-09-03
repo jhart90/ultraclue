@@ -151,7 +151,7 @@ export function Game() {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const lastCardIdRef = useRef(0);
   useEffect(() => {
-    const last = [...chat].reverse().find((m) => m.card && m.card.kind !== 'roll');
+    const last = [...chat].reverse().find((m) => m.card && m.card.kind !== 'roll' && m.card.kind !== 'turn');
     if (!last || last.id <= lastCardIdRef.current) return;
     const first = lastCardIdRef.current === 0;
     lastCardIdRef.current = last.id;

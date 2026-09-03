@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCard, shortcutDestForRoom, PUBLIC_ROOM_CODE, DICE_ANIM_MS, TURN_FLASH_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
 import { useStore, savedDice } from '../store';
 import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
-import { DiceOverlay, type DiceRollShow } from '../components/DiceOverlay';
+import { DiceOverlay, DICE_FADE_MS, type DiceRollShow } from '../components/DiceOverlay';
 import { DiceSettings } from '../components/DiceSettings';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
@@ -59,6 +59,15 @@ function DiceRetirer({ active, animUntil, onRetire }: { active: boolean; animUnt
   return null;
 }
 
+const CAMERA_LOCK_KEY = 'ultraclue-camlock';
+function readCameraLock(): boolean {
+  try {
+    return localStorage.getItem(CAMERA_LOCK_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
 const FLOOR_LABELS: Record<string, string> = {
   'ground-floor': 'Ground Floor',
   'upper-floor': 'Upper Floor',
@@ -88,10 +97,16 @@ export function Game() {
   const serverOffset = useStore((s) => s.serverOffset);
   const setDice = useStore((s) => s.setDice);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // "Lock camera on player to move": off means the map never follows a move or recentres on a turn.
+  const [cameraLock, setCameraLock] = useState(readCameraLock);
   const [rosterOpen, setRosterOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(soundEnabled);
   // The 3D dice for the latest roll; they rest on screen until a pop-up, the next roll, or a click.
   const [diceShow, setDiceShow] = useState<DiceRollShow | null>(null);
+  const diceShowRef = useRef(diceShow);
+  diceShowRef.current = diceShow;
+  // True while dice left over from the previous turn are fading out.
+  const [diceFading, setDiceFading] = useState(false);
   const animUntilRef = useRef(0);
   const retireDice = useCallback(() => setDiceShow(null), []);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
@@ -147,8 +162,30 @@ export function Game() {
     }
   }, [game?.announcement?.seq, game?.phase, game?.envelope, game?.winnerId, game?.players]);
 
-  // Mobile: the chat sits below the board, so announce each new event card in a toast up top.
-  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+  // Floating notices — the "<name>'s turn" flash and each new event card's toast — share one spot
+  // over the board. A new notice goes on top and pushes whatever is still showing down a row, so
+  // two never overlap; each leaves on its own timer.
+  type Notice = { id: string; kind: 'flash' | 'toast'; text: string; color?: string };
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const noticeTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const pushNotice = useCallback((n: Notice, ttl: number) => {
+    setNotices((cur) => [n, ...cur.filter((x) => x.id !== n.id)].slice(0, 4));
+    const timers = noticeTimers.current;
+    clearTimeout(timers.get(n.id));
+    timers.set(
+      n.id,
+      setTimeout(() => {
+        timers.delete(n.id);
+        setNotices((cur) => cur.filter((x) => x.id !== n.id));
+      }, ttl),
+    );
+  }, []);
+  useEffect(() => {
+    const timers = noticeTimers.current;
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, []);
+
+  // Announce each new event card (a suggestion, reveal or accusation) as a toast.
   const lastCardIdRef = useRef(0);
   useEffect(() => {
     const last = [...chat].reverse().find((m) => m.card && m.card.kind !== 'roll' && m.card.kind !== 'turn');
@@ -156,10 +193,8 @@ export function Game() {
     const first = lastCardIdRef.current === 0;
     lastCardIdRef.current = last.id;
     if (first) return; // don't toast the backlog on (re)join
-    setToast({ id: last.id, text: last.text });
-    const t = setTimeout(() => setToast((cur) => (cur?.id === last.id ? null : cur)), 4200);
-    return () => clearTimeout(t);
-  }, [chat]);
+    pushNotice({ id: `toast:${last.id}`, kind: 'toast', text: last.text }, 4200);
+  }, [chat, pushNotice]);
 
   // Every roll (mine or a bot's) throws the 3D dice in the roller's colours. rollSeq bumps even
   // when the values repeat. The overlay plays the sound itself.
@@ -168,18 +203,31 @@ export function Game() {
   // straight into the next player's dice.
   const turnKey = game ? `${game.round ?? 0}:${game.activeIdx}` : '';
   const turnKeyRef = useRef(turnKey);
-  const [turnFlash, setTurnFlash] = useState<{ key: string; name: string; color: string } | null>(null);
   const flashAtRef = useRef(0);
   useEffect(() => {
     if (!game || game.phase !== 'play' || turnKey === turnKeyRef.current) return;
     turnKeyRef.current = turnKey;
     flashAtRef.current = Date.now();
+    // Dice still resting from the previous turn fade out as this one begins — and are gone before
+    // this turn's own roll (which waits out the flash) lands.
+    let fadeT: ReturnType<typeof setTimeout> | undefined;
+    const resting = diceShowRef.current;
+    if (resting) {
+      const seq = resting.seq;
+      setDiceFading(true);
+      fadeT = setTimeout(() => {
+        setDiceShow((cur) => (cur && cur.seq === seq ? null : cur));
+        setDiceFading(false);
+      }, DICE_FADE_MS);
+    }
     const active = game.players.find((p) => p.id === game.turnOrder[game.activeIdx]);
-    if (!active) return;
-    setTurnFlash({ key: turnKey, name: active.id === myId ? 'Your turn' : `${active.name}'s turn`, color: suspectColor(active.suspectId) });
-    const t = setTimeout(() => setTurnFlash((cur) => (cur?.key === turnKey ? null : cur)), TURN_FLASH_MS + 400);
-    return () => clearTimeout(t);
-  }, [turnKey, game?.phase]);
+    if (!active) return () => clearTimeout(fadeT);
+    pushNotice(
+      { id: `flash:${turnKey}`, kind: 'flash', text: active.id === myId ? 'Your turn' : `${active.name}'s turn`, color: suspectColor(active.suspectId) },
+      TURN_FLASH_MS + 400,
+    );
+    return () => clearTimeout(fadeT);
+  }, [turnKey, game?.phase, pushNotice]);
 
   useEffect(() => {
     const rs = game?.rollSeq ?? 0;
@@ -192,11 +240,15 @@ export function Game() {
       animUntilRef.current = Date.now() + wait + DICE_ANIM_MS;
       const show = { seq: rs, values: game.lastRoll, color: style.color, pips: style.pips, name: roller?.name ?? 'Someone' };
       rollSeqRef.current = rs;
-      if (!wait) {
+      const land = () => {
+        setDiceFading(false);
         setDiceShow(show);
+      };
+      if (!wait) {
+        land();
         return;
       }
-      const t = setTimeout(() => setDiceShow(show), wait);
+      const t = setTimeout(land, wait);
       return () => clearTimeout(t);
     }
     rollSeqRef.current = rs;
@@ -423,6 +475,7 @@ export function Game() {
             players={orderedPlayers}
             reachable={game.reachable}
             lastMove={game.lastMove}
+            cameraLock={cameraLock}
             weaponLocations={game.weaponLocations}
             canMove={myTurn && game.turnPhase === 'awaitMove' && !suggestionPending}
             onMoveTo={moveTo}
@@ -460,6 +513,7 @@ export function Game() {
               players={orderedPlayers}
               weaponLocations={game.weaponLocations}
               lastMove={game.lastMove}
+              cameraLock={cameraLock}
               canMove={false}
               keyboardZoom={false}
             />
@@ -512,12 +566,20 @@ export function Game() {
         />
       )}
 
-      {turnFlash && (
-        <div className="pill pill--flash" key={turnFlash.key} style={{ background: turnFlash.color, color: contrastInk(turnFlash.color), borderColor: contrastInk(turnFlash.color) }}>
-          {turnFlash.name}
-        </div>
-      )}
-      <DiceOverlay roll={diceShow} />
+      <div className="notices" aria-live="polite">
+        {notices.map((n) => (
+          <div key={n.id} className="notices__slot">
+            <div
+              className={`pill pill--stacked pill--${n.kind}`}
+              style={n.color ? { background: n.color, color: contrastInk(n.color), borderColor: contrastInk(n.color) } : undefined}
+              onClick={n.kind === 'toast' ? () => document.querySelector('.game__chat')?.scrollIntoView({ behavior: 'smooth' }) : undefined}
+            >
+              {n.text}
+            </div>
+          </div>
+        ))}
+      </div>
+      <DiceOverlay roll={diceShow} fading={diceFading} />
       <DiceRetirer active={anyPopup && !!diceShow} animUntil={animUntilRef.current} onRetire={retireDice} />
 
       {rosterOpen && (
@@ -531,12 +593,6 @@ export function Game() {
           buttons={statusDesc.buttons}
           onClose={() => setStatusOpen(false)}
         />
-      )}
-
-      {toast && (
-        <div className={`pill pill--toast${game.turnDeadline ? ' pill--toast-below' : ''}`} key={toast.id} onClick={() => document.querySelector('.game__chat')?.scrollIntoView({ behavior: 'smooth' })}>
-          {toast.text}
-        </div>
       )}
 
       {accFlow && (
@@ -632,9 +688,24 @@ export function Game() {
             })}
             {!iAmHost && <div className="game__setnote">Only the host can replace players.</div>}
 
-            <div className="game__settinghead2">Your dice</div>
             <DiceSettings current={me?.dice ?? savedDice() ?? defaultDice(me?.suspectId)} onChange={setDice} />
-            <div className="game__setnote">Everyone sees these colours when your dice roll. Computers roll their character's colour.</div>
+
+            <div className="game__settinghead2">Camera</div>
+            <label className="game__settoggle">
+              <input
+                type="checkbox"
+                checked={cameraLock}
+                onChange={(e) => {
+                  setCameraLock(e.target.checked);
+                  try {
+                    localStorage.setItem(CAMERA_LOCK_KEY, e.target.checked ? 'on' : 'off');
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
+              Lock camera on player to move
+            </label>
 
             <div className="game__settinghead2">Sound</div>
             <label className="game__settoggle">
@@ -655,8 +726,8 @@ export function Game() {
             </button>
             <div className="game__setnote">
               {savedAt
-                ? `Saved to this browser at ${new Date(savedAt).toLocaleTimeString()}. It also auto-saves every round.`
-                : 'Stored in this browser; auto-saves after every full round. Load it from the title screen.'}
+                ? `Saved to this browser at ${new Date(savedAt).toLocaleTimeString()}.`
+                : 'Stored in this browser. Load it from the title screen.'}
             </div>
           </div>
         </>

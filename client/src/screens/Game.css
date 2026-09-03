@@ -256,9 +256,8 @@
 }
 
 /* ---- Pills: every floating notice shares one shape (turn clock, event toast, turn flash) ----
-   Fixed, centred, Georgia bold, 2px border and a drop shadow. Positions stack under the turn banner:
-   the clock sits directly beneath it; a toast sits there too, or one row lower while a clock shows;
-   the turn flash sits over the middle of the board. */
+   Fixed, centred, Georgia bold, 2px border and a drop shadow. The clock sits directly under the
+   turn banner; the turn flash and event toasts live in the notice stack over the board. */
 .pill {
   position: fixed;
   left: 50%;
@@ -300,25 +299,62 @@
     transform: translateX(-50%) scale(1.08);
   }
 }
+/* The notice stack: one fixed spot over the board where the turn flash and event toasts appear.
+   Newest on top; a new arrival grows into place and pushes the rest down, so nothing overlaps. */
+.notices {
+  position: fixed;
+  top: 38vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 92vw;
+  pointer-events: none;
+}
+.notices__slot {
+  display: grid;
+  grid-template-rows: 1fr;
+  justify-items: center;
+  max-width: 100%;
+  animation: notice-grow 0.25s ease-out;
+}
+.notices__slot > * {
+  min-height: 0;
+}
+@keyframes notice-grow {
+  from {
+    grid-template-rows: 0fr;
+  }
+  to {
+    grid-template-rows: 1fr;
+  }
+}
+/* Inside the stack the pill flows in the column instead of pinning itself to the viewport. */
+.pill--stacked {
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+  max-width: 100%;
+}
 .pill--toast {
-  top: 4.4rem;
   font-size: 1.05rem;
   color: var(--ink, #ece8f5);
   pointer-events: auto;
   cursor: pointer;
   animation: pill-toast 4s ease forwards;
 }
-.pill--toast-below {
-  top: 8.2rem;
-}
 @keyframes pill-toast {
   0% {
     opacity: 0;
-    transform: translate(-50%, -6px);
+    transform: translateY(-6px);
   }
   8% {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateY(0);
   }
   85% {
     opacity: 1;
@@ -327,32 +363,30 @@
     opacity: 0;
   }
 }
-/* "<name>'s turn" — the character's own colours, over the board, for a beat at the start of a turn. */
+/* "<name>'s turn" — the character's own colours, for a beat at the start of a turn. */
 .pill--flash {
-  top: 38vh;
   font-size: 1.9rem;
   padding: 0.7rem 2.4rem;
-  z-index: 205;
   animation: pill-flash 1.4s ease forwards;
 }
 @keyframes pill-flash {
   0% {
     opacity: 0;
-    transform: translate(-50%, 8px) scale(0.92);
+    transform: translateY(8px) scale(0.92);
   }
   15% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1.04);
+    transform: translateY(0) scale(1.04);
   }
   25% {
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
   }
   75% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -6px) scale(0.98);
+    transform: translateY(-6px) scale(0.98);
   }
 }
 @media (max-width: 820px) {
@@ -364,13 +398,8 @@
     top: 3.6rem;
     font-size: 1.35rem;
   }
-  /* Under the turn-order chips on a phone, so it never covers them. */
   .pill--toast {
-    top: 8.6rem;
     font-size: 0.9rem;
-  }
-  .pill--toast-below {
-    top: 11.2rem;
   }
   .pill--flash {
     font-size: 1.5rem;

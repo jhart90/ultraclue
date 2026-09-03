@@ -20,7 +20,10 @@ function playBounds(w: number, h: number): PlayBounds {
   return { left: r.left, right: r.right, top: Math.max(0, r.top), bottom: Math.min(h, r.bottom) };
 }
 
-function DiceCanvas({ roll }: { roll: DiceRollShow }) {
+/** How long resting dice take to fade out when the next turn begins (ms). */
+export const DICE_FADE_MS = 500;
+
+function DiceCanvas({ roll, fading }: { roll: DiceRollShow; fading?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [settled, setSettled] = useState(false);
   const [labelTop, setLabelTop] = useState<number | null>(null);
@@ -63,7 +66,7 @@ function DiceCanvas({ roll }: { roll: DiceRollShow }) {
   }, []);
 
   return (
-    <div className="dice-overlay">
+    <div className={`dice-overlay${fading ? ' dice-overlay--fade' : ''}`}>
       <canvas ref={canvasRef} className="dice3d-canvas" />
       <div className="dice-overlay__label" style={labelTop != null ? { top: labelTop, bottom: 'auto' } : undefined}>
         {roll.name} rolls{settled ? <span className="dice-overlay__total"> {roll.values[0]} + {roll.values[1]} = {roll.values[0] + roll.values[1]}</span> : '…'}
@@ -73,8 +76,9 @@ function DiceCanvas({ roll }: { roll: DiceRollShow }) {
 }
 
 /** Full-screen, non-interactive 3D dice for the latest roll. The dice keep their resting positions
- *  on screen until the parent clears `roll` (next pop-up, next roll, or any click). */
-export function DiceOverlay({ roll }: { roll: DiceRollShow | null }) {
+ *  on screen until the parent clears `roll` (next pop-up, next roll, or any click); `fading` plays
+ *  the fade-out first, for dice left over when the next turn begins. */
+export function DiceOverlay({ roll, fading }: { roll: DiceRollShow | null; fading?: boolean }) {
   if (!roll) return null;
-  return <DiceCanvas key={roll.seq} roll={roll} />;
+  return <DiceCanvas key={roll.seq} roll={roll} fading={fading} />;
 }

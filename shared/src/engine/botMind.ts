@@ -26,7 +26,16 @@ export interface BotMind {
   k: BotKnowledge;
   /** Cards nobody can hold — i.e. confirmed in the envelope (empty for easy bots). */
   envelope: Set<string>;
+  /** Everyone at the table, in turn order. */
+  playerIds: string[];
+  /** The suggestion history the bot is entitled to know (see botNotes.ts). */
+  events: SuggestionEvent[];
 }
+
+/** A medium/hard bot gambles on an accusation once its odds are at least this good… */
+const GAMBLE_MIN_ODDS = 1 / 3;
+/** …but only if a rival looks about to win: a suggestion of theirs, this round, that nobody could
+ *  disprove and whose three cards are all still possible envelope cards by the bot's own reckoning. */
 
 const EASY_MEMORY = 30; // suggestions an easy bot keeps in its head
 const EASY_GAMBLE_COMBOS = 6; // easy guesses once (#suspects × #weapons × #rooms) left is this small
@@ -73,7 +82,24 @@ export function botMind(
     }
   }
   const envelope = d === 'easy' ? new Set<string>() : envelopeKnown(k, botId, playerIds, hand);
-  return { difficulty: d, botId, hand, k, envelope };
+  return { difficulty: d, botId, hand, k, envelope, playerIds, events };
+}
+
+/**
+ * Does some other player look set to solve the case before this bot's next turn? The tell is a
+ * suggestion made within the last round (one per seat at most, so the last `players - 1` events)
+ * that went undisproved, naming only cards the bot itself still considers possible envelope cards
+ * and none the suggester is known to hold. Whoever made it either holds those cards or has just
+ * confirmed the solution — and if it's the latter, they accuse on their next turn.
+ */
+export function botThreatened(m: BotMind): boolean {
+  const window = Math.max(1, m.playerIds.length - 1);
+  const recent = m.events.slice(-window);
+  return recent.some((e) => {
+    if (e.suggesterId === m.botId || e.suggesterId === '' || e.responderId) return false;
+    const theirs = m.k.has.get(e.suggesterId);
+    return e.trio.every((c) => !m.k.ruledOut.has(c) && !m.hand.includes(c) && !theirs?.has(c));
+  });
 }
 
 /** Rooms still worth visiting to learn about: not held by anyone, not confirmed in the envelope. */
@@ -109,7 +135,18 @@ export function botDecideAccusation(m: BotMind, rng: RNG): BotAccusation | null 
   const s = one(c.suspects);
   const w = one(c.weapons);
   const r = one(c.rooms);
-  return s && w && r ? { suspectId: s, weaponId: w, roomId: r } : null;
+  if (s && w && r) return { suspectId: s, weaponId: w, roomId: r };
+
+  // Not certain — but if a rival looks about to win, a good enough guess beats waiting to lose.
+  const open = (cands: { id: string }[], pinned: string | null) => (pinned ? cands.filter((x) => x.id === pinned) : cands);
+  const S = open(c.suspects, s);
+  const W = open(c.weapons, w);
+  const R = open(c.rooms, r);
+  const combos = S.length * W.length * R.length;
+  if (combos > 0 && 1 / combos >= GAMBLE_MIN_ODDS && botThreatened(m)) {
+    return { suspectId: pick(S, rng).id, weaponId: pick(W, rng).id, roomId: pick(R, rng).id };
+  }
+  return null;
 }
 
 /**

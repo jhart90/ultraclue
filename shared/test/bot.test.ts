@@ -11,6 +11,9 @@ import {
   botRevealCard,
   botMoveTarget,
   botShouldStay,
+  botDecideAccusation,
+  botThreatened,
+  type BotMind,
 } from '../src';
 
 /** Rule out everything except the given solution triple. */
@@ -80,5 +83,55 @@ describe('bot deduction', () => {
     expect(botShouldStay('room-study', new Set(['room-study']), new Set())).toBe(false); // ruled out
     expect(botShouldStay('room-study', new Set(), new Set(['room-study']))).toBe(false); // already tested
     expect(botShouldStay(undefined, new Set(), new Set())).toBe(false); // not in a room
+  });
+});
+
+describe('bot gambles when a rival is about to win', () => {
+  const bot = 'bot';
+  const rival = 'A';
+  const others = ['B', 'C'];
+  /** A hard bot that has pinned the weapon and room but still has two suspects in play. */
+  function mind(events: BotMind['events'], envelope: string[] = []): BotMind {
+    const ruledOut = ruledOutExcept('suspect-scarlet', 'weapon-rope', 'room-study');
+    ruledOut.delete('suspect-mustard'); // second suspect still possible
+    return {
+      difficulty: 'hard',
+      botId: bot,
+      hand: [],
+      k: { has: new Map(), hasnt: new Map(), groups: [], ruledOut },
+      envelope: new Set(envelope),
+      playerIds: [bot, rival, ...others],
+      events,
+    };
+  }
+  const undisproved = { suggesterId: rival, trio: ['suspect-scarlet', 'weapon-rope', 'room-study'], passers: [bot, ...others] };
+
+  it('never guesses while nobody looks close', () => {
+    expect(botThreatened(mind([]))).toBe(false);
+    expect(botDecideAccusation(mind([]), makeRng(1))).toBeNull();
+  });
+
+  it('guesses at 1-in-2 odds after a rival\'s undisproved suggestion of still-possible cards', () => {
+    const m = mind([undisproved]);
+    expect(botThreatened(m)).toBe(true);
+    const acc = botDecideAccusation(m, makeRng(7));
+    expect(acc).not.toBeNull();
+    expect(['suspect-scarlet', 'suspect-mustard']).toContain(acc!.suspectId);
+    expect(acc!.weaponId).toBe('weapon-rope');
+    expect(acc!.roomId).toBe('room-study');
+  });
+
+  it('ignores a suggestion that was disproved, is stale, or names a card already ruled out', () => {
+    expect(botThreatened(mind([{ ...undisproved, responderId: 'B' }]))).toBe(false);
+    expect(botThreatened(mind([{ ...undisproved, trio: ['suspect-plum', 'weapon-rope', 'room-study'] }]))).toBe(false);
+    // older than one round: three later suggestions push it out of the window
+    const later = { suggesterId: 'B', trio: ['suspect-plum', 'weapon-candlestick', 'room-lounge'], passers: [], responderId: 'C' };
+    expect(botThreatened(mind([undisproved, later, later, later]))).toBe(false);
+  });
+
+  it('holds out when the odds are worse than 1 in 3, even under threat', () => {
+    const m = mind([undisproved]);
+    m.k.ruledOut.delete('weapon-candlestick'); // 2 suspects x 2 weapons = 1 in 4
+    expect(botDecideAccusation(m, makeRng(3))).toBeNull();
   });
 });

@@ -11,6 +11,15 @@
     opacity: 0;
   }
 }
+/* Dice still resting from the previous turn fade away as the next turn begins. */
+.dice-overlay--fade {
+  animation: dice-overlay-out 0.5s ease-in forwards;
+}
+@keyframes dice-overlay-out {
+  to {
+    opacity: 0;
+  }
+}
 .dice3d-canvas {
   position: absolute;
   inset: 0;
@@ -45,22 +54,36 @@
 }
 
 /* Dice colour pickers (settings menu). */
-.dicepick__row {
+.dicepick__head {
   display: flex;
   align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.dicepick__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   margin: 0.35rem 0;
 }
 .dicepick__label {
   flex: none;
-  width: 3.4rem;
+  width: 2.6rem;
+  padding-top: 2px;
   font-size: 0.72rem;
   color: var(--muted, #9a93b3);
 }
+/* The swatches own the remaining width and wrap within it. */
+.dicepick__swatches {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
 .dicepick__swatch {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
@@ -96,7 +119,6 @@
 .dicepick__preview {
   display: inline-flex;
   gap: 4px;
-  margin-left: auto;
 }
 .dicepick__die {
   width: 22px;

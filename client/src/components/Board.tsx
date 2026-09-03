@@ -3,6 +3,7 @@ import { BOARD, coordKey, getCard, type Coord, type PlayerView, type RoomLayout,
 import { resolveOverride } from '../render/overrides';
 import { resolveBoardArt } from '../render/boardArt';
 import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
+import { packRoom, type Packing, type Rect } from '../render/roomPacking';
 import './Board.css';
 
 interface LastMove {
@@ -111,6 +112,51 @@ function roomBounds(room: RoomLayout) {
 
 /** SVG path tracing only the outer edges of a room's tiles, so an L-shaped room gets a clean
  *  border that follows its real footprint instead of a bounding rectangle. */
+/** Where a room's name bubble sits and how big it is (also the keep-out for tokens). */
+function labelGeom(room: RoomLayout, title: string) {
+  const b = roomBounds(room);
+  const isRect = room.tiles.length === (b.w / TS) * (b.h / TS);
+  const cx = isRect ? b.x + b.w / 2 : room.label.x * TS + TS / 2;
+  const cy = isRect ? b.y + b.h / 2 : room.label.y * TS + TS / 2;
+  const fs = Math.max(6.5, Math.min(11, (b.w - 12) / (title.length * 0.62)));
+  const w = Math.min(b.w - 4, title.length * fs * 0.6 + 12);
+  const h = fs + 7;
+  return { isRect, cx, cy, fs, w, h };
+}
+
+/** Full-size pawn radius; the packer shrinks from here as a room fills up. */
+const PAWN_R = TS / 2 - 6;
+/** Weapon glyphs are authored for a 6.5-unit radius; they scale down with the pawns. */
+const WEAPON_R = 6.5;
+
+// Packings depend only on the room and the head-count, so they're cached across renders.
+const PACK_CACHE = new Map<string, Packing>();
+function packFor(room: RoomLayout, pawns: number, weapons: number): Packing {
+  const key = `${room.id}:${pawns}:${weapons}`;
+  let pk = PACK_CACHE.get(key);
+  if (pk) return pk;
+  const title = getCard(room.id)?.title ?? room.id;
+  const lg = labelGeom(room, title);
+  const b = roomBounds(room);
+  const reserved: Rect[] = [
+    // the name bubble, plus the glyph line above it
+    { x: lg.cx - lg.w / 2 - 2, y: lg.cy - lg.h / 2 - 16, w: lg.w + 4, h: lg.h + 18 },
+  ];
+  if (room.shortcutTile) reserved.push({ x: room.shortcutTile.x * TS, y: room.shortcutTile.y * TS, w: TS, h: TS });
+  pk = packRoom({
+    tiles: room.tiles,
+    ts: TS,
+    reserved,
+    pawns,
+    weapons,
+    rMax: PAWN_R,
+    anchor: { x: lg.cx, y: lg.cy + lg.h / 2 + PAWN_R },
+    top: { x: b.x + b.w / 2, y: b.y },
+  });
+  PACK_CACHE.set(key, pk);
+  return pk;
+}
+
 function roomOutline(tiles: Coord[]): string {
   const inRoom = new Set(tiles.map(coordKey));
   const has = (x: number, y: number) => inRoom.has(`${x},${y}`);
@@ -262,10 +308,10 @@ function spansGap(st: { a: Coord[]; b: Coord[] }): boolean {
 
 /** A weapon token: a pewter silhouette of the weapon inside the same 13-unit footprint the old
     plain circle used, with a hover tooltip naming it. Unknown ids fall back to the circle. */
-function WeaponToken({ id, px, py, label, onTip }: { id: string; px: number; py: number; label?: string; onTip?: TipFn }) {
+function WeaponToken({ id, px, py, scale = 1, label, onTip }: { id: string; px: number; py: number; scale?: number; label?: string; onTip?: TipFn }) {
   const g = WEAPON_GLYPHS[id];
   return (
-    <g transform={`translate(${px},${py})`} role="img" aria-label={label ? `${label} token` : undefined} {...tipProps(label, onTip)}>
+    <g transform={`translate(${px},${py}) scale(${scale})`} role="img" aria-label={label ? `${label} token` : undefined} {...tipProps(label, onTip)}>
       {/* generous invisible hit area so the thin glyphs are easy to hover */}
       <circle r={7.5} fill="transparent" stroke="none" />
       {g ? (
@@ -347,6 +393,7 @@ export function Board({
   onMoveTo,
   keyboardZoom = true,
   myId,
+  cameraLock = true,
   activeId,
 }: {
   players: PlayerView[];
@@ -359,6 +406,9 @@ export function Board({
   keyboardZoom?: boolean;
   /** The viewer's own player id. When set, the camera locks onto and follows *other* players' moves. */
   myId?: string;
+  /** When false the camera never follows another player's move or recentres on a turn change;
+   *  the viewer keeps full control of pan and zoom. */
+  cameraLock?: boolean;
   /** Whose turn it is. When this changes, the camera recentres on them at the follow zoom (unlocked). */
   activeId?: string;
 }) {
@@ -398,7 +448,7 @@ export function Board({
     const sig = moveSig;
     if (sig === animSig.current) return;
     animSig.current = sig;
-    const follow = !!myId && lastMove.playerId !== myId;
+    const follow = cameraLock && !!myId && lastMove.playerId !== myId;
     if (follow) {
       lockedRef.current = true;
       drag.current = null;
@@ -435,7 +485,7 @@ export function Board({
       step(lastMove.path[i]);
     }, WALK_STEP_MS);
     return () => clearInterval(timer);
-  }, [moveSig, myId]);
+  }, [moveSig, myId, cameraLock]);
 
   // When the turn passes to a new player, recentre the camera on them at the follow zoom — but leave
   // it unlocked, so the viewer can immediately pan/zoom away.
@@ -445,6 +495,7 @@ export function Board({
     const prev = turnRef.current;
     turnRef.current = activeId;
     if (prev === null || prev === activeId) return; // skip first mount; only react to a real change
+    if (!cameraLock) return; // the viewer has opted out of the camera moving on its own
     if (lockedRef.current) return; // a move is being followed — don't fight that camera
     const p = playersRef.current.find((pl) => pl.id === activeId);
     const el = viewportRef.current;
@@ -458,6 +509,24 @@ export function Board({
   }, [activeId]);
 
   const reachSet = new Set((reachable ?? []).map(coordKey));
+
+  // Who and what is standing in each room right now. A pawn mid-walk is not "in" its room yet, so
+  // the room's packing doesn't shuffle until it arrives.
+  const weaponsByRoom = new Map<string, string[]>();
+  for (const [wid, rid] of Object.entries(weaponLocations ?? {})) {
+    const arr = weaponsByRoom.get(rid) ?? [];
+    arr.push(wid);
+    weaponsByRoom.set(rid, arr);
+  }
+  const pawnsByRoom = new Map<string, PlayerView[]>();
+  for (const p of players) {
+    if (p.inRoomId && BOARD.rooms[p.inRoomId] && anim?.playerId !== p.id) {
+      const arr = pawnsByRoom.get(p.inRoomId) ?? [];
+      arr.push(p);
+      pawnsByRoom.set(p.inRoomId, arr);
+    }
+  }
+  const packing = (rid: string) => packFor(BOARD.rooms[rid], pawnsByRoom.get(rid)?.length ?? 0, weaponsByRoom.get(rid)?.length ?? 0);
 
   // Fit-to-width on first mount.
   useLayoutEffect(() => {
@@ -720,13 +789,8 @@ export function Board({
             const art = boardArt ?? resolveOverride(room.id, 'room', title);
             // A room whose tiles fill its whole bounding box is a plain rectangle; otherwise it has
             // a notch and must be drawn from its actual tiles so the L-shape shows.
-            const isRect = room.tiles.length === (b.w / TS) * (b.h / TS);
             // name bubble: centred for rectangles, on the label tile for L-shapes
-            const cxr = isRect ? b.x + b.w / 2 : room.label.x * TS + TS / 2;
-            const cyr = isRect ? b.y + b.h / 2 : room.label.y * TS + TS / 2;
-            const fs = Math.max(6.5, Math.min(11, (b.w - 12) / (title.length * 0.62)));
-            const bubbleW = Math.min(b.w - 4, title.length * fs * 0.6 + 12);
-            const bubbleH = fs + 7;
+            const { isRect, cx: cxr, cy: cyr, fs, w: bubbleW, h: bubbleH } = labelGeom(room, title);
             return (
               <g key={room.id}>
                 {isRect ? (
@@ -891,49 +955,29 @@ export function Board({
 
           {/* weapon tokens, grouped by their current room (a suggestion summons them). Drawn above the
               move overlay, like the pawns, so their hover tooltips keep working during a move */}
-          {weaponLocations &&
-            (() => {
-              const byRoom = new Map<string, string[]>();
-              for (const [wid, rid] of Object.entries(weaponLocations)) {
-                const arr = byRoom.get(rid) ?? [];
-                arr.push(wid);
-                byRoom.set(rid, arr);
-              }
-              return [...byRoom.entries()].flatMap(([rid, wids]) => {
-                const room = BOARD.rooms[rid];
-                if (!room) return [];
-                const b = roomBounds(room);
-                const n = wids.length;
-                const r = 6.5;
-                const spacing = Math.min(2 * r + 1, (b.w - 12) / Math.max(n, 1));
-                return wids.map((wid, i) => (
-                  <WeaponToken
-                    key={wid}
-                    id={wid}
-                    px={b.x + b.w / 2 + (i - (n - 1) / 2) * spacing}
-                    py={b.y + 13}
-                    label={getCard(wid)?.title}
-                    onTip={setTip}
-                  />
-                ));
-              });
-            })()}
+          {[...weaponsByRoom.entries()].flatMap(([rid, wids]) => {
+            if (!BOARD.rooms[rid]) return [];
+            const pk = packing(rid);
+            return wids.map((wid, i) => {
+              const slot = pk.weaponSlots[i];
+              return (
+                <WeaponToken
+                  key={wid}
+                  id={wid}
+                  px={slot.x}
+                  py={slot.y}
+                  scale={Math.min(1, pk.r / WEAPON_R)}
+                  label={getCard(wid)?.title}
+                  onTip={setTip}
+                />
+              );
+            });
+          })}
 
           {/* player pawns: those inside a room cluster together in that one space; others sit on
               their tile (and walk along the path while animating) */}
           {(() => {
-            const inRoom = new Map<string, PlayerView[]>();
-            const free: PlayerView[] = [];
-            for (const p of players) {
-              const animating = anim?.playerId === p.id;
-              if (p.inRoomId && BOARD.rooms[p.inRoomId] && !animating) {
-                const arr = inRoom.get(p.inRoomId) ?? [];
-                arr.push(p);
-                inRoom.set(p.inRoomId, arr);
-              } else {
-                free.push(p);
-              }
-            }
+            const free = players.filter((p) => !(p.inRoomId && BOARD.rooms[p.inRoomId] && anim?.playerId !== p.id));
             return (
               <>
                 {free.map((p) => {
@@ -950,23 +994,23 @@ export function Board({
                     />
                   );
                 })}
-                {[...inRoom.entries()].flatMap(([rid, occ]) => {
-                  const b = roomBounds(BOARD.rooms[rid]);
-                  const n = occ.length;
-                  const r = TS / 2 - 6;
-                  const spacing = Math.min(TS - 1, (b.w - 14) / Math.max(n, 1));
-                  return occ.map((p, i) => (
-                    <Pawn
-                      key={p.id}
-                      px={b.x + b.w / 2 + (i - (n - 1) / 2) * spacing}
-                      py={b.y + b.h * 0.62}
-                      r={r}
-                      color={suspectColor(p.suspectId)}
-                      eliminated={p.eliminated}
-                      label={getCard(p.suspectId)?.title}
-                      onTip={setTip}
-                    />
-                  ));
+                {[...pawnsByRoom.entries()].flatMap(([rid, occ]) => {
+                  const pk = packing(rid);
+                  return occ.map((p, i) => {
+                    const slot = pk.pawnSlots[i];
+                    return (
+                      <Pawn
+                        key={p.id}
+                        px={slot.x}
+                        py={slot.y}
+                        r={pk.r}
+                        color={suspectColor(p.suspectId)}
+                        eliminated={p.eliminated}
+                        label={getCard(p.suspectId)?.title}
+                        onTip={setTip}
+                      />
+                    );
+                  });
                 })}
               </>
             );

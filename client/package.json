@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pack:stress": "tsx scripts/packStress.ts"
   },
   "dependencies": {
     "html2canvas": "^1.4.1",

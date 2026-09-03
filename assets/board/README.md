@@ -17,9 +17,11 @@ Each image is stretched onto that room's **tile rectangle** on the board — its
 individual tiles. So the image's aspect ratio must equal the room's `width x height` in tiles from the
 table below. The Clock Tower is 3 x 5 tiles, so its art must be 3:5 portrait.
 
-Seven rooms are not full rectangles (see *Irregular shapes*). For those, the parts of the bounding box
-that are not room tiles are cut out at render time, so paint the whole rectangle and let the cut-outs
-fall where they may — or leave those spots visually quiet.
+Seven rooms are not full rectangles (see *Irregular shapes*). The board masks those to their real tile
+shape and draws its own outline around it, so **never ask the art to draw the irregular outline
+itself**. Paint the full rectangle, floor to every edge, and compose the furniture so the room reads
+correctly once the mask cuts the corners away. If the art tries to draw the cross or the notch and its
+proportions are even slightly off, the blank area lands inside the room and shows as white patches.
 
 ## What the board draws on top
 
@@ -65,6 +67,8 @@ the same place.
 > landings outside the walls.
 > Furnishings hug the walls. The centre of the floor stays open and simple — a plain rug or bare
 > floorboards — because game pieces sit there.
+> Every pixel of the canvas is room — floor, furniture or wall. There must be no blank, white or
+> transparent area anywhere, not even in corners that will be masked away; paint plain floor there.
 > Do not draw people, and do not letter any text anywhere in the image.
 
 Fill in the room's numbers from the table, then add two or three lines describing the specific

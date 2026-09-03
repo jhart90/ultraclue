@@ -35,7 +35,7 @@ export const WEAPONS: WeaponCard[] = [
   { id: 'weapon-pitchfork', type: 'weapon', title: 'Pitchfork', phrase: 'Country justice.' },
   { id: 'weapon-meat-hook', type: 'weapon', title: 'Meat Hook', phrase: 'Hangs the question.' },
   { id: 'weapon-pool-cue', type: 'weapon', title: 'Pool Cue', phrase: 'Calls the shot, sinks the rival.' },
-  { id: 'weapon-flask', type: 'weapon', title: 'Poisoned Flask', phrase: 'The nightcap that doesn’t wake.' },
+  { id: 'weapon-paint', type: 'weapon', title: 'Paint', phrase: 'A fresh coat hides an old stain.' },
   { id: 'weapon-cane', type: 'weapon', title: 'Walking Cane', phrase: 'A gentleman’s last word.' },
   { id: 'weapon-razor', type: 'weapon', title: 'Straight Razor', phrase: 'Close shave, closer call.' },
   { id: 'weapon-branding-iron', type: 'weapon', title: 'Branding Iron', phrase: 'Leaves a lasting impression.' },

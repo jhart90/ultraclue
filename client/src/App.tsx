@@ -5,6 +5,7 @@ import { Game } from './screens/Game';
 import { Gallery } from './screens/Gallery';
 import { StatsScreen } from './screens/StatsScreen';
 import { SeatPicker } from './components/SeatPicker';
+import { CardZoomOverlay } from './components/CardZoom';
 
 export function App() {
   const screen = useStore((s) => s.screen);
@@ -29,6 +30,7 @@ export function App() {
     <>
       {view}
       {seatPick && <SeatPicker />}
+      <CardZoomOverlay />
     </>
   );
 }

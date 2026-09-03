@@ -33,7 +33,7 @@ function Mini({ id }: { id: string }) {
   const card = getCard(id);
   if (!card) return null;
   return (
-    <span className="chatcard__mini" title={card.title}>
+    <span className="chatcard__mini">
       <Card card={card} />
     </span>
   );

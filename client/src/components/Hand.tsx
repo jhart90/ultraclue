@@ -1,16 +1,14 @@
-import { useState } from 'react';
 import { getCard, type AnyCard } from 'shared';
 import { CardArt } from '../render/cardArt';
 import { resolveOverride } from '../render/overrides';
-import { Card } from './Card';
+import { openCardZoom } from './CardZoom';
 import { compareCards } from '../util/cardSort';
 import './Hand.css';
 
 // The player's private hand: a tidy shelf sorted by type (suspect, weapon, room) then alphabetically
-// (suspects by surname), plus a click-to-open "flip-through" viewer with prev/next.
+// (suspects by surname). Clicking a card opens it full-size in the shared zoom viewer, which pages
+// prev/next through the rest of the hand.
 export function Hand({ cardIds }: { cardIds: string[] }) {
-  const [focused, setFocused] = useState<number | null>(null);
-
   const cards = cardIds
     .map((id) => getCard(id))
     .filter((c): c is AnyCard => !!c)
@@ -23,7 +21,15 @@ export function Hand({ cardIds }: { cardIds: string[] }) {
           <div
             key={card.id}
             className={`hand__card hand__card--${card.type}`}
-            onClick={() => setFocused(i)}
+            role="button"
+            tabIndex={0}
+            onClick={() => openCardZoom(cards, i)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openCardZoom(cards, i);
+              }
+            }}
             title={`${card.title} — click to enlarge`}
           >
             <div className="hand__thumb">
@@ -40,31 +46,6 @@ export function Hand({ cardIds }: { cardIds: string[] }) {
           </div>
         ))}
       </div>
-
-      {focused != null && cards[focused] && (
-        <div className="hand__viewer" onClick={() => setFocused(null)}>
-          <div className="hand__viewerinner" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="hand__nav"
-              onClick={() => setFocused((focused - 1 + cards.length) % cards.length)}
-              aria-label="Previous card"
-            >
-              ‹
-            </button>
-            <Card card={cards[focused]} />
-            <button
-              className="hand__nav"
-              onClick={() => setFocused((focused + 1) % cards.length)}
-              aria-label="Next card"
-            >
-              ›
-            </button>
-          </div>
-          <div className="hand__viewerhint">
-            {focused + 1} / {cards.length} · click outside to close
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { getCard } from 'shared';
 import { SORTED_SUSPECTS, SORTED_WEAPONS, SORTED_ROOMS } from '../util/cardSort';
 import { highlightChat } from '../util/highlightChat';
 import { Card } from './Card';
+import { openCardZoom } from './CardZoom';
 import './SuggestPanels.css';
 
 /** Suspect/weapon(/room) picker for a suggestion or an accusation. */
@@ -126,7 +127,19 @@ export function RevealPanel({
                 className={`sp__cardbtn${selected === c ? ' sp__cardbtn--sel' : ''}`}
                 onClick={() => setSelected(c)}
               >
-                <Card card={card} />
+                <Card card={card} zoomable={false} />
+                <span
+                  className="sp__zoom"
+                  role="button"
+                  aria-label={`Enlarge ${card.title}`}
+                  title="Enlarge"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openCardZoom(card);
+                  }}
+                >
+                  🔍
+                </span>
               </button>
             ) : null;
           })}

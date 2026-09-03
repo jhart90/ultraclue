@@ -69,7 +69,7 @@ export function TitleCards() {
           className="title__card"
           style={{ left: `${c.left}%`, bottom: `${c.bottom}vh`, transform: `translateX(-50%) rotate(${c.angle}deg) scale(0.8)` }}
         >
-          {c.faceUp ? <Card card={c.card} /> : <CardBack />}
+          {c.faceUp ? <Card card={c.card} zoomable={false} /> : <CardBack />}
         </div>
       ))}
     </div>

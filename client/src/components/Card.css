@@ -13,6 +13,18 @@
   font-family: 'Georgia', serif;
 }
 
+/* Clickable cards lift slightly on hover and show the magnifier cursor. */
+.card--zoomable {
+  cursor: zoom-in;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.card--zoomable:hover,
+.card--zoomable:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(200, 162, 74, 0.35);
+  outline: none;
+}
+
 .card__art {
   width: 100%;
   flex: 1 1 auto; /* fill all the space above the body so every card lands at the same height */

@@ -161,6 +161,36 @@
   border-radius: 12px; /* match the card so the selection ring follows its corners */
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
+.sp__cardbtn {
+  position: relative;
+}
+/* Magnifier chip in the corner of each pickable card: the click itself selects, this enlarges. */
+.sp__zoom {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: rgba(20, 16, 30, 0.85);
+  border: 1px solid rgba(200, 162, 74, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: zoom-in;
+  opacity: 0.75;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.sp__cardbtn:hover .sp__zoom,
+.sp__zoom:hover {
+  opacity: 1;
+}
+.sp__zoom:hover {
+  transform: scale(1.1);
+  border-color: var(--accent, #c8a24a);
+}
 .sp__cardbtn:hover {
   transform: translateY(-6px);
 }

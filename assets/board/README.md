@@ -27,9 +27,8 @@ Art has to survive these overlays, so keep the middle of the room calm:
 
 - **Pawns** cluster in the centre of the room, up to 40 of them.
 - **Weapon tokens** sit as small pewter circles along the top edge.
-- **The room name** currently renders as a white bubble at the room's centre. If the art carries its
-  own name plaque (as the reference Trophy Room art does), the built-in label should be suppressed for
-  rooms that have board art — a one-line change in `Board.tsx`.
+- **The room name** renders as a white bubble at the room's centre, so the art must **not** letter the
+  room name onto the floor. No name plaques, no signage, no text of any kind.
 - **Doors** are drawn as small wooden doors or iron gates straddling the wall line, and
   **secret passages** get a staircase icon on their tile. Art can show these too, but the icons land on
   top, so do not put fine detail exactly there.
@@ -47,15 +46,16 @@ the same place.
 
 > Top-down floorplan illustration of the **&lt;ROOM NAME&gt;** of a grand murder-mystery mansion, drawn as
 > a single board-game tile. Vibrant retro-vintage board game art: bold black ink outlines, warm
-> saturated colours, clean flat shading, no photorealism, no text other than the room name.
+> saturated colours, clean flat shading, no photorealism, no text anywhere in the image.
 > The floor is a rectangle **&lt;W&gt; units wide by &lt;H&gt; units tall** (portrait/landscape), seen straight from
 > above. The four walls sit just inside the image edges and splay slightly outward, so their inner
 > faces and the objects mounted on them are visible.
 > Doors: **&lt;door list&gt;**. Each door is an open wooden door on the wall with a pale tiled threshold
 > spilling outside it.
 > Furnishings hug the walls. The centre of the floor stays open and simple — a plain rug or bare
-> floorboards — with the room name lettered on it in a small oval plaque.
-> Background outside the walls is pure white (or transparent). Do not draw people.
+> floorboards — because game pieces sit there.
+> Background outside the walls is pure white (or transparent). Do not draw people, and do not letter
+> any text anywhere in the image.
 
 Fill in the room's numbers from the table, then add two or three lines describing the specific
 furniture, and name the palette from its card art.
@@ -152,7 +152,7 @@ uncluttered, or paint a hatch or opening there.
 
 | Room | Tile (col, row) | Story |
 | --- | --- | --- |
-| Chapel | see board data | Down through the crypt -> Cemetery |
+| Chapel | 3rd col, 8th row | Down through the crypt -> Cemetery |
 | Clock Tower | 1st col, 1st row | Down the weight shaft -> Boiler Room |
 | Theatre / Workshop | — | The trapdoor under the stage |
 | Boat House / Bunker | — | The smugglers' tunnel |

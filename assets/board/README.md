@@ -37,7 +37,14 @@ Art has to survive these overlays, so keep the middle of the room calm:
 
 Match the reference: vibrant retro-vintage board-game illustration, bold black ink outlines, warm
 saturated colour, straight-on top-down floor with the four walls splayed slightly outward so their
-inner faces and any wall-mounted objects are visible. Transparent background outside the walls.
+inner faces and any wall-mounted objects are visible.
+
+**Full bleed is the rule that matters most.** The art is stretched onto the room's tile rectangle, so
+the outer face of the walls must be flush with the image edge on all four sides. Any blank margin
+around the room shows up in game as a pale gap between the art and the room's own border, and pushes
+the painted walls inward so they no longer line up with the wall the board draws. Nothing may stick
+out past the walls — in particular, door thresholds must **not** spill outside, because that forces the
+whole room to shrink inward to make room for them.
 
 Colour and subject should echo that room's **card art** in `assets/overrides/rooms/`, so the two read as
 the same place.
@@ -48,14 +55,17 @@ the same place.
 > a single board-game tile. Vibrant retro-vintage board game art: bold black ink outlines, warm
 > saturated colours, clean flat shading, no photorealism, no text anywhere in the image.
 > The floor is a rectangle **&lt;W&gt; units wide by &lt;H&gt; units tall** (portrait/landscape), seen straight from
-> above. The four walls sit just inside the image edges and splay slightly outward, so their inner
-> faces and the objects mounted on them are visible.
-> Doors: **&lt;door list&gt;**. Each door is an open wooden door on the wall with a pale tiled threshold
-> spilling outside it.
+> above. FULL BLEED: the room fills the entire canvas edge to edge, with the outer face of the walls
+> flush against all four image borders. No margin, no white border, no drop shadow, no frame, no
+> rounded corners — this is a seamless tile that butts up against its neighbours. The walls are thin,
+> no more than a quarter of one grid unit, and splay slightly outward so their inner faces and the
+> objects mounted on them are visible.
+> Doors: **&lt;door list&gt;**. Each door is an opening cut through the wall, with the wooden door leaf
+> swinging inward onto the floor. Nothing extends beyond the image edge — no thresholds, steps or
+> landings outside the walls.
 > Furnishings hug the walls. The centre of the floor stays open and simple — a plain rug or bare
 > floorboards — because game pieces sit there.
-> Background outside the walls is pure white (or transparent). Do not draw people, and do not letter
-> any text anywhere in the image.
+> Do not draw people, and do not letter any text anywhere in the image.
 
 Fill in the room's numbers from the table, then add two or three lines describing the specific
 furniture, and name the palette from its card art.
@@ -66,10 +76,13 @@ Same two passes as card art, minus the frame alignment (board art has no drawn f
 
 ```bash
 python .claude/skills/optimize-image-assets/scripts/optimize_overrides.py assets/board/rooms
+python .claude/skills/optimize-image-assets/scripts/trim_board_art.py
 ```
 
 Generate as large as the tool allows at the right ratio; the optimiser downscales to 900px on the long
-edge and converts to WebP.
+edge and converts to WebP. The trim pass then strips any blank margin left around the room. It only
+cuts rows and columns that are almost entirely blank, so it cannot rescue art whose walls float well
+inside the canvas — that needs regenerating with the full-bleed wording above.
 
 ## Room specifications
 

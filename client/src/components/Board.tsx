@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { BOARD, coordKey, getCard, type Coord, type PlayerView, type RoomLayout, type SectionTheme } from 'shared';
 import { resolveOverride } from '../render/overrides';
+import { resolveBoardArt } from '../render/boardArt';
+import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
 import './Board.css';
 
 interface LastMove {
@@ -256,6 +258,28 @@ function spansGap(st: { a: Coord[]; b: Coord[] }): boolean {
   if (st.a.length !== st.b.length) return false;
   const dx = Math.abs(st.a[0].x - st.b[0].x);
   return dx > 1 && dx <= 5 && st.a.every((t, i) => t.y === st.b[i].y);
+}
+
+/** A weapon token: a pewter silhouette of the weapon inside the same 13-unit footprint the old
+    plain circle used, with a hover tooltip naming it. Unknown ids fall back to the circle. */
+function WeaponToken({ id, px, py, label, onTip }: { id: string; px: number; py: number; label?: string; onTip?: TipFn }) {
+  const g = WEAPON_GLYPHS[id];
+  return (
+    <g transform={`translate(${px},${py})`} role="img" aria-label={label ? `${label} token` : undefined} {...tipProps(label, onTip)}>
+      {/* generous invisible hit area so the thin glyphs are easy to hover */}
+      <circle r={7.5} fill="transparent" stroke="none" />
+      {g ? (
+        <>
+          {g.thick && <path d={g.thick} fill="none" stroke="#4b4e54" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />}
+          {g.thick && <path d={g.thick} fill="none" stroke="#c9cdd3" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />}
+          {g.d && <path d={g.d} fill="url(#pewter)" stroke="#4b4e54" strokeWidth={0.7} strokeLinejoin="round" />}
+          {g.lines && <path d={g.lines} fill="none" stroke="#4b4e54" strokeWidth={0.8} strokeLinecap="round" strokeLinejoin="round" />}
+        </>
+      ) : (
+        <circle r={6.5} fill="url(#pewter)" stroke="#4b4e54" />
+      )}
+    </g>
+  );
 }
 
 function Staircase({ at, label, onTip }: { at: Coord; label?: string; onTip?: TipFn }) {
@@ -680,7 +704,12 @@ export function Board({
             const theme = BOARD.sections.find((s) => s.id === room.sectionId)?.theme ?? 'ground-floor';
             const t = THEME[theme];
             const title = getCard(room.id)?.title ?? room.id;
-            const art = resolveOverride(room.id, 'room', title);
+            // Floor art: proper top-down board art if it has been painted (assets/board/rooms),
+            // otherwise the room's card portrait as a stand-in. Board art is authored to the room's
+            // exact tile rectangle, so it is stretched onto the bounds and shown undimmed; the card
+            // portrait is cropped to cover and sat under a scrim so the name bubble stays legible.
+            const boardArt = resolveBoardArt(room.id, title);
+            const art = boardArt ?? resolveOverride(room.id, 'room', title);
             // A room whose tiles fill its whole bounding box is a plain rectangle; otherwise it has
             // a notch and must be drawn from its actual tiles so the L-shape shows.
             const isRect = room.tiles.length === (b.w / TS) * (b.h / TS);
@@ -709,11 +738,13 @@ export function Board({
                           y={b.y + 2}
                           width={b.w - 4}
                           height={b.h - 4}
-                          preserveAspectRatio="xMidYMid slice"
+                          preserveAspectRatio={boardArt ? 'none' : 'xMidYMid slice'}
                           clipPath={`url(#roomclip-${room.id})`}
                           style={{ pointerEvents: 'none' }}
                         />
-                        <rect x={b.x + 2} y={b.y + 2} width={b.w - 4} height={b.h - 4} rx="4" fill="rgba(10,7,16,0.32)" clipPath={`url(#roomclip-${room.id})`} style={{ pointerEvents: 'none' }} />
+                        {!boardArt && (
+                          <rect x={b.x + 2} y={b.y + 2} width={b.w - 4} height={b.h - 4} rx="4" fill="rgba(10,7,16,0.32)" clipPath={`url(#roomclip-${room.id})`} style={{ pointerEvents: 'none' }} />
+                        )}
                       </>
                     )}
                     <rect x={b.x + 4} y={b.y + 4} width={b.w - 8} height={b.h - 8} rx="4" fill="none" stroke="rgba(231,198,106,0.2)" strokeWidth="1" />
@@ -724,13 +755,36 @@ export function Board({
                     {room.tiles.map((tl) => (
                       <rect key={`${tl.x}-${tl.y}`} x={tl.x * TS - 0.3} y={tl.y * TS - 0.3} width={TS + 0.6} height={TS + 0.6} fill={t.floor} />
                     ))}
+                    {/* board art is painted over the whole bounding box, and the notches are cut out
+                        by clipping to the room's actual tiles */}
+                    {boardArt && (
+                      <>
+                        <clipPath id={`roomclip-${room.id}`}>
+                          {room.tiles.map((tl) => (
+                            <rect key={`${tl.x}-${tl.y}`} x={tl.x * TS - 0.3} y={tl.y * TS - 0.3} width={TS + 0.6} height={TS + 0.6} />
+                          ))}
+                        </clipPath>
+                        <image
+                          href={boardArt}
+                          x={b.x + 2}
+                          y={b.y + 2}
+                          width={b.w - 4}
+                          height={b.h - 4}
+                          preserveAspectRatio="none"
+                          clipPath={`url(#roomclip-${room.id})`}
+                          style={{ pointerEvents: 'none' }}
+                        />
+                      </>
+                    )}
                     <path d={roomOutline(room.tiles)} fill="none" stroke="#e7c66a" strokeWidth="2" strokeLinejoin="round" />
                   </>
                 )}
                 {/* thematic glyph, centred just above the room name */}
-                <text x={cxr} y={cyr - bubbleH / 2 - 3} textAnchor="middle" fontSize="13" style={{ pointerEvents: 'none' }}>
-                  {EMOJI[room.id] ?? ''}
-                </text>
+                {!boardArt && (
+                  <text x={cxr} y={cyr - bubbleH / 2 - 3} textAnchor="middle" fontSize="13" style={{ pointerEvents: 'none' }}>
+                    {EMOJI[room.id] ?? ''}
+                  </text>
+                )}
                 {/* room name, in a white bubble */}
                 <g style={{ pointerEvents: 'none' }}>
                   <rect x={cxr - bubbleW / 2} y={cyr - bubbleH / 2} width={bubbleW} height={bubbleH} rx={bubbleH / 2} fill="#f4efe1" stroke="#2a2018" strokeWidth="1" />
@@ -750,34 +804,6 @@ export function Board({
             return room.entrances.map((e, i) => <Door key={`${room.id}-${i}`} rt={e.roomTile} dt={e.doorTile} gate={gate} />);
           })}
 
-          {/* weapon tokens, grouped by their current room (a suggestion summons them) */}
-          {weaponLocations &&
-            (() => {
-              const byRoom = new Map<string, string[]>();
-              for (const [wid, rid] of Object.entries(weaponLocations)) {
-                const arr = byRoom.get(rid) ?? [];
-                arr.push(wid);
-                byRoom.set(rid, arr);
-              }
-              return [...byRoom.entries()].flatMap(([rid, wids]) => {
-                const room = BOARD.rooms[rid];
-                if (!room) return [];
-                const b = roomBounds(room);
-                const n = wids.length;
-                const r = 6.5;
-                const spacing = Math.min(2 * r + 1, (b.w - 12) / Math.max(n, 1));
-                return wids.map((wid, i) => (
-                  <circle
-                    key={wid}
-                    cx={b.x + b.w / 2 + (i - (n - 1) / 2) * spacing}
-                    cy={b.y + 13}
-                    r={r}
-                    fill="url(#pewter)"
-                    stroke="#4b4e54"
-                  />
-                ));
-              });
-            })()}
 
           {/* secret-passage staircases */}
           {BOARD.shortcuts.flatMap((sc) => {
@@ -853,6 +879,36 @@ export function Board({
                   })}
                 </>
               );
+            })()}
+
+          {/* weapon tokens, grouped by their current room (a suggestion summons them). Drawn above the
+              move overlay, like the pawns, so their hover tooltips keep working during a move */}
+          {weaponLocations &&
+            (() => {
+              const byRoom = new Map<string, string[]>();
+              for (const [wid, rid] of Object.entries(weaponLocations)) {
+                const arr = byRoom.get(rid) ?? [];
+                arr.push(wid);
+                byRoom.set(rid, arr);
+              }
+              return [...byRoom.entries()].flatMap(([rid, wids]) => {
+                const room = BOARD.rooms[rid];
+                if (!room) return [];
+                const b = roomBounds(room);
+                const n = wids.length;
+                const r = 6.5;
+                const spacing = Math.min(2 * r + 1, (b.w - 12) / Math.max(n, 1));
+                return wids.map((wid, i) => (
+                  <WeaponToken
+                    key={wid}
+                    id={wid}
+                    px={b.x + b.w / 2 + (i - (n - 1) / 2) * spacing}
+                    py={b.y + 13}
+                    label={getCard(wid)?.title}
+                    onTip={setTip}
+                  />
+                ));
+              });
             })()}
 
           {/* player pawns: those inside a room cluster together in that one space; others sit on

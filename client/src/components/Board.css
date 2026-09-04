@@ -18,6 +18,9 @@
   top: 0;
   left: 0;
   transform-origin: 0 0;
+}
+/* Only while panning/zooming: keeps the gesture smooth without freezing the board's raster at 1x. */
+.bv__stage--moving {
   will-change: transform;
 }
 

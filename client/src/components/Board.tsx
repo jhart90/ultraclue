@@ -4,6 +4,7 @@ import { resolveOverride } from '../render/overrides';
 import { resolveBoardArt } from '../render/boardArt';
 import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
 import { packRoom, type Packing, type Rect } from '../render/roomPacking';
+import { BOARD_TEXTURES, textureUrl, texturePatternId, type BoardTexture } from '../render/boardTextures';
 import './Board.css';
 
 interface LastMove {
@@ -15,7 +16,7 @@ const TS = 26;
 const BW = BOARD.width * TS;
 const BH = BOARD.height * TS;
 const MIN_SCALE = 0.45;
-const MAX_SCALE = 3;
+const MAX_SCALE = 4;
 /** Walk-animation cadence: ms the pawn spends on each tile of its path. */
 export const WALK_STEP_MS = 300;
 /** Zoom level the camera locks to while following another player's move. */
@@ -122,6 +123,71 @@ function labelGeom(room: RoomLayout, title: string) {
   const w = Math.min(b.w - 4, title.length * fs * 0.6 + 12);
   const h = fs + 7;
   return { isRect, cx, cy, fs, w, h };
+}
+
+/** Fill for a tile that isn't part of a room: a texture pattern when the file exists, else the flat
+ *  theme colour. Halls take the floor of their level; outdoor lawn takes grass; an outdoor path
+ *  tile that runs straight through (neighbours only above and below, or only left and right)
+ *  takes the matching path texture, and every other outdoor path tile keeps its plain look. */
+const PATH_KEYS = new Set(BOARD.cells.filter((c) => c.type === 'path').map((c) => coordKey(c)));
+/** "hall tile -> room tile" pairs joined by a door or gate, so a doorway counts as a walkable
+ *  neighbour when choosing a path texture (a path ending at a door is a straight, not a dead end). */
+const DOOR_LINKS = new Set(Object.values(BOARD.rooms).flatMap((room) => room.entrances.map((e) => `${coordKey(e.doorTile)}>${coordKey(e.roomTile)}`)));
+/** Whether the tile at (x+dx, y+dy) is walkable from the path tile at (x, y): another path tile,
+ *  or a room tile reached through a door. */
+function walkableFrom(x: number, y: number, dx: number, dy: number): boolean {
+  const from = coordKey({ x, y });
+  const to = coordKey({ x: x + dx, y: y + dy });
+  return PATH_KEYS.has(to) || DOOR_LINKS.has(`${from}>${to}`);
+}
+const THEME_OF = new Map(BOARD.sections.map((sec) => [sec.id, sec.theme]));
+function tileTexture(c: { x: number; y: number; type: string; sectionId: string; obstacleKind?: string }): BoardTexture | undefined {
+  const theme = THEME_OF.get(c.sectionId);
+  if (c.type === 'obstacle') {
+    if (theme === 'grounds' && c.obstacleKind === 'lawn') return 'grass';
+    if (theme === 'ground-floor' && c.obstacleKind === 'wall') return 'wood_floor_vertical_light_pillar'; // the hall pillars
+    if (theme === 'basement' && c.obstacleKind === 'wall') return 'cobblestone_pillar'; // cellar pillars and blocked stubs
+    return undefined;
+  }
+  if (c.type !== 'path') return undefined;
+  if (theme === 'upper-floor') return 'wood_floor_horizontal';
+  if (theme === 'ground-floor') return 'wood_floor_vertical_light';
+  if (theme === 'basement') return 'cobblestone';
+  if (theme === 'grounds') {
+    const has = (dx: number, dy: number) => walkableFrom(c.x, c.y, dx, dy);
+    const up = has(0, -1), down = has(0, 1), left = has(-1, 0), right = has(1, 0);
+    if (up && down && !left && !right) return 'path_vertical';
+    if (left && right && !up && !down) return 'path_horizontal';
+    if (up && down && left && right) return 'path_plus_intersection'; // four-way crossing (symmetric, no rotation)
+  }
+  return undefined;
+}
+/** Outdoor path tiles that bend or branch are drawn from one texture each, rotated per tile (SVG
+ *  rotation is clockwise). The corner texture joins the TOP and LEFT edges: 90 joins top+right,
+ *  180 right+bottom, 270 bottom+left. The T texture is open on the left, top and right with grass
+ *  along the BOTTOM: 90 puts the closed side on the left, 180 on the top, 270 on the right. */
+function rotatedTexture(c: { x: number; y: number; type: string; sectionId: string }): { name: BoardTexture; angle: number } | undefined {
+  if (c.type !== 'path' || THEME_OF.get(c.sectionId) !== 'grounds') return undefined;
+  const has = (dx: number, dy: number) => walkableFrom(c.x, c.y, dx, dy);
+  const up = has(0, -1), down = has(0, 1), left = has(-1, 0), right = has(1, 0);
+  const n = [up, down, left, right].filter(Boolean).length;
+  if (n === 2) {
+    if (up && left) return { name: 'path_corner', angle: 0 };
+    if (up && right) return { name: 'path_corner', angle: 90 };
+    if (down && right) return { name: 'path_corner', angle: 180 };
+    if (down && left) return { name: 'path_corner', angle: 270 };
+  }
+  if (n === 3) {
+    if (!down) return { name: 'path_t_intersection', angle: 0 };
+    if (!left) return { name: 'path_t_intersection', angle: 90 };
+    if (!up) return { name: 'path_t_intersection', angle: 180 };
+    if (!right) return { name: 'path_t_intersection', angle: 270 };
+  }
+  return undefined;
+}
+function tileFill(c: { x: number; y: number; type: string; sectionId: string; obstacleKind?: string }, fallback: string): string {
+  const tex = tileTexture(c);
+  return tex && textureUrl(tex) ? `url(#${texturePatternId(tex)})` : fallback;
 }
 
 /** Full-size pawn radius; the packer shrinks from here as a room fills up. */
@@ -414,6 +480,18 @@ export function Board({
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ scale: 0.8, tx: 0, ty: 0 });
+  // Promote the stage to its own GPU layer only while the camera is moving. Left on permanently,
+  // `will-change: transform` makes Chrome rasterise the board once at 1x (a tile is 26px) and
+  // stretch that bitmap when zoomed, blurring the room art, name bubbles and tokens alike. Dropping
+  // the hint once a pan/zoom settles lets the browser re-rasterise the view at the real zoom.
+  const [moving, setMoving] = useState(false);
+  const movingT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    setMoving(true);
+    clearTimeout(movingT.current);
+    movingT.current = setTimeout(() => setMoving(false), 250);
+    return () => clearTimeout(movingT.current);
+  }, [view]);
   const viewRef = useRef(view);
   viewRef.current = view; // always the latest committed view, for use inside gesture handlers
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
@@ -653,7 +731,7 @@ export function Board({
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerUp}
     >
-      <div className="bv__stage" style={{ transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})` }}>
+      <div className={`bv__stage${moving ? ' bv__stage--moving' : ''}`} style={{ transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})` }}>
         <svg width={BW} height={BH} className="bv__svg" role="img" aria-label="Mansion board">
           {/* section panels */}
           {BOARD.sections.map((s) => {
@@ -682,7 +760,18 @@ export function Board({
           {/* path cells */}
           {BOARD.cells.filter((c) => c.type === 'path').map((c) => {
             const t = THEME[(BOARD.sections.find((s) => s.id === c.sectionId)?.theme) ?? 'ground-floor'];
-            return <rect key={`p${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={t.path} stroke="rgba(0,0,0,0.18)" strokeWidth="0.5" />;
+            const rot = rotatedTexture(c);
+            const rotUrl = rot ? textureUrl(rot.name) : undefined;
+            if (rot && rotUrl) {
+              // bends and branches are drawn as a rotated image rather than a pattern fill, one per tile
+              return (
+                <g key={`p${c.x}-${c.y}`}>
+                  <image href={rotUrl} x={c.x * TS} y={c.y * TS} width={TS} height={TS} preserveAspectRatio="none" transform={`rotate(${rot.angle} ${c.x * TS + TS / 2} ${c.y * TS + TS / 2})`} />
+                  <rect x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill="none" stroke="rgba(0,0,0,0.18)" strokeWidth="0.5" />
+                </g>
+              );
+            }
+            return <rect key={`p${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={tileFill(c, t.path)} stroke="rgba(0,0,0,0.18)" strokeWidth="0.5" />;
           })}
 
           {/* obstacles — things pieces walk around: lawns and the pond outdoors, hedge walls in the
@@ -695,13 +784,15 @@ export function Board({
             return (
               <g style={{ pointerEvents: 'none' }}>
                 {obstacles.map((c) => (
-                  <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={FILL[c.obstacleKind ?? 'wall']} />
+                  <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={tileFill(c, FILL[c.obstacleKind ?? 'wall'])} />
                 ))}
                 {kind('water').length > 0 && <path d={roomOutline(kind('water'))} fill="none" stroke="#9fd6e6" strokeWidth="1.5" strokeLinejoin="round" />}
                 {kind('hedge').length > 0 && <path d={roomOutline(kind('hedge'))} fill="none" stroke="#6f9a5a" strokeWidth="2" strokeLinejoin="round" />}
-                {kind('wall').map((c) => (
-                  <rect key={`w${c.x}-${c.y}`} x={c.x * TS + 4} y={c.y * TS + 4} width={TS - 8} height={TS - 8} rx="3" fill="none" stroke="#8a8398" strokeWidth="1.5" />
-                ))}
+                {kind('wall')
+                  .filter((c) => !(tileTexture(c) && textureUrl(tileTexture(c)!))) // textured pillars draw their own
+                  .map((c) => (
+                    <rect key={`w${c.x}-${c.y}`} x={c.x * TS + 4} y={c.y * TS + 4} width={TS - 8} height={TS - 8} rx="3" fill="none" stroke="#8a8398" strokeWidth="1.5" />
+                  ))}
                 {kind('water').map((c) => (
                   <path key={`r${c.x}-${c.y}`} d={`M${c.x * TS + 5} ${c.y * TS + TS / 2} q${TS / 4} -3 ${TS / 2} 0 t${TS / 2 - 10} 0`} fill="none" stroke="rgba(190,230,245,0.45)" strokeWidth="1" />
                 ))}
@@ -1017,6 +1108,14 @@ export function Board({
           })()}
 
           <defs>
+            {BOARD_TEXTURES.map((name) => {
+              const href = textureUrl(name);
+              return href ? (
+                <pattern key={name} id={texturePatternId(name)} patternUnits="userSpaceOnUse" width={TS} height={TS}>
+                  <image href={href} x={0} y={0} width={TS} height={TS} preserveAspectRatio="none" />
+                </pattern>
+              ) : null;
+            })}
             <radialGradient id="pewter" cx="38%" cy="32%" r="75%">
               <stop offset="0" stopColor="#eef0f2" />
               <stop offset="0.6" stopColor="#a9adb3" />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { buildSims, drawFrame, simsSettleTime, type PlayBounds } from '../dice/dice3d';
 import { playDiceRoll } from '../util/sound';
 import './DiceOverlay.css';
@@ -25,8 +25,6 @@ export const DICE_FADE_MS = 500;
 
 function DiceCanvas({ roll, fading }: { roll: DiceRollShow; fading?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [settled, setSettled] = useState(false);
-  const [labelTop, setLabelTop] = useState<number | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -43,19 +41,13 @@ function DiceCanvas({ roll, fading }: { roll: DiceRollShow; fading?: boolean }) 
 
     playDiceRoll();
     const bounds = playBounds(w, h);
-    setLabelTop(bounds.bottom - 30); // the caption sits along the bottom edge of the board area
     const sims = buildSims(roll.values, w, h, roll.color, roll.pips, bounds);
     const settleAt = simsSettleTime(sims);
     const t0 = performance.now();
     let raf = 0;
-    let done = false;
     const tick = (now: number) => {
       const t = now - t0;
       const moving = drawFrame(ctx, sims, t, w, h);
-      if (t >= settleAt && !done) {
-        done = true;
-        setSettled(true);
-      }
       if (moving || t < settleAt) raf = requestAnimationFrame(tick);
       else drawFrame(ctx, sims, settleAt + 401, w, h); // final resting frame — stays until dismissed
     };
@@ -68,9 +60,6 @@ function DiceCanvas({ roll, fading }: { roll: DiceRollShow; fading?: boolean }) 
   return (
     <div className={`dice-overlay${fading ? ' dice-overlay--fade' : ''}`}>
       <canvas ref={canvasRef} className="dice3d-canvas" />
-      <div className="dice-overlay__label" style={labelTop != null ? { top: labelTop, bottom: 'auto' } : undefined}>
-        {roll.name} rolls{settled ? <span className="dice-overlay__total"> {roll.values[0]} + {roll.values[1]} = {roll.values[0] + roll.values[1]}</span> : '…'}
-      </div>
     </div>
   );
 }

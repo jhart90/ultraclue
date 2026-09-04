@@ -24,34 +24,6 @@
   position: absolute;
   inset: 0;
 }
-.dice-overlay__label {
-  position: absolute;
-  left: 50%;
-  bottom: 84px;
-  transform: translateX(-50%);
-  font-family: 'Georgia', serif;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--accent, #c8a24a);
-  text-shadow: 0 2px 6px #000, 0 0 12px rgba(0, 0, 0, 0.8);
-  white-space: nowrap;
-}
-.dice-overlay__total {
-  color: #fff;
-  font-size: 18px;
-  display: inline-block;
-  animation: dice-total-pop 0.3s ease-out;
-}
-@keyframes dice-total-pop {
-  0% {
-    opacity: 0;
-    transform: scale(1.8);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
 
 /* Dice colour pickers (settings menu). */
 .dicepick__head {

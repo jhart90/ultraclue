@@ -243,8 +243,8 @@ const BASEMENT_TILES = [
   '..yyyyyyyyyyy....xxxxxxx', // 15
   '..yyyyyyyyyyy..xxxnnnnnx', // 16
   '..yyyyyyyyyyy.....nnnnnx', // 17   blast corridor (15-17,17) into the bunker
-  '..uuuuuuuuuuu..xxxnnnnnx', // 18
-  '..uuuuuuuuuuu..xxxxxxxxx', // 19
+  '..uuuuuuu......xxxnnnnnx', // 18
+  '..uuuuuuu......xxxxxxxxx', // 19
 ];
 const BASEMENT_DOORS = [
   '........................', // 0
@@ -264,8 +264,8 @@ const BASEMENT_DOORS = [
   '......^.................', // 14 gymnasium north
   '............>...........', // 15 gymnasium east
   '........................', // 16
-  '.........v........<.....', // 17 gymnasium -> sauna (connecting), bunker (its only door, at the end of the blast corridor)
-  '............>...........', // 18 sauna east
+  '........v.........<.....', // 17 gymnasium -> sauna (connecting), bunker (its only door, at the end of the blast corridor)
+  '........>...............', // 18 sauna east
   '..<.....................', // 19 sauna west
 ];
 

@@ -124,8 +124,9 @@ function emitLobby(room: Room): void {
 }
 
 function emitChat(room: Room): void {
-  // Whispers carry an audience (`to`); send each human only the messages they're allowed to see.
-  const hasPrivate = room.chat.some((m) => m.to);
+  // Private lines carry an audience: `to` (only these ids) or `except` (everyone but these ids).
+  // Send each human only the messages they're allowed to see.
+  const hasPrivate = room.chat.some((m) => m.to || m.except);
   if (!hasPrivate) {
     io.to(room.code).emit(SOCKET_EVENTS.CHAT, { chat: room.chat });
     return;
@@ -133,7 +134,7 @@ function emitChat(room: Room): void {
   for (const slot of room.slots) {
     const occ = slot.occupant;
     if (!occ || occ.isBot) continue;
-    const chat = room.chat.filter((m) => !m.to || m.to.includes(occ.id));
+    const chat = room.chat.filter((m) => (!m.to || m.to.includes(occ.id)) && !m.except?.includes(occ.id));
     io.to(occ.id).emit(SOCKET_EVENTS.CHAT, { chat });
   }
 }

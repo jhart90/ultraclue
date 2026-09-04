@@ -10,6 +10,9 @@ export interface ChatMsg {
   system?: boolean; // game-log narration / room notices, rendered without a "name:" prefix
   /** Audience (player ids). Undefined = public/everyone; otherwise only these ids may see it. */
   to?: string[];
+  /** The inverse of `to`: everyone EXCEPT these ids. Used for the face-down half of a reveal, so
+   *  that a player who joins after it happened still sees it (a fixed `to` list would omit them). */
+  except?: string[];
   /** A private "whisper" — rendered in italic grey. */
   whisper?: boolean;
   /** Structured game event drawn as a card in the chat (roll, suggestion, reveal, accusation). */

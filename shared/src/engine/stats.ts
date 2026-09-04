@@ -125,8 +125,14 @@ export interface StatsSummary {
   /** Player ids leading each category (ties share the honour). */
   mostTravelled: Ranked[];
   mostRoomsVisited: Ranked[];
-  mostSuggestions: Ranked[];
+  /** Times this player's character was named in someone's suggestion (their own included). */
+  mostSuspected: Ranked[];
   mostReveals: Ranked[];
+  /** …and the players at the other end of the same four numbers. */
+  leastTravelled: Ranked[];
+  leastRoomsVisited: Ranked[];
+  leastSuspected: Ranked[];
+  leastReveals: Ranked[];
   /** Every player's line for the table, in turn order. */
   rows: StatsRow[];
 }
@@ -139,18 +145,21 @@ function ranked(tally: Record<string, number>, top = 3): Ranked[] {
     .map(([id, count]) => ({ id, count }));
 }
 
-/** Leaders of a per-player number; everyone tied at the top is included. */
-function leaders(view: GameView, pick: (ps: PlayerStats) => number): Ranked[] {
+/**
+ * The players at one end of a per-player number; everyone tied there shares the honour.
+ * 'max' skips zeros — an honour nobody actually scored isn't one — while 'min' keeps them, since
+ * doing none of a thing is exactly what "least" means.
+ */
+function extreme(view: GameView, valueOf: (id: string) => number, dir: 'max' | 'min'): Ranked[] {
   const st = view.stats;
   if (!st) return [];
-  let best = 0;
+  let best: number | null = null;
   let out: Ranked[] = [];
   for (const id of view.turnOrder) {
-    const ps = st.players[id];
-    if (!ps) continue;
-    const n = pick(ps);
-    if (n <= 0) continue;
-    if (n > best) {
+    if (!st.players[id]) continue; // never dealt in
+    const n = valueOf(id);
+    if (dir === 'max' && n <= 0) continue;
+    if (best === null || (dir === 'max' ? n > best : n < best)) {
       best = n;
       out = [];
     }
@@ -168,6 +177,11 @@ export function summarizeStats(view: GameView): StatsSummary | undefined {
     const pid = suspectOf.get(sid);
     if (pid) timesSuspected[pid] = n;
   }
+  const of = (id: string): PlayerStats => st.players[id] ?? emptyPlayer();
+  const tiles = (id: string) => of(id).tiles;
+  const roomsSeen = (id: string) => of(id).roomsVisited.length;
+  const reveals = (id: string) => of(id).reveals;
+  const suspected = (id: string) => timesSuspected[id] ?? 0;
   return {
     turnsPlayed: st.turnsPlayed,
     rounds: view.round ?? 0,
@@ -175,10 +189,14 @@ export function summarizeStats(view: GameView): StatsSummary | undefined {
     topSuspects: ranked(st.suspects),
     topWeapons: ranked(st.weapons),
     topRooms: ranked(st.rooms),
-    mostTravelled: leaders(view, (ps) => ps.tiles),
-    mostRoomsVisited: leaders(view, (ps) => ps.roomsVisited.length),
-    mostSuggestions: leaders(view, (ps) => ps.suggestions),
-    mostReveals: leaders(view, (ps) => ps.reveals),
+    mostTravelled: extreme(view, tiles, 'max'),
+    mostRoomsVisited: extreme(view, roomsSeen, 'max'),
+    mostSuspected: extreme(view, suspected, 'max'),
+    mostReveals: extreme(view, reveals, 'max'),
+    leastTravelled: extreme(view, tiles, 'min'),
+    leastRoomsVisited: extreme(view, roomsSeen, 'min'),
+    leastSuspected: extreme(view, suspected, 'min'),
+    leastReveals: extreme(view, reveals, 'min'),
     rows: view.turnOrder.map((playerId) => {
       const ps = st.players[playerId] ?? emptyPlayer();
       return {

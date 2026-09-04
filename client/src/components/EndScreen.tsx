@@ -7,7 +7,7 @@ import './EndScreen.css';
 const EMOJI: Record<string, string> = {
   travelled: '👣',
   rooms: '🚪',
-  suggestions: '🔍',
+  suspected: '🔍',
   reveals: '🃏',
   suspect: '🕵️',
   weapon: '🗡️',
@@ -50,6 +50,7 @@ function mmss(ms: number): string {
 function Honour({ view, icon, title, leaders, unit }: { view: GameView; icon: string; title: string; leaders: Ranked[]; unit: string }) {
   if (!leaders.length) return null;
   const n = leaders[0].count;
+  // A "least" honour is often a tie on zero, so the row can be long; the CSS wraps the names.
   return (
     <div className="end__honour">
       <div className="end__honouricon">{icon}</div>
@@ -230,8 +231,14 @@ export function EndScreen({
                 <div className="end__honours">
                   <Honour view={game} icon={EMOJI.travelled} title="Most travelled" leaders={summary.mostTravelled} unit="tile" />
                   <Honour view={game} icon={EMOJI.rooms} title="Most rooms visited" leaders={summary.mostRoomsVisited} unit="room" />
-                  <Honour view={game} icon={EMOJI.suggestions} title="Most suggestions" leaders={summary.mostSuggestions} unit="suggestion" />
+                  <Honour view={game} icon={EMOJI.suspected} title="Most suspected" leaders={summary.mostSuspected} unit="time" />
                   <Honour view={game} icon={EMOJI.reveals} title="Most cards shown" leaders={summary.mostReveals} unit="card" />
+                </div>
+                <div className="end__honours end__honours--least">
+                  <Honour view={game} icon={EMOJI.travelled} title="Least travelled" leaders={summary.leastTravelled} unit="tile" />
+                  <Honour view={game} icon={EMOJI.rooms} title="Least rooms visited" leaders={summary.leastRoomsVisited} unit="room" />
+                  <Honour view={game} icon={EMOJI.suspected} title="Least suspected" leaders={summary.leastSuspected} unit="time" />
+                  <Honour view={game} icon={EMOJI.reveals} title="Least cards shown" leaders={summary.leastReveals} unit="card" />
                 </div>
               </section>
 
@@ -245,7 +252,7 @@ export function EndScreen({
                         <th>Turns</th>
                         <th>Tiles</th>
                         <th>Rooms</th>
-                        <th>Suggested</th>
+                        <th>Suggestions</th>
                         <th>Shown</th>
                         <th>Accused</th>
                         <th>Suspected</th>

@@ -6,6 +6,24 @@ import './DiceOverlay.css';
 const DICE_PALETTE = ['#ff3d57', '#ff8a00', '#ffe234', '#2fe04a', '#00e5d0', '#0aa8ff', '#b444ff', '#ff4fa3', '#ffffff', '#14171d'];
 const PIP_PALETTE = ['#111111', '#ffffff', '#ffe08a', '#ff6b6b', '#7ee89a', '#6cd2c8'];
 const AUTO_KEY = 'ultraclue-dice-auto';
+const SIZE_KEY = 'ultraclue-dice-size';
+
+/** How large the 3D dice are thrown, as a multiplier on the model size. Viewer-local, like sound. */
+export function diceScale(): number {
+  try {
+    const n = Number(localStorage.getItem(SIZE_KEY));
+    return Number.isFinite(n) && n >= 0.5 && n <= 2 ? n : 1;
+  } catch {
+    return 1;
+  }
+}
+export function setDiceScale(n: number): void {
+  try {
+    localStorage.setItem(SIZE_KEY, String(n));
+  } catch {
+    /* ignore */
+  }
+}
 
 function readAuto(): boolean {
   try {
@@ -28,6 +46,7 @@ export function DiceSettings({
   title?: string;
 }) {
   const [auto, setAuto] = useState(readAuto);
+  const [size, setSize] = useState(diceScale);
   const apply = (color: string, pips: string, autoNext: boolean) => {
     setAuto(autoNext);
     try {
@@ -72,13 +91,6 @@ export function DiceSettings({
       <div className="dicepick__row">
         <span className="dicepick__label">Pips</span>
         <span className="dicepick__swatches">
-          <button
-            className={`dicepick__auto${auto ? ' dicepick__auto--on' : ''}`}
-            title="Black or white, whichever reads best on your dice"
-            onClick={() => apply(body, pips, true)}
-          >
-            auto
-          </button>
           {PIP_PALETTE.map((c) => (
             <button
               key={c}
@@ -89,6 +101,26 @@ export function DiceSettings({
             />
           ))}
           <input type="color" className="dicepick__custom" value={pips} title="Custom pip colour" onChange={(e) => apply(body, e.target.value, false)} />
+        </span>
+      </div>
+      <div className="dicepick__row">
+        <span className="dicepick__label">Size</span>
+        <span className="dicepick__swatches">
+          <input
+            type="range"
+            className="dicepick__size"
+            min={0.5}
+            max={2}
+            step={0.05}
+            value={size}
+            title="How large the dice are thrown"
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setSize(n);
+              setDiceScale(n);
+            }}
+          />
+          <span className="dicepick__sizeval">{Math.round(size * 100)}%</span>
         </span>
       </div>
     </div>

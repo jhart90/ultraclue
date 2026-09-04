@@ -105,3 +105,19 @@
   height: 6px;
   border-radius: 50%;
 }
+
+/* Dice-size slider (settings menu). */
+.dicepick__size {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--accent, #c8a24a);
+  cursor: pointer;
+}
+.dicepick__sizeval {
+  flex: none;
+  width: 2.6rem;
+  text-align: right;
+  font-size: 0.7rem;
+  color: var(--muted, #9a93b3);
+  font-variant-numeric: tabular-nums;
+}

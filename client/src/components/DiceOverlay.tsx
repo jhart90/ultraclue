@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { buildSims, drawFrame, simsSettleTime, type PlayBounds } from '../dice/dice3d';
+import { diceScale } from './DiceSettings';
 import { playDiceRoll } from '../util/sound';
 import './DiceOverlay.css';
 
@@ -41,7 +42,7 @@ function DiceCanvas({ roll, fading }: { roll: DiceRollShow; fading?: boolean }) 
 
     playDiceRoll();
     const bounds = playBounds(w, h);
-    const sims = buildSims(roll.values, w, h, roll.color, roll.pips, bounds);
+    const sims = buildSims(roll.values, w, h, roll.color, roll.pips, bounds, 45, diceScale());
     const settleAt = simsSettleTime(sims);
     const t0 = performance.now();
     let raf = 0;

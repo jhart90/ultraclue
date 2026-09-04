@@ -340,48 +340,52 @@
   transform: none;
   max-width: 100%;
 }
+/* Every notice lives the same 4.2s — matching NOTICE_MS in Game.tsx — and any of them can be
+   clicked away early. Only the entry flourish differs between the two kinds. */
+.pill--stacked {
+  pointer-events: auto;
+  cursor: pointer;
+}
 .pill--toast {
   font-size: 1.05rem;
   color: var(--ink, #ece8f5);
-  pointer-events: auto;
-  cursor: pointer;
-  animation: pill-toast 4s ease forwards;
+  animation: pill-toast 4.2s ease forwards;
 }
 @keyframes pill-toast {
   0% {
     opacity: 0;
     transform: translateY(-6px);
   }
-  8% {
+  6% {
     opacity: 1;
     transform: translateY(0);
   }
-  85% {
+  88% {
     opacity: 1;
   }
   100% {
     opacity: 0;
   }
 }
-/* "<name>'s turn" — the character's own colours, for a beat at the start of a turn. */
+/* "<name>'s turn" — the character's own colours, with a pop as it lands. */
 .pill--flash {
   font-size: 1.9rem;
   padding: 0.7rem 2.4rem;
-  animation: pill-flash 1.4s ease forwards;
+  animation: pill-flash 4.2s ease forwards;
 }
 @keyframes pill-flash {
   0% {
     opacity: 0;
     transform: translateY(8px) scale(0.92);
   }
-  15% {
+  5% {
     opacity: 1;
     transform: translateY(0) scale(1.04);
   }
-  25% {
+  9% {
     transform: translateY(0) scale(1);
   }
-  75% {
+  88% {
     opacity: 1;
   }
   100% {

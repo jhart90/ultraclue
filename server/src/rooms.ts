@@ -497,11 +497,11 @@ export function mirrorLog(room: Room, defer?: (apply: () => boolean, ms: number)
         }, ms);
       } else if (card?.kind === 'reveal' && card.cardId) {
         // Everyone sees a face-down reveal card; the two players in on it get the face-up version.
-        const humans = room.slots.map((s) => s.occupant).filter((o) => o && !o.isBot).map((o) => o!.id);
+        // The face-down half is addressed by exclusion rather than a fixed list of the humans
+        // present at the time, so someone who joins later still sees that a card was shown.
         const insiders = [card.responderId, card.suggesterId];
-        const outsiders = humans.filter((id) => !insiders.includes(id));
         room.chat.push({
-          id: room.nextChatId++, from: '', text: entry.text, system: true, to: outsiders,
+          id: room.nextChatId++, from: '', text: entry.text, system: true, except: insiders,
           card: { kind: 'reveal', responderId: card.responderId, suggesterId: card.suggesterId },
         });
         room.chat.push({ id: room.nextChatId++, from: '', text: entry.text, system: true, to: insiders, card });

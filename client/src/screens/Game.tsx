@@ -15,6 +15,7 @@ import { EndScreen } from '../components/EndScreen';
 import { StatusModal, AccusationFlow, AccusingModal, type StatusButton } from '../components/GamePopups';
 import { soundEnabled, setSoundEnabled } from '../util/sound';
 import { contrastInk } from '../render/colorUtils';
+import { highlightChat } from '../util/highlightChat';
 import './Game.css';
 
 function suspectColor(suspectId?: string): string {
@@ -165,9 +166,16 @@ export function Game() {
   // Floating notices — the "<name>'s turn" flash and each new event card's toast — share one spot
   // over the board. A new notice goes on top and pushes whatever is still showing down a row, so
   // two never overlap; each leaves on its own timer.
+  // Every notice stays up for the same beat, whatever its kind, unless it is clicked away.
   type Notice = { id: string; kind: 'flash' | 'toast'; text: string; color?: string };
+  const NOTICE_MS = 4200;
   const [notices, setNotices] = useState<Notice[]>([]);
   const noticeTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const dismissNotice = useCallback((id: string) => {
+    clearTimeout(noticeTimers.current.get(id));
+    noticeTimers.current.delete(id);
+    setNotices((cur) => cur.filter((x) => x.id !== id));
+  }, []);
   const pushNotice = useCallback((n: Notice, ttl: number) => {
     setNotices((cur) => [n, ...cur.filter((x) => x.id !== n.id)].slice(0, 4));
     const timers = noticeTimers.current;
@@ -193,7 +201,7 @@ export function Game() {
     const first = lastCardIdRef.current === 0;
     lastCardIdRef.current = last.id;
     if (first) return; // don't toast the backlog on (re)join
-    pushNotice({ id: `toast:${last.id}`, kind: 'toast', text: last.text }, 4200);
+    pushNotice({ id: `toast:${last.id}`, kind: 'toast', text: last.text }, NOTICE_MS);
   }, [chat, pushNotice]);
 
   // Every roll (mine or a bot's) throws the 3D dice in the roller's colours. rollSeq bumps even
@@ -224,7 +232,7 @@ export function Game() {
     if (!active) return () => clearTimeout(fadeT);
     pushNotice(
       { id: `flash:${turnKey}`, kind: 'flash', text: active.id === myId ? 'Your turn' : `${active.name}'s turn`, color: suspectColor(active.suspectId) },
-      TURN_FLASH_MS + 400,
+      NOTICE_MS,
     );
     return () => clearTimeout(fadeT);
   }, [turnKey, game?.phase, pushNotice]);
@@ -322,6 +330,8 @@ export function Game() {
   const orderedPlayers = game.turnOrder
     .map((id) => game.players.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => !!p);
+  /** Everyone at the table with their character's colour, so names can be tinted in chat and pills. */
+  const chatPlayers = game.players.map((p) => ({ id: p.id, name: p.name, color: suspectColor(p.suspectId), suspectId: p.suspectId, dice: p.dice }));
 
   const myRoom = me?.inRoomId ? getCard(me.inRoomId)?.title : null;
   const myShortcutDest = me?.inRoomId ? shortcutDestForRoom(me.inRoomId) : undefined;
@@ -485,11 +495,7 @@ export function Game() {
         </div>
 
         <aside className="game__chat">
-          <Chat
-            messages={chat}
-            onSend={sendChat}
-            players={game.players.map((p) => ({ id: p.id, name: p.name, color: suspectColor(p.suspectId), suspectId: p.suspectId, dice: p.dice }))}
-          />
+          <Chat messages={chat} onSend={sendChat} players={chatPlayers} />
         </aside>
       </div>
 
@@ -572,9 +578,12 @@ export function Game() {
             <div
               className={`pill pill--stacked pill--${n.kind}`}
               style={n.color ? { background: n.color, color: contrastInk(n.color), borderColor: contrastInk(n.color) } : undefined}
-              onClick={n.kind === 'toast' ? () => document.querySelector('.game__chat')?.scrollIntoView({ behavior: 'smooth' }) : undefined}
+              title="Click to dismiss"
+              onClick={() => dismissNotice(n.id)}
             >
-              {n.text}
+              {/* The turn flash is already painted in the character's colour, so it is left plain;
+                  event toasts get every name tinted the way the chat log tints them. */}
+              {n.kind === 'toast' ? highlightChat(n.text, chatPlayers) : n.text}
             </div>
           </div>
         ))}

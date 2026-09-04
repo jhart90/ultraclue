@@ -153,7 +153,8 @@ export interface PlayBounds {
 
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 const WAVE_STAGGER_MS = 110;
-const DIE_SIZE = 41;
+/** Model size of one die at the default scale; `buildSims` multiplies it by the viewer's setting. */
+export const DIE_SIZE = 41;
 
 /** Scatter landing spots around the middle of the play area, no two dice touching. */
 function scatterTargets(n: number, b: PlayBounds): Array<{ x: number; y: number }> {
@@ -214,9 +215,10 @@ function pickWallBounce(
 }
 
 /** Plan a throw of `values` (each 1..6) that lands inside `bounds` on a canvas `w`×`h` px. */
-export function buildSims(values: number[], w: number, h: number, color: string, pipColor: string, bounds?: PlayBounds, bouncePct = 45): DieSim[] {
+export function buildSims(values: number[], w: number, h: number, color: string, pipColor: string, bounds?: PlayBounds, bouncePct = 45, scale = 1): DieSim[] {
   const b = bounds ?? { left: 0, right: w, top: 0, bottom: h };
   const bounceChance = Math.max(0, Math.min(100, bouncePct)) / 100;
+  const dieSize = DIE_SIZE * scale;
   const targets = scatterTargets(values.length, b);
   const cx = b.left + (b.right - b.left) / 2;
   const rgb = hexToRgb(color);
@@ -227,12 +229,12 @@ export function buildSims(values: number[], w: number, h: number, color: string,
     const start = { x: fromLeft ? -80 : w + 80, y: target.y + 120 + Math.random() * 160 };
     const dur = 1450 + Math.random() * 250;
     const delay = (waveDelay += i === 0 ? 0 : WAVE_STAGGER_MS);
-    const wall = Math.random() < bounceChance ? pickWallBounce(start, target, b, DIE_SIZE / 2) : null;
+    const wall = Math.random() < bounceChance ? pickWallBounce(start, target, b, dieSize / 2) : null;
     return {
       value,
       rgb,
       pipColor,
-      size: DIE_SIZE,
+      size: dieSize,
       start,
       target,
       ...(wall ? { via: wall.via, viaAt: wall.viaAt } : {}),

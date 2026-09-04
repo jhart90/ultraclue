@@ -218,6 +218,34 @@ function hedgeTexture(c: { x: number; y: number; type: string; obstacleKind?: st
   const sideways = hedge(-1, 0) || hedge(1, 0);
   return { name: 'hedge_horizontal', angle: upright && !sideways ? 90 : 0 };
 }
+/** The pond by the Boat House. `water_shoreline` carries its band of grass along the EAST edge, so
+ *  0 degrees puts the shore east: 90 south, 180 west, 270 north. `water_corner` has grass along the
+ *  EAST and SOUTH edges, so 0 is a south-east shore, 90 south-west, 180 north-west, 270 north-east.
+ *
+ *  A side is shore only where a real tile of dry land sits against it. Where the pond runs off the
+ *  edge of the section there is no tile at all, and that side stays open water so the pond reads as
+ *  continuing past the board rather than ending at a beach. */
+const TILE_KEYS = new Set(BOARD.cells.map((c) => coordKey(c)));
+const WATER_KEYS = new Set(
+  BOARD.cells.filter((c) => c.type === 'obstacle' && c.obstacleKind === 'water').map((c) => coordKey(c)),
+);
+const SHORE_ANGLE: Record<string, number> = { east: 0, south: 90, west: 180, north: 270 };
+const WATER_CORNER_ANGLE: Record<string, number> = { 'east|south': 0, 'south|west': 90, 'north|west': 180, 'north|east': 270 };
+function waterTexture(c: { x: number; y: number; type: string; obstacleKind?: string }): { name: BoardTexture; angle: number } | undefined {
+  if (c.type !== 'obstacle' || c.obstacleKind !== 'water') return undefined;
+  const shores = ([['north', 0, -1], ['east', 1, 0], ['south', 0, 1], ['west', -1, 0]] as const)
+    .filter(([, dx, dy]) => {
+      const k = coordKey({ x: c.x + dx, y: c.y + dy });
+      return TILE_KEYS.has(k) && !WATER_KEYS.has(k);
+    })
+    .map(([dir]) => dir);
+  if (shores.length === 1) return { name: 'water_shoreline', angle: SHORE_ANGLE[shores[0]] };
+  if (shores.length === 2) {
+    const angle = WATER_CORNER_ANGLE[`${shores[0]}|${shores[1]}`];
+    if (angle !== undefined) return { name: 'water_corner', angle }; // perpendicular pair only
+  }
+  return { name: 'water', angle: 0 };
+}
 function tileFill(c: { x: number; y: number; type: string; sectionId: string; obstacleKind?: string }, fallback: string): string {
   const tex = tileTexture(c);
   return tex && textureUrl(tex) ? `url(#${texturePatternId(tex)})` : fallback;
@@ -817,25 +845,28 @@ export function Board({
             return (
               <g style={{ pointerEvents: 'none' }}>
                 {obstacles.map((c) => {
-                  const hedge = hedgeTexture(c);
-                  const hedgeUrl = hedge ? textureUrl(hedge.name) : undefined;
-                  if (hedge && hedgeUrl) {
+                  const tex = hedgeTexture(c) ?? waterTexture(c);
+                  const url = tex ? textureUrl(tex.name) : undefined;
+                  if (tex && url) {
                     return (
                       <image
                         key={`o${c.x}-${c.y}`}
-                        href={hedgeUrl}
+                        href={url}
                         x={c.x * TS}
                         y={c.y * TS}
                         width={TS}
                         height={TS}
                         preserveAspectRatio="none"
-                        transform={`rotate(${hedge.angle} ${c.x * TS + TS / 2} ${c.y * TS + TS / 2})`}
+                        transform={`rotate(${tex.angle} ${c.x * TS + TS / 2} ${c.y * TS + TS / 2})`}
                       />
                     );
                   }
                   return <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={tileFill(c, FILL[c.obstacleKind ?? 'wall'])} />;
                 })}
-                {kind('water').length > 0 && <path d={roomOutline(kind('water'))} fill="none" stroke="#9fd6e6" strokeWidth="1.5" strokeLinejoin="round" />}
+                {/* The painted shoreline and ripples only stand in while the pond has no texture. */}
+                {kind('water').length > 0 && !textureUrl('water') && (
+                  <path d={roomOutline(kind('water'))} fill="none" stroke="#9fd6e6" strokeWidth="1.5" strokeLinejoin="round" />
+                )}
                 {/* The green outline only stands in for the hedge when no texture has been dropped in;
                     drawn over the real foliage it reads as a stray line. */}
                 {kind('hedge').length > 0 && !textureUrl('hedge_horizontal') && !textureUrl('hedge_corner') && (
@@ -846,7 +877,7 @@ export function Board({
                   .map((c) => (
                     <rect key={`w${c.x}-${c.y}`} x={c.x * TS + 4} y={c.y * TS + 4} width={TS - 8} height={TS - 8} rx="3" fill="none" stroke="#8a8398" strokeWidth="1.5" />
                   ))}
-                {kind('water').map((c) => (
+                {!textureUrl('water') && kind('water').map((c) => (
                   <path key={`r${c.x}-${c.y}`} d={`M${c.x * TS + 5} ${c.y * TS + TS / 2} q${TS / 4} -3 ${TS / 2} 0 t${TS / 2 - 10} 0`} fill="none" stroke="rgba(190,230,245,0.45)" strokeWidth="1" />
                 ))}
               </g>

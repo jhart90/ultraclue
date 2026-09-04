@@ -83,7 +83,7 @@ python .claude/skills/optimize-image-assets/scripts/optimize_overrides.py assets
 python .claude/skills/optimize-image-assets/scripts/trim_board_art.py
 ```
 
-Generate as large as the tool allows at the right ratio; the optimiser downscales to 900px on the long
+Generate as large as the tool allows at the right ratio; the optimiser downscales board art to 1200px on the long
 edge and converts to WebP. The trim pass then strips any blank margin left around the room. It only
 cuts rows and columns that are almost entirely blank, so it cannot rescue art whose walls float well
 inside the canvas — that needs regenerating with the full-bleed wording above.

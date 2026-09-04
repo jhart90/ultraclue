@@ -55,6 +55,9 @@ export interface PublicStats {
   characterTiles: Record<string, number>;
   /** Times the character was named as the suspect in a suggestion (they need not have been in play). */
   characterSuspected: Record<string, number>;
+  /** Times each weapon / room card was named in a suggestion, across every public game. */
+  weaponsSuggested: Record<string, number>;
+  roomsSuggested: Record<string, number>;
   characterAccusations: Record<string, number>;
   characterCorrect: Record<string, number>;
   /** Newest first, capped at PUBLIC_STATS_RECENT. */
@@ -77,6 +80,8 @@ export function emptyPublicStats(): PublicStats {
     characterGames: {},
     characterTiles: {},
     characterSuspected: {},
+    weaponsSuggested: {},
+    roomsSuggested: {},
     characterAccusations: {},
     characterCorrect: {},
     recent: [],
@@ -159,9 +164,28 @@ export function foldPublicGame(stats: PublicStats, view: GameView, id: string): 
     bump(stats.characterAccusations, p.suspectId, ps?.accusations ?? 0);
   }
   for (const [sid, n] of Object.entries(view.stats?.suspects ?? {})) bump(stats.characterSuspected, sid, n);
+  for (const [wid, n] of Object.entries(view.stats?.weapons ?? {})) bump(stats.weaponsSuggested, wid, n);
+  for (const [rid, n] of Object.entries(view.stats?.rooms ?? {})) bump(stats.roomsSuggested, rid, n);
   if (summary.solved) bump(stats.characterCorrect, summary.winnerSuspectId);
   const archived: ArchivedPublicGame = { ...summary, view: archiveView(view) };
   stats.recent.unshift(archived);
   if (stats.recent.length > PUBLIC_STATS_RECENT) stats.recent.length = PUBLIC_STATS_RECENT;
   return archived;
+}
+
+/** Fill in tallies that a stats file saved by an older build never recorded, from whatever the
+ *  rolling archive still holds. Only touches tallies that are entirely absent, so a file that has
+ *  them (even at zero for some cards) is left alone. Returns true if anything was rebuilt. */
+export function backfillPublicStats(stats: PublicStats, raw: Partial<PublicStats>): boolean {
+  let changed = false;
+  const rebuild = (key: 'weaponsSuggested' | 'roomsSuggested', pick: (g: ArchivedPublicGame) => Record<string, number> | undefined) => {
+    if (raw[key]) return;
+    const tally: Record<string, number> = {};
+    for (const g of stats.recent) for (const [id, n] of Object.entries(pick(g) ?? {})) bump(tally, id, n);
+    stats[key] = tally;
+    changed = true;
+  };
+  rebuild('weaponsSuggested', (g) => g.view.stats?.weapons);
+  rebuild('roomsSuggested', (g) => g.view.stats?.rooms);
+  return changed;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { startGame, makeAccusation, makeRng, viewFor, emptyPublicStats, foldPublicGame, PUBLIC_STATS_RECENT, type Player } from '../src';
+import { startGame, makeAccusation, makeRng, viewFor, emptyPublicStats, foldPublicGame, backfillPublicStats, PUBLIC_STATS_RECENT, type Player } from '../src';
 
 function lobbyPlayer(id: string, suspectId: string, isBot = false): Player {
   return { id, name: isBot ? `Computer ${id}` : id.toUpperCase(), suspectId, isBot, isHost: false, connected: true, hand: [], eliminated: false, position: { x: 0, y: 0 } };
@@ -61,5 +61,39 @@ describe('public game history', () => {
     expect(stats.totalGames).toBe(PUBLIC_STATS_RECENT + 5);
     expect(stats.recent).toHaveLength(PUBLIC_STATS_RECENT);
     expect(stats.recent[0].id).toBe(`g${PUBLIC_STATS_RECENT + 4}`);
+  });
+});
+
+describe('suggestion tallies across public games', () => {
+  it('sums how often each weapon and room was named, game after game', () => {
+    const stats = emptyPublicStats();
+    const a = finishedGame(11, true);
+    a.stats!.weapons = { 'weapon-rope': 2, 'weapon-dagger': 1 };
+    a.stats!.rooms = { 'room-study': 3 };
+    const b = finishedGame(12, false);
+    b.stats!.weapons = { 'weapon-rope': 1 };
+    b.stats!.rooms = { 'room-study': 1, 'room-lounge': 2 };
+    foldPublicGame(stats, a, 'g1');
+    foldPublicGame(stats, b, 'g2');
+    expect(stats.weaponsSuggested).toEqual({ 'weapon-rope': 3, 'weapon-dagger': 1 });
+    expect(stats.roomsSuggested).toEqual({ 'room-study': 4, 'room-lounge': 2 });
+  });
+
+  it('backfills the tallies from the archive when an older stats file lacks them', () => {
+    const stats = emptyPublicStats();
+    const a = finishedGame(13, true);
+    a.stats!.weapons = { 'weapon-candlestick': 2 };
+    a.stats!.rooms = { 'room-kitchen': 1 };
+    foldPublicGame(stats, a, 'g1');
+    // simulate a file written before the tallies existed
+    const raw = { ...stats } as Partial<typeof stats>;
+    delete raw.weaponsSuggested;
+    delete raw.roomsSuggested;
+    const loaded = { ...emptyPublicStats(), ...raw, recent: stats.recent };
+    expect(backfillPublicStats(loaded, raw)).toBe(true);
+    expect(loaded.weaponsSuggested).toEqual({ 'weapon-candlestick': 2 });
+    expect(loaded.roomsSuggested).toEqual({ 'room-kitchen': 1 });
+    // a file that already has them is left alone
+    expect(backfillPublicStats(loaded, loaded)).toBe(false);
   });
 });

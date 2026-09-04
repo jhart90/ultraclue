@@ -230,6 +230,11 @@ export function StatsScreen() {
             <Ranking title="Top Murder Weapons" tally={stats.weapons} all={WEAPONS} />
             <Ranking title="Top Crime Scenes" tally={stats.rooms} all={ROOMS} />
           </div>
+          <div className="stats__grid stats__grid--3">
+            <Ranking title="Most Suspected Characters" tally={stats.characterSuspected} all={SUSPECTS} note="times named in a suggestion" />
+            <Ranking title="Most Suspected Weapons" tally={stats.weaponsSuggested} all={WEAPONS} note="times named in a suggestion" />
+            <Ranking title="Most Suspected Rooms" tally={stats.roomsSuggested} all={ROOMS} note="times named in a suggestion" />
+          </div>
 
           <h2 className="stats__h2">Character Statistics</h2>
           <div className="stats__grid stats__grid--4">

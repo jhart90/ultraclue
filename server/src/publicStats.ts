@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { emptyPublicStats, foldPublicGame, type GameView, type PublicStats } from 'shared';
+import { backfillPublicStats, emptyPublicStats, foldPublicGame, type GameView, type PublicStats } from 'shared';
 
 // Persistent history of the public table: all-time aggregates plus the last 50 games, kept in a
 // JSON file so it survives restarts. DATA_DIR overrides where it lives (mount a volume there in
@@ -14,8 +14,10 @@ function load(): PublicStats {
   try {
     const raw = fs.readFileSync(FILE, 'utf8');
     const parsed = JSON.parse(raw) as Partial<PublicStats>;
-    // tolerate older files missing newer fields
-    return { ...emptyPublicStats(), ...parsed, recent: Array.isArray(parsed.recent) ? parsed.recent : [] };
+    // tolerate older files missing newer fields, rebuilding what the archive can still supply
+    const stats: PublicStats = { ...emptyPublicStats(), ...parsed, recent: Array.isArray(parsed.recent) ? parsed.recent : [] };
+    if (backfillPublicStats(stats, parsed)) console.log('[public-stats] backfilled suggestion tallies from the archive');
+    return stats;
   } catch {
     return emptyPublicStats();
   }

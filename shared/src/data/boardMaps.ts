@@ -265,8 +265,8 @@ const BASEMENT_DOORS = [
   '............>...........', // 15 gymnasium east
   '........................', // 16
   '........v.........<.....', // 17 gymnasium -> sauna (connecting), bunker (its only door, at the end of the blast corridor)
-  '........>...............', // 18 sauna east
-  '..<.....................', // 19 sauna west
+  '........................', // 18
+  '..<.....................', // 19 sauna west (its only door; the Gymnasium connects in from above)
 ];
 
 export const SECTION_MAPS: SectionMap[] = [

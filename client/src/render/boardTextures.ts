@@ -19,7 +19,8 @@ export type BoardTexture =
   | 'path_plus_intersection'
   | 'wood_floor_vertical_light_pillar'
   | 'cobblestone_pillar'
-  | 'hedge_horizontal';
+  | 'hedge_horizontal'
+  | 'hedge_corner';
 
 export const BOARD_TEXTURES: readonly BoardTexture[] = [
   'wood_floor_horizontal',
@@ -34,6 +35,7 @@ export const BOARD_TEXTURES: readonly BoardTexture[] = [
   'wood_floor_vertical_light_pillar',
   'cobblestone_pillar',
   'hedge_horizontal',
+  'hedge_corner',
 ];
 
 /** URL of a texture file, or undefined if none has been dropped in. */

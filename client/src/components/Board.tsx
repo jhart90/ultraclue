@@ -185,19 +185,37 @@ function rotatedTexture(c: { x: number; y: number; type: string; sectionId: stri
   }
   return undefined;
 }
-/** Hedge tiles in the maze. One texture file covers both runs: it is authored as a hedge running
- *  left-to-right, and the vertical stretches are the same image turned a quarter turn. A tile counts
- *  as vertical only when it continues up or down and NOT sideways, so the corners of the maze's
- *  outer ring stay with the horizontal band they cap and the short stubs beside the east gate --
- *  which touch no other hedge -- keep the file's own orientation. */
+/** Hedge tiles in the maze, drawn from two files. `hedge_horizontal` is authored as a hedge running
+ *  left-to-right, and the vertical stretches are the same image turned a quarter turn; a tile counts
+ *  as vertical only when it continues up or down and NOT sideways, so the stubs beside the east gate
+ *  -- which touch no other hedge -- keep the file's own orientation. `hedge_corner` fills its tile
+ *  with grass along the RIGHT and BOTTOM edges, so at 0 degrees the foliage reaches the TOP and LEFT:
+ *  90 turns it up+right, 180 right+down, 270 down+left (SVG rotation is clockwise).
+ *
+ *  A tile bends when it has exactly two connections and they are perpendicular. A connection is a
+ *  neighbouring hedge tile OR the wall of the Hedge Maze clearing itself, which is what turns the
+ *  ends of the inner wall in towards the room so the foliage runs unbroken into the room's own art. */
 const HEDGE_KEYS = new Set(
   BOARD.cells.filter((c) => c.type === 'obstacle' && c.obstacleKind === 'hedge').map((c) => coordKey(c)),
 );
+const MAZE_ROOM_KEYS = new Set(
+  (BOARD.rooms['room-hedge-maze']?.tiles ?? []).map((t) => coordKey(t)),
+);
+const HEDGE_CORNER_ANGLE: Record<string, number> = { 'up|left': 0, 'up|right': 90, 'down|right': 180, 'down|left': 270 };
 function hedgeTexture(c: { x: number; y: number; type: string; obstacleKind?: string }): { name: BoardTexture; angle: number } | undefined {
   if (c.type !== 'obstacle' || c.obstacleKind !== 'hedge') return undefined;
-  const has = (dx: number, dy: number) => HEDGE_KEYS.has(coordKey({ x: c.x + dx, y: c.y + dy }));
-  const sideways = has(-1, 0) || has(1, 0);
-  const upright = has(0, -1) || has(0, 1);
+  const at = (dx: number, dy: number) => coordKey({ x: c.x + dx, y: c.y + dy });
+  const hedge = (dx: number, dy: number) => HEDGE_KEYS.has(at(dx, dy));
+  const joins = (dx: number, dy: number) => hedge(dx, dy) || MAZE_ROOM_KEYS.has(at(dx, dy));
+  const links = ([['up', 0, -1], ['down', 0, 1], ['left', -1, 0], ['right', 1, 0]] as const)
+    .filter(([, dx, dy]) => joins(dx, dy))
+    .map(([dir]) => dir);
+  if (links.length === 2) {
+    const angle = HEDGE_CORNER_ANGLE[`${links[0]}|${links[1]}`];
+    if (angle !== undefined) return { name: 'hedge_corner', angle }; // perpendicular pair; a parallel one falls through
+  }
+  const upright = hedge(0, -1) || hedge(0, 1);
+  const sideways = hedge(-1, 0) || hedge(1, 0);
   return { name: 'hedge_horizontal', angle: upright && !sideways ? 90 : 0 };
 }
 function tileFill(c: { x: number; y: number; type: string; sectionId: string; obstacleKind?: string }, fallback: string): string {
@@ -820,7 +838,7 @@ export function Board({
                 {kind('water').length > 0 && <path d={roomOutline(kind('water'))} fill="none" stroke="#9fd6e6" strokeWidth="1.5" strokeLinejoin="round" />}
                 {/* The green outline only stands in for the hedge when no texture has been dropped in;
                     drawn over the real foliage it reads as a stray line. */}
-                {kind('hedge').length > 0 && !textureUrl('hedge_horizontal') && (
+                {kind('hedge').length > 0 && !textureUrl('hedge_horizontal') && !textureUrl('hedge_corner') && (
                   <path d={roomOutline(kind('hedge'))} fill="none" stroke="#6f9a5a" strokeWidth="2" strokeLinejoin="round" />
                 )}
                 {kind('wall')

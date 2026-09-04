@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { contrastPips, type DiceStyle } from 'shared';
 import './DiceOverlay.css';
 
-// Swatches ported from Roll67: starburst brights plus white and near-black.
+// Swatches ported from Roll67: starburst brights plus white and near-black. Pips offer the same
+// choices as the body, so the two rows read as one control rather than two unrelated ones.
 const DICE_PALETTE = ['#ff3d57', '#ff8a00', '#ffe234', '#2fe04a', '#00e5d0', '#0aa8ff', '#b444ff', '#ff4fa3', '#ffffff', '#14171d'];
-const PIP_PALETTE = ['#111111', '#ffffff', '#ffe08a', '#ff6b6b', '#7ee89a', '#6cd2c8'];
 const AUTO_KEY = 'ultraclue-dice-auto';
 const SIZE_KEY = 'ultraclue-dice-size';
 
@@ -91,7 +91,7 @@ export function DiceSettings({
       <div className="dicepick__row">
         <span className="dicepick__label">Pips</span>
         <span className="dicepick__swatches">
-          {PIP_PALETTE.map((c) => (
+          {DICE_PALETTE.map((c) => (
             <button
               key={c}
               className={`dicepick__swatch${!auto && pips === c ? ' dicepick__swatch--on' : ''}`}

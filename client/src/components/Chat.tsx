@@ -31,8 +31,12 @@ function groupItems(messages: ChatMsg[]): Item[] {
     }
     const item: Item = { msg: m, responses: [] };
     items.push(item);
+    // A suggestion keeps collecting until it is answered or another one starts. Turn headers, roll
+    // cards and stray system lines can land in between — a roll card in particular arrives late,
+    // because it waits for the dice to finish tumbling — and used to orphan every response that
+    // followed, leaving a run of bare "cannot disprove" lines under no card at all.
     if (m.card?.kind === 'suggestion') open = item;
-    else if (m.card) open = null;
+    else if (m.card?.kind === 'accusation') open = null;
   }
   return items;
 }

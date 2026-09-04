@@ -440,6 +440,12 @@ export function pickSuspect(room: Room, id: string, suspectId: string): void {
   slot.occupant.suspectId = suspectId;
 }
 
+/** How much chat history a room keeps. One turn at the 40-seat public table runs to about 45 lines
+ *  — a turn header, a roll, a move, a suggestion and a response from every other player — so 500
+ *  held barely eleven turns, and a suggestion could be trimmed away while its own responses were
+ *  still arriving. This holds a full round. */
+const CHAT_BACKLOG = 2500;
+
 export function addChat(
   room: Room,
   fromName: string,
@@ -451,7 +457,7 @@ export function addChat(
   const clean = text.trim().slice(0, 300);
   if (!clean) return;
   room.chat.push({ id: room.nextChatId++, from: fromName, text: clean, system, to, whisper });
-  if (room.chat.length > 500) room.chat.shift();
+  while (room.chat.length > CHAT_BACKLOG) room.chat.shift();
 }
 
 /** Show a transient italic "<name> is thinking…" line while a bot deliberates. Replaces any
@@ -511,7 +517,7 @@ export function mirrorLog(room: Room, defer?: (apply: () => boolean, ms: number)
       room.mirroredLogId = entry.id;
     }
   }
-  while (room.chat.length > 500) room.chat.shift();
+  while (room.chat.length > CHAT_BACKLOG) room.chat.shift();
 }
 
 /** Mark a participant disconnected. The seat stays human and the game waits for them — only an

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { BOARD, coordKey, getCard, type Coord, type PlayerView, type RoomLayout, type SectionTheme } from 'shared';
 import { resolveOverrideThumb } from '../render/overrides';
-import { resolveBoardArt } from '../render/boardArt';
+import { resolveBoardArt, sharedArtGroup } from '../render/boardArt';
 import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
 import { packRoom, type Packing, type Rect } from '../render/roomPacking';
 import { BOARD_TEXTURES, textureUrl, texturePatternId, type BoardTexture } from '../render/boardTextures';
@@ -109,6 +109,18 @@ function roomBounds(room: RoomLayout) {
   const minX = Math.min(...xs);
   const minY = Math.min(...ys);
   return { x: minX * TS, y: minY * TS, w: (Math.max(...xs) - minX + 1) * TS, h: (Math.max(...ys) - minY + 1) * TS, minX, minY };
+}
+
+/** The rectangle a room's floor art is stretched onto. Normally its own bounds; for rooms that
+ *  share one painting it is the union of the group's bounds, so every room in the group lays the
+ *  image down on the same rectangle and their shares line up. */
+function artBounds(room: RoomLayout) {
+  const group = sharedArtGroup(room.id);
+  if (!group) return roomBounds(room);
+  const boxes = group.map((id) => BOARD.rooms[id]).filter(Boolean).map(roomBounds);
+  const x = Math.min(...boxes.map((r) => r.x));
+  const y = Math.min(...boxes.map((r) => r.y));
+  return { x, y, w: Math.max(...boxes.map((r) => r.x + r.w)) - x, h: Math.max(...boxes.map((r) => r.y + r.h)) - y };
 }
 
 /** SVG path tracing only the outer edges of a room's tiles, so an L-shaped room gets a clean
@@ -963,8 +975,12 @@ export function Board({
             // A room with no board art yet borrows its card portrait as a stand-in. That is a
             // placeholder, so it takes the small thumbnail: it is drawn 74-256px wide here, and the
             // full-size master would add several MB to every game load for art due to be replaced.
-            const boardArt = resolveBoardArt(room.id, title);
+            // Shared art is filed under the group's primary room, so look it up by that name.
+            const group = sharedArtGroup(room.id);
+            const artist = group ? group[0] : room.id;
+            const boardArt = resolveBoardArt(artist, getCard(artist)?.title ?? artist);
             const art = boardArt ?? resolveOverrideThumb(room.id, 'room', title);
+            const ab = artBounds(room);
             // A room whose tiles fill its whole bounding box is a plain rectangle; otherwise it has
             // a notch and must be drawn from its actual tiles so the L-shape shows.
             // name bubble: centred for rectangles, on the label tile for L-shapes
@@ -984,10 +1000,10 @@ export function Board({
                         </clipPath>
                         <image
                           href={art}
-                          x={b.x + 2}
-                          y={b.y + 2}
-                          width={b.w - 4}
-                          height={b.h - 4}
+                          x={ab.x + 2}
+                          y={ab.y + 2}
+                          width={ab.w - 4}
+                          height={ab.h - 4}
                           preserveAspectRatio={boardArt ? 'none' : 'xMidYMid slice'}
                           clipPath={`url(#roomclip-${room.id})`}
                           style={{ pointerEvents: 'none' }}
@@ -1016,10 +1032,10 @@ export function Board({
                         </clipPath>
                         <image
                           href={boardArt}
-                          x={b.x + 2}
-                          y={b.y + 2}
-                          width={b.w - 4}
-                          height={b.h - 4}
+                          x={ab.x + 2}
+                          y={ab.y + 2}
+                          width={ab.w - 4}
+                          height={ab.h - 4}
                           preserveAspectRatio="none"
                           clipPath={`url(#roomclip-${room.id})`}
                           style={{ pointerEvents: 'none' }}

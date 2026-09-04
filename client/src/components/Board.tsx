@@ -185,6 +185,21 @@ function rotatedTexture(c: { x: number; y: number; type: string; sectionId: stri
   }
   return undefined;
 }
+/** Hedge tiles in the maze. One texture file covers both runs: it is authored as a hedge running
+ *  left-to-right, and the vertical stretches are the same image turned a quarter turn. A tile counts
+ *  as vertical only when it continues up or down and NOT sideways, so the corners of the maze's
+ *  outer ring stay with the horizontal band they cap and the short stubs beside the east gate --
+ *  which touch no other hedge -- keep the file's own orientation. */
+const HEDGE_KEYS = new Set(
+  BOARD.cells.filter((c) => c.type === 'obstacle' && c.obstacleKind === 'hedge').map((c) => coordKey(c)),
+);
+function hedgeTexture(c: { x: number; y: number; type: string; obstacleKind?: string }): { name: BoardTexture; angle: number } | undefined {
+  if (c.type !== 'obstacle' || c.obstacleKind !== 'hedge') return undefined;
+  const has = (dx: number, dy: number) => HEDGE_KEYS.has(coordKey({ x: c.x + dx, y: c.y + dy }));
+  const sideways = has(-1, 0) || has(1, 0);
+  const upright = has(0, -1) || has(0, 1);
+  return { name: 'hedge_horizontal', angle: upright && !sideways ? 90 : 0 };
+}
 function tileFill(c: { x: number; y: number; type: string; sectionId: string; obstacleKind?: string }, fallback: string): string {
   const tex = tileTexture(c);
   return tex && textureUrl(tex) ? `url(#${texturePatternId(tex)})` : fallback;
@@ -783,11 +798,31 @@ export function Board({
             const FILL: Record<string, string> = { water: '#2a6f8c', lawn: '#3d6b3b', hedge: '#1e3d21', wall: '#4a4356' };
             return (
               <g style={{ pointerEvents: 'none' }}>
-                {obstacles.map((c) => (
-                  <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={tileFill(c, FILL[c.obstacleKind ?? 'wall'])} />
-                ))}
+                {obstacles.map((c) => {
+                  const hedge = hedgeTexture(c);
+                  const hedgeUrl = hedge ? textureUrl(hedge.name) : undefined;
+                  if (hedge && hedgeUrl) {
+                    return (
+                      <image
+                        key={`o${c.x}-${c.y}`}
+                        href={hedgeUrl}
+                        x={c.x * TS}
+                        y={c.y * TS}
+                        width={TS}
+                        height={TS}
+                        preserveAspectRatio="none"
+                        transform={`rotate(${hedge.angle} ${c.x * TS + TS / 2} ${c.y * TS + TS / 2})`}
+                      />
+                    );
+                  }
+                  return <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={tileFill(c, FILL[c.obstacleKind ?? 'wall'])} />;
+                })}
                 {kind('water').length > 0 && <path d={roomOutline(kind('water'))} fill="none" stroke="#9fd6e6" strokeWidth="1.5" strokeLinejoin="round" />}
-                {kind('hedge').length > 0 && <path d={roomOutline(kind('hedge'))} fill="none" stroke="#6f9a5a" strokeWidth="2" strokeLinejoin="round" />}
+                {/* The green outline only stands in for the hedge when no texture has been dropped in;
+                    drawn over the real foliage it reads as a stray line. */}
+                {kind('hedge').length > 0 && !textureUrl('hedge_horizontal') && (
+                  <path d={roomOutline(kind('hedge'))} fill="none" stroke="#6f9a5a" strokeWidth="2" strokeLinejoin="round" />
+                )}
                 {kind('wall')
                   .filter((c) => !(tileTexture(c) && textureUrl(tileTexture(c)!))) // textured pillars draw their own
                   .map((c) => (

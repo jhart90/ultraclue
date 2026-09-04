@@ -171,7 +171,7 @@ const PASSAGE_DEFS: [string, string, string][] = [
   ['room-laboratory', 'room-gazebo', "Dr Orchid's poison garden"],
   ['room-theatre', 'room-workshop', 'The trapdoor under the stage'],
   ['room-boat-house', 'room-bunker', "The smugglers' tunnel"],
-  ['room-master-suite', 'room-wine-cellar', 'The priest hole'],
+  ['room-walk-in-closet', 'room-wine-cellar', 'The empty barrel'],
   ['room-trophy', 'room-armory', 'Behind the bear'],
 ];
 

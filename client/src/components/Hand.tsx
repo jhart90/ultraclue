@@ -1,6 +1,6 @@
 import { getCard, type AnyCard } from 'shared';
 import { CardArt } from '../render/cardArt';
-import { resolveOverride } from '../render/overrides';
+import { resolveOverrideThumb } from '../render/overrides';
 import { openCardZoom } from './CardZoom';
 import { compareCards } from '../util/cardSort';
 import './Hand.css';
@@ -34,7 +34,7 @@ export function Hand({ cardIds }: { cardIds: string[] }) {
           >
             <div className="hand__thumb">
               {(() => {
-                const override = resolveOverride(card.id, card.type, card.title);
+                const override = resolveOverrideThumb(card.id, card.type, card.title);
                 return override ? (
                   <img src={override} alt={card.title} className="hand__thumbimg" />
                 ) : (

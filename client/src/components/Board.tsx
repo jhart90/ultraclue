@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { BOARD, coordKey, getCard, type Coord, type PlayerView, type RoomLayout, type SectionTheme } from 'shared';
-import { resolveOverride } from '../render/overrides';
+import { resolveOverrideThumb } from '../render/overrides';
 import { resolveBoardArt } from '../render/boardArt';
 import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
 import { packRoom, type Packing, type Rect } from '../render/roomPacking';
@@ -876,8 +876,11 @@ export function Board({
             // otherwise the room's card portrait as a stand-in. Board art is authored to the room's
             // exact tile rectangle, so it is stretched onto the bounds and shown undimmed; the card
             // portrait is cropped to cover and sat under a scrim so the name bubble stays legible.
+            // A room with no board art yet borrows its card portrait as a stand-in. That is a
+            // placeholder, so it takes the small thumbnail: it is drawn 74-256px wide here, and the
+            // full-size master would add several MB to every game load for art due to be replaced.
             const boardArt = resolveBoardArt(room.id, title);
-            const art = boardArt ?? resolveOverride(room.id, 'room', title);
+            const art = boardArt ?? resolveOverrideThumb(room.id, 'room', title);
             // A room whose tiles fill its whole bounding box is a plain rectangle; otherwise it has
             // a notch and must be drawn from its actual tiles so the L-shape shows.
             // name bubble: centred for rectangles, on the label tile for L-shapes

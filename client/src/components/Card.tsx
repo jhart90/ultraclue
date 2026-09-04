@@ -1,6 +1,6 @@
 import type { AnyCard } from 'shared';
 import { CardArt } from '../render/cardArt';
-import { resolveOverride } from '../render/overrides';
+import { resolveOverride, resolveOverrideThumb } from '../render/overrides';
 import { openCardZoom } from './CardZoom';
 import './Card.css';
 
@@ -14,9 +14,13 @@ const TYPE_LABEL: Record<AnyCard['type'], string> = {
  * One game card. By default clicking it (or pressing Enter/Space on it) opens the full-size zoom
  * viewer; pass `zoomable={false}` where the card is decorative or already the target of another
  * click (the title scatter, the reveal picker, the zoom viewer itself).
+ *
+ * The art is the small thumbnail unless `hiRes` is set: every screen but the zoom viewer draws the
+ * card at 200px or less, so the 900px master would be ~5x the bytes for no visible gain.
  */
-export function Card({ card, zoomable = true }: { card: AnyCard; zoomable?: boolean }) {
-  const override = resolveOverride(card.id, card.type, card.title);
+export function Card({ card, zoomable = true, hiRes = false }: { card: AnyCard; zoomable?: boolean; hiRes?: boolean }) {
+  const override = hiRes ? resolveOverride(card.id, card.type, card.title) : resolveOverrideThumb(card.id, card.type, card.title);
+  const thumb = hiRes ? resolveOverrideThumb(card.id, card.type, card.title) : undefined;
   const zoomProps = zoomable
     ? {
         role: 'button' as const,
@@ -36,7 +40,11 @@ export function Card({ card, zoomable = true }: { card: AnyCard; zoomable?: bool
     : {};
   return (
     <div className={`card card--${card.type}${zoomable ? ' card--zoomable' : ''}`} {...zoomProps}>
-      <div className={`card__art${override ? ' card__art--img' : ''}`}>
+      <div
+        className={`card__art${override ? ' card__art--img' : ''}`}
+        // While the full-size file downloads, the already-cached thumbnail stands in behind it.
+        style={thumb && thumb !== override ? { backgroundImage: `url(${thumb})`, backgroundSize: 'cover' } : undefined}
+      >
         {override ? (
           <img src={override} alt={card.title} className="card__override" />
         ) : (

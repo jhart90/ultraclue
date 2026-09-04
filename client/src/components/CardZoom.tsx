@@ -89,7 +89,7 @@ export function CardZoomOverlay() {
           </button>
         )}
         <div className="cardzoom__card" style={{ zoom }} onClick={(e) => e.stopPropagation()}>
-          <Card card={card} zoomable={false} />
+          <Card card={card} zoomable={false} hiRes />
         </div>
         {many && (
           <button

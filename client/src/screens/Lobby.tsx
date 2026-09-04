@@ -5,7 +5,7 @@ import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
 import { CardArt } from '../render/cardArt';
-import { resolveOverride } from '../render/overrides';
+import { resolveOverrideThumb } from '../render/overrides';
 import { PublicLobby } from './PublicLobby';
 import './Lobby.css';
 
@@ -13,7 +13,7 @@ import './Lobby.css';
 function SuspectPortrait({ suspectId }: { suspectId: string }) {
   const card = getCard(suspectId);
   if (!card || card.type !== 'suspect') return null;
-  const override = resolveOverride(card.id, 'suspect', card.title);
+  const override = resolveOverrideThumb(card.id, 'suspect', card.title);
   return (
     <div className="seat__portrait">
       {override ? <img src={override} alt={card.title} /> : <CardArt card={card} />}

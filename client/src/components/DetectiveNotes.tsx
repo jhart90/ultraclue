@@ -3,6 +3,7 @@ import { SUSPECTS, WEAPONS, ROOMS, getCard, type AnyCard, type PlayerView } from
 import { useStore } from '../store';
 import { NoteBox, NOTE_STATES } from './NoteBox';
 import './DetectiveNotes.css';
+import { CardName } from './CardName';
 
 const COLS = 8;
 const EMPTY_ROW = new Array(COLS).fill(0);
@@ -121,7 +122,9 @@ export function DetectiveNotes({
               {card.type === 'suspect' && (
                 <span className="notes__cswatch" style={{ background: (card as { color: string }).color }} />
               )}
-              <span className="notes__ctitle">{card.title}</span>
+              <span className="notes__ctitle">
+                <CardName card={card} />
+              </span>
             </div>
             <div className="notes__boxes">
               {Array.from({ length: COLS }, (_, col) => (

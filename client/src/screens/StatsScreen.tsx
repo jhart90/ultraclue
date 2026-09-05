@@ -5,6 +5,7 @@ import { Wordmark } from '../components/Wordmark';
 import { EndScreen } from '../components/EndScreen';
 import { contrastInk } from '../render/colorUtils';
 import './StatsScreen.css';
+import { CardName } from '../components/CardName';
 
 const suspectColor = (id?: string) => {
   const c = id ? getCard(id) : undefined;
@@ -27,7 +28,7 @@ const avg = (num: number, den: number, digits = 1) => (den ? (num / den).toFixed
 function GameTile({ g, onOpen }: { g: ArchivedPublicGame; onOpen: () => void }) {
   const color = suspectColor(g.winnerSuspectId);
   const env = g.envelope;
-  const trio = env ? [env.suspectId, env.weaponId, env.roomId].map((id) => getCard(id)?.title ?? id).join(' · ') : '';
+  const trio = env ? [env.suspectId, env.weaponId, env.roomId] : null;
   const character = g.winnerSuspectId ? getCard(g.winnerSuspectId)?.title : undefined;
   return (
     <button className="stile" onClick={onOpen} style={{ borderLeftColor: color }}>
@@ -54,7 +55,17 @@ function GameTile({ g, onOpen }: { g: ArchivedPublicGame; onOpen: () => void }) 
         </span>
         {fmtDuration(g.startedAt, g.endedAt) && <span>{fmtDuration(g.startedAt, g.endedAt)}</span>}
       </div>
-      {trio && <div className="stile__env">Envelope: {trio}</div>}
+      {trio && (
+        <div className="stile__env">
+          Envelope:{' '}
+          {trio.map((id, i) => (
+            <span key={id}>
+              {i > 0 ? ' · ' : ''}
+              <CardName id={id} />
+            </span>
+          ))}
+        </div>
+      )}
     </button>
   );
 }
@@ -104,7 +115,7 @@ function Ranking({
               <span className="rank__pos">{i + 1}</span>
               <span className="rank__label">
                 {!human && getCard(r.id)?.type === 'suspect' && <span className="rank__dot" style={{ background: suspectColor(r.id) }} />}
-                {r.label}
+                {!human && getCard(r.id) ? <CardName id={r.id} /> : r.label}
               </span>
               <span className="rank__bar">
                 <span className="rank__fill" style={{ width: max ? `${(r.count / max) * 100}%` : 0 }} />

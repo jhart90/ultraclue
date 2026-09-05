@@ -85,7 +85,7 @@ export function AccusationFlow({
 }
 
 export interface StatusButton {
-  label: string;
+  label: React.ReactNode;
   icon: string;
   onClick: () => void;
   primary?: boolean;

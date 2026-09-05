@@ -3,6 +3,7 @@ import { getCard, summarizeStats, PUBLIC_ROOM_CODE, type GameView, type Ranked }
 import { Card } from './Card';
 import { contrastInk } from '../render/colorUtils';
 import './EndScreen.css';
+import { CardName } from './CardName';
 
 const EMOJI: Record<string, string> = {
   travelled: '👣',
@@ -83,7 +84,9 @@ function TopCards({ icon, title, items }: { icon: string; title: string; items: 
         <ol className="end__toplist">
           {items.map((it, i) => (
             <li key={it.id} className={i === 0 ? 'end__topitem end__topitem--lead' : 'end__topitem'}>
-              <span className="end__topname">{getCard(it.id)?.title ?? it.id}</span>
+              <span className="end__topname">
+                <CardName id={it.id} />
+              </span>
               <span className="end__topcount">×{it.count}</span>
             </li>
           ))}

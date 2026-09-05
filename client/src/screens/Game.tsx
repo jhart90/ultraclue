@@ -7,6 +7,7 @@ import { DiceSettings } from '../components/DiceSettings';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
 import { HandFan } from '../components/HandFan';
+import { CardName, RoomName } from '../components/CardName';
 import { Board, WALK_STEP_MS } from '../components/Board';
 import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
@@ -379,7 +380,15 @@ export function Game() {
         { label: 'Roll & Move', icon: '🎲', primary: true, onClick: () => (setStatusOpen(false), rollMove()) },
       ];
       if (myShortcutDest)
-        buttons.push({ label: `Take Shortcut to ${myShortcutName}`, icon: '🕳️', onClick: () => (setStatusOpen(false), takeShortcut()) });
+        buttons.push({
+          label: (
+            <>
+              Take Shortcut to <RoomName title={myShortcutName ?? '?'} />
+            </>
+          ),
+          icon: '🕳️',
+          onClick: () => (setStatusOpen(false), takeShortcut()),
+        });
       buttons.push({ label: 'Skip movement', icon: '⏭️', onClick: () => (setStatusOpen(false), skipMove()) });
       return { lines: [`You are in the ${myRoom}.`, 'Roll, take the secret passage, or skip to stay.'], buttons };
     }
@@ -448,7 +457,9 @@ export function Game() {
             {revealedCard && (
               <div className="game__revealed" title="A card was revealed only to you">
                 <span className="game__revealedlbl">Shown to you:</span>
-                <span className="game__revealedname">{revealedCard.title}</span>
+                <span className="game__revealedname">
+                  <CardName card={revealedCard} />
+                </span>
               </div>
             )}
             <div className="game__ctext">
@@ -459,11 +470,15 @@ export function Game() {
                 </span>
               ) : myTurn ? (
                 game.turnPhase === 'awaitRoll' ? (
-                  <span>You are in the {myRoom}. Roll to leave, or skip to stay.</span>
+                  <span>
+                    You are in the <RoomName title={myRoom ?? ''} />. Roll to leave, or skip to stay.
+                  </span>
                 ) : game.turnPhase === 'awaitMove' ? (
                   <span>Click a highlighted square to move.</span>
                 ) : me?.inRoomId ? (
-                  <span>You're in the {myRoom}. Suggest, accuse, or end your turn.</span>
+                  <span>
+                    You're in the <RoomName title={myRoom ?? ''} />. Suggest, accuse, or end your turn.
+                  </span>
                 ) : (
                   <span>Accuse, or end your turn.</span>
                 )
@@ -477,7 +492,9 @@ export function Game() {
                   <>
                     <button className="btn btn--primary" onClick={rollMove}>🎲 Roll &amp; Move</button>
                     {myShortcutDest && (
-                      <button className="btn" onClick={takeShortcut}>🕳️ Take Shortcut to {myShortcutName}</button>
+                      <button className="btn" onClick={takeShortcut}>
+                        🕳️ Take Shortcut to <RoomName title={myShortcutName ?? '?'} />
+                      </button>
                     )}
                     <button className="btn" onClick={skipMove}>Skip movement</button>
                   </>

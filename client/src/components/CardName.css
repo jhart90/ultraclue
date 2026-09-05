@@ -1,0 +1,38 @@
+/* A room name, lettered like its nameplate on the board (Board.tsx draws the same bubble in SVG:
+   #f4efe1 fill, #2a2018 outline, Georgia bold in #1a120a). Sized in em so it follows the text. */
+.roomplate {
+  display: inline-block;
+  box-sizing: border-box;
+  padding: 0 0.55em;
+  border: 1px solid #2a2018;
+  border-radius: 999px;
+  background: #f4efe1;
+  color: #1a120a;
+  font-family: 'Georgia', serif;
+  font-weight: 700;
+  font-style: normal;
+  font-size: 0.9em;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: 0.05em;
+  text-shadow: none;
+}
+
+/* A weapon name, with its pewter board-token silhouette in front. */
+.weaponname {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.weaponname__icon {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  margin-right: 0.12em;
+  vertical-align: -0.2em;
+  overflow: visible;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+}
+
+.suspectname {
+  font-weight: 700;
+}

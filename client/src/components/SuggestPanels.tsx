@@ -4,6 +4,7 @@ import { SORTED_SUSPECTS, SORTED_WEAPONS, SORTED_ROOMS } from '../util/cardSort'
 import { highlightChat } from '../util/highlightChat';
 import { Card } from './Card';
 import { openCardZoom } from './CardZoom';
+import { RoomName, WeaponName } from './CardName';
 import './SuggestPanels.css';
 
 /** Suspect/weapon(/room) picker for a suggestion or an accusation. */
@@ -57,7 +58,7 @@ export function SelectModal({
                   className={`sp__chip${weaponId === w.id ? ' sp__chip--on' : ''}`}
                   onClick={() => setWeaponId(w.id)}
                 >
-                  {w.title}
+                  <WeaponName id={w.id} title={w.title} />
                 </button>
               ))}
             </div>
@@ -66,7 +67,7 @@ export function SelectModal({
             <h4>Room</h4>
             {mode === 'suggest' ? (
               <div className="sp__fixed">
-                {getCard(fixedRoomId ?? '')?.title}
+                <RoomName title={getCard(fixedRoomId ?? '')?.title ?? '?'} />
                 <div className="sp__fixednote">(your current room)</div>
               </div>
             ) : (
@@ -77,7 +78,7 @@ export function SelectModal({
                     className={`sp__chip${roomId === r.id ? ' sp__chip--on' : ''}`}
                     onClick={() => setRoomId(r.id)}
                   >
-                    {r.title}
+                    <RoomName title={r.title} />
                   </button>
                 ))}
               </div>

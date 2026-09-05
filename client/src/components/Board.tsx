@@ -3,6 +3,7 @@ import { BOARD, coordKey, getCard, type Coord, type PlayerView, type RoomLayout,
 import { resolveOverrideThumb } from '../render/overrides';
 import { resolveBoardArt, sharedArtGroup } from '../render/boardArt';
 import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
+import { highlightChat } from '../util/highlightChat';
 import { packRoom, type Packing, type Rect } from '../render/roomPacking';
 import { BOARD_TEXTURES, textureUrl, texturePatternId, type BoardTexture } from '../render/boardTextures';
 import './Board.css';
@@ -1231,7 +1232,7 @@ export function Board({
       {followName && <div className="bv__follow">🎥 Following {followName}…</div>}
       {tip && (
         <div className="bv__tip" style={{ left: tip.x + 14, top: tip.y + 14 }}>
-          {tip.text}
+          {highlightChat(tip.text)}
         </div>
       )}
     </div>

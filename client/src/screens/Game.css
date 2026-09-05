@@ -6,6 +6,8 @@
   --pad: 1rem;
   --gap: 0.8rem;
   --map-right: calc(var(--pad) + var(--chat-w) + var(--gap));
+  /* height of the hand fan's band along the screen bottom (HandFan.css); the page keeps it clear */
+  --fan-band: 132px;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -214,6 +216,12 @@
   gap: 0.8rem;
   /* leave room beneath the hand for the Detective Notes folder tab pinned to the screen bottom */
   padding-bottom: 44px;
+}
+/* With the fan, the hand is a fixed band over the screen bottom; this row just holds its space. */
+.game__bottom--fan {
+  height: var(--fan-band);
+  flex: 0 0 var(--fan-band);
+  padding-bottom: 0;
 }
 .game__handwrap {
   flex: 1;
@@ -576,6 +584,17 @@
   /* The page is auto-height here, so give the board a real floor so it can't collapse to nothing. */
   .game__board {
     grid-template-rows: auto auto minmax(460px, 1fr);
+  }
+  /* the chat is stacked below the board here, so the fan takes the full width and the tabs sit on
+     the board's bottom-right corner, just above the fan */
+  .game--fan .fan {
+    right: var(--pad);
+  }
+  .game--fan .dock__tabs {
+    left: auto;
+    right: var(--pad);
+    width: auto;
+    bottom: var(--fan-band);
   }
   /* a slightly smaller notch so it doesn't crowd the top bar on phones */
   .game__turn {

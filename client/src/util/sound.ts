@@ -38,3 +38,37 @@ export function playDiceRoll(): void {
     /* ignore */
   }
 }
+
+// A soft "card slides out of the fan" whisper for the hand: a 50ms burst of band-passed noise,
+// synthesised on the spot so there's no clip to download. Played on every hover change, so it is
+// kept quiet and short.
+let audioCtx: AudioContext | null = null;
+
+export function playCardHover(): void {
+  if (!soundEnabled() || typeof window === 'undefined') return;
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx ??= new Ctx();
+    if (audioCtx.state === 'suspended') void audioCtx.resume();
+    const ctx = audioCtx;
+    const t = ctx.currentTime;
+    const len = Math.floor(ctx.sampleRate * 0.05);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 2600;
+    filter.Q.value = 0.9;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.07, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start(t);
+  } catch {
+    /* ignore */
+  }
+}

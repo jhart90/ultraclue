@@ -6,6 +6,7 @@ import { DiceOverlay, DICE_FADE_MS, type DiceRollShow } from '../components/Dice
 import { DiceSettings } from '../components/DiceSettings';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
+import { HandFan } from '../components/HandFan';
 import { Board, WALK_STEP_MS } from '../components/Board';
 import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
@@ -61,6 +62,15 @@ function DiceRetirer({ active, animUntil, onRetire }: { active: boolean; animUnt
 }
 
 const CAMERA_LOCK_KEY = 'ultraclue-camlock';
+/** 'on' = the old flat shelf of thumbnails instead of the fan of cards. Viewer-local. */
+const HAND_SHELF_KEY = 'ultraclue-hand-shelf';
+function readHandShelf(): boolean {
+  try {
+    return localStorage.getItem(HAND_SHELF_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
 function readCameraLock(): boolean {
   try {
     return localStorage.getItem(CAMERA_LOCK_KEY) !== 'off';
@@ -98,6 +108,7 @@ export function Game() {
   const serverOffset = useStore((s) => s.serverOffset);
   const setDice = useStore((s) => s.setDice);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [handShelf, setHandShelf] = useState(readHandShelf);
   // "Lock camera on player to move": off means the map never follows a move or recentres on a turn.
   const [cameraLock, setCameraLock] = useState(readCameraLock);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -406,8 +417,11 @@ export function Game() {
   // A pop-up window opening retires the resting dice (once they've actually landed).
   const anyPopup = showAccFlow || showEnd || showDisprove || showNoEvidence || showStatus || showAccusing || !!modal;
 
+  // The hand fan (default) or the classic shelf; the fan needs the folder tabs moved out of its way.
+  const fan = !observer && !handShelf;
+
   return (
-    <div className="game">
+    <div className={`game${fan ? ' game--fan' : ''}`}>
       <header className="game__top">
         <div className="game__title">
           <Wordmark size="sm" /> <span className="game__code">{game.code === PUBLIC_ROOM_CODE ? 'Public Game' : `Room ${game.code}`}</span>
@@ -499,9 +513,11 @@ export function Game() {
         </aside>
       </div>
 
-      <div className="game__bottom">
+      <div className={`game__bottom${fan ? ' game__bottom--fan' : ''}`}>
         {observer ? (
           <div className="game__observing">👁 Observer Mode — watching the game. You hold no cards and make no moves.</div>
+        ) : fan ? (
+          <HandFan cardIds={game.yourHand} />
         ) : (
           <div className="game__handwrap">
             <div className="game__handlabel">Your hand · {me?.handCount ?? game.yourHand.length} cards</div>
@@ -716,6 +732,23 @@ export function Game() {
               Lock camera on player to move
             </label>
 
+            <div className="game__settinghead2">Hand</div>
+            <label className="game__settoggle">
+              <input
+                type="checkbox"
+                checked={handShelf}
+                onChange={(e) => {
+                  setHandShelf(e.target.checked);
+                  try {
+                    localStorage.setItem(HAND_SHELF_KEY, e.target.checked ? 'on' : 'off');
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
+              Classic shelf (a row of small thumbnails instead of the fan)
+            </label>
+
             <div className="game__settinghead2">Sound</div>
             <label className="game__settoggle">
               <input
@@ -726,7 +759,7 @@ export function Game() {
                   setSoundOn(e.target.checked);
                 }}
               />
-              Dice roll sounds
+              Dice and card sounds
             </label>
 
             <div className="game__settinghead2">Save</div>

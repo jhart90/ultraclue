@@ -54,6 +54,18 @@
   align-items: flex-end;
   pointer-events: none;
 }
+/* With the hand fan along the bottom of the map area, the tabs move to the empty strip beneath the
+   chat column, so the fan gets the map's full width. The folders still open over the map. */
+.game--fan .dock__tabs {
+  left: auto;
+  right: var(--pad, 0);
+  width: var(--chat-w, 340px);
+  justify-content: center;
+}
+.game--fan .dock__tab {
+  padding: 0.45rem 1.1rem;
+  font-size: 0.92rem;
+}
 .dock__tab {
   pointer-events: auto;
   padding: 0.5rem 1.8rem;

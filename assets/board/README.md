@@ -110,7 +110,7 @@ Door positions are counted from the top for east/west walls and from the left fo
 | Dining Room | ground floor | 25 | 5 x 5 | rectangle | N 3rd of 5 cols; S 3rd of 5 cols |
 | Drawing Room | ground floor | 24 | 8 x 3 | rectangle | W 1st of 3 rows; E 1st of 3 rows; S 6th of 8 cols |
 | Gallery | upper floor | 42 | 14 x 3 | rectangle | N 1st of 14 cols; E 2nd of 3 rows; S 7th of 14 cols |
-| Gazebo | grounds | 12 | 4 x 4 | irregular | N 3rd of 4 cols; E 2nd of 4 rows; S 3rd of 4 cols |
+| Gazebo | grounds | 12 | 4 x 4 | octagon (cut corners) | N 3rd of 4 cols; E 2nd of 4 rows; S 3rd of 4 cols |
 | Greenhouse | grounds | 24 | 6 x 4 | rectangle | N 3rd of 6 cols; W 4th of 4 rows; S 5th of 6 cols |
 | Gymnasium | basement | 44 | 11 x 4 | rectangle | N 5th of 11 cols; E 2nd of 4 rows; S 8th of 11 cols -> Sauna |
 | Hedge Maze | grounds | 9 | 3 x 3 | rectangle | N 1st of 3 cols; E 2nd of 3 rows |
@@ -122,7 +122,7 @@ Door positions are counted from the top for east/west walls and from the left fo
 | Music Room | ground floor | 25 | 5 x 5 | rectangle | N 2nd of 5 cols; E 3rd of 5 rows |
 | Pantry | ground floor | 9 | 3 x 3 | rectangle | S 2nd of 3 cols |
 | Parlour | ground floor | 35 | 7 x 5 | rectangle | W 3rd of 5 rows; S 4th of 7 cols; E 5th of 5 rows |
-| Planetarium | upper floor | 30 | 9 x 4 | irregular | E 2nd of 4 rows; W 3rd of 4 rows; S 5th of 9 cols |
+| Planetarium | upper floor | 30 | 9 x 4 | cut corners | E 2nd of 4 rows; W 3rd of 4 rows; S 5th of 9 cols |
 | Rose Garden | grounds | 30 | 6 x 5 | rectangle | W 1st of 5 rows; E 4th of 5 rows; S 4th of 6 cols |
 | Sauna | basement | 22 | 11 x 2 | rectangle | E 1st of 2 rows; W 2nd of 2 rows |
 | Smoking Room | ground floor | 21 | 7 x 3 | rectangle | W 1st of 3 rows; E 1st of 3 rows |
@@ -154,12 +154,27 @@ XXXXXX           ..XXX..        XX....XXX
                  ..XXX..
 
 Master Suite (10x6)   Planetarium (9x4)   Workshop (8x4)
-XXXXXXXXXX            .XXXXXX..           XXXXXXXX
+XXXXXXXXXX            /XXXXXX//           XXXXXXXX
 XXXXXXXXXX            XXXXXXXXX           XXXXXXXX
 XXXXXXXXXX            XXXXXXXXX           XXXXXXXX
-XXXXXXXXXX            .XXXXXX..           ....XXXX
+XXXXXXXXXX            /XXXXXX//           ....XXXX
 XXXXXXXX..
 XXXXXXXX..
+```
+
+The Gazebo is really an octagon and the Planetarium is round-cornered: their `/` tiles are **cut on the
+diagonal**, not notched. The board paints the half of each `/` tile nearest the room as room, running
+the art and the gold border corner to corner across it, and the other half as lawn or hall. A `//`
+pair is one slant two tiles wide and one tall. So for these two rooms the art SHOULD draw the slanted
+wall, and it must land exactly on that diagonal: from the corner of the room's box to one tile in (or
+two tiles in, for a `//` pair) along the adjacent edge.
+
+```
+Gazebo (4x4)
+/XX\
+XXXX
+XXXX
+\XX/
 ```
 
 ### Secret passages

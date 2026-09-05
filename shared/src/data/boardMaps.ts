@@ -3,6 +3,7 @@
 //   letter  room tile (see ROOM_KEY)      .  hall / path       (space)  no tile (void)
 //   #       elevator (3x3)                ~  water (obstacle)  ,        lawn (obstacle, soft)
 //   H       hedge wall (obstacle)         F  fountain (obstacle)         x  grave / pillar (obstacle)
+//   /       a room corner cut on the diagonal (obstacle; which room and which corner is in board.ts)
 //
 // Doors are authored in a second layer of the same shape: an arrow on a ROOM tile pointing at the
 // hall (or neighbouring room) tile it opens onto:  ^ v < >
@@ -82,10 +83,10 @@ const GROUNDS_TILES = [
   ',,.....H.......H..............', // 5
   ',,.,.,.HHHHHHHHH..,,.,,.,,.,,.', // 6
   ',,............................', // 7   the long walk
-  ',ZZ..,.,,,,,,.YYYYYYYYY.GGGGGG', // 8
+  '/ZZ/.,.,,,,,,.YYYYYYYYY.GGGGGG', // 8   the octagonal Gazebo's cut corners
   'ZZZZ.,.RRRRRR.YYYYYYYYY.GGGGGG', // 9
   'ZZZZ...RRRRRR.YYFFFFYYY.GGGGGG', // 10
-  ',ZZ....RRRRRR.YYFFFFYYY.GGGGGG', // 11
+  '/ZZ/...RRRRRR.YYFFFFYYY.GGGGGG', // 11
   '.....,.RRRRRR.YYFFFFYYY..,,,..', // 12
   '.....,.RRRRRR.YYYYYYYYY..,,,..', // 13
   ',,,,.,.,,,.,,.,,,,.,,,,..,,,..', // 14
@@ -173,10 +174,10 @@ const GROUND_DOORS = [
 // ---------------------------------------------------------------------------------------------
 const UPPER_TILES = [
   'xllllll.............qqqx', // 0
-  'xllllll...pppppp....qqqx', // 1
+  'xllllll../pppppp//..qqqx', // 1   the round Planetarium's cut corners (two-tile slants on the east)
   'xllllll..ppppppppp..qqq.', // 2
   '.........ppppppppp..qqq.', // 3
-  'bbbbbbb..xpppppp....qqq.', // 4
+  'bbbbbbb../pppppp//..qqq.', // 4
   'bbbbbbbssssss...........', // 5
   'bbbbbbbssssss.tttttttt..', // 6
   'bbbbbbbssssss.tttttttt..', // 7

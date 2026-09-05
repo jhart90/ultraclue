@@ -23,7 +23,8 @@ export interface Coord {
 export type SectionTheme = 'grounds' | 'ground-floor' | 'upper-floor' | 'basement';
 export type FloorId = 'ground-floor' | 'upper-floor' | 'basement';
 export type CellType = 'room' | 'path' | 'elevator' | 'fountain' | 'obstacle';
-export type ObstacleKind = 'water' | 'lawn' | 'hedge' | 'wall';
+export type ObstacleKind = 'water' | 'lawn' | 'hedge' | 'wall' | 'chamfer';
+export type ChamferCorner = 'nw' | 'ne' | 'sw' | 'se';
 
 export interface BoardCell {
   x: number;
@@ -51,6 +52,16 @@ export interface Shortcut {
   aRoomId: string;
   bRoomId: string;
   story: string;
+}
+
+/** A room corner cut on the diagonal. Its tiles are obstacles (nothing walks on them); the room's
+ *  art and border cross them corner to corner, so the half nearest the room reads as room and the
+ *  rest as the hall or lawn around it. One tile gives a 45-degree cut; two in a row, a shallower
+ *  slant. `corner` names which corner of the room the cut is on. */
+export interface Chamfer {
+  roomId: string;
+  corner: ChamferCorner;
+  tiles: Coord[];
 }
 
 export interface RoomLayout {
@@ -103,6 +114,8 @@ export interface Board {
   stairs: StairLink[];
   /** The 4x3 fountain in the middle of the walled Courtyard — an obstacle pieces walk around. */
   fountain: Coord[];
+  /** Room corners cut on the diagonal (the round Planetarium, the octagonal Gazebo). */
+  chamfers: Chamfer[];
 }
 
 export const coordKey = (c: Coord): string => `${c.x},${c.y}`;
@@ -173,6 +186,26 @@ const PASSAGE_DEFS: [string, string, string][] = [
   ['room-boat-house', 'room-bunker', "The smugglers' tunnel"],
   ['room-walk-in-closet', 'room-wine-cellar', 'The empty barrel'],
   ['room-trophy', 'room-armory', 'Behind the bear'],
+];
+
+// ---- chamfers: room corners cut on the diagonal, on the '/' tiles of the maps -------------------
+interface ChamferDef {
+  room: string;
+  section: string;
+  corner: ChamferCorner;
+  tiles: [number, number][]; // section-local; one tile, or two in a row for a shallower slant
+}
+const CHAMFER_DEFS: ChamferDef[] = [
+  // The round Planetarium: single-tile cuts on the west, two-tile slants on the east.
+  { room: 'room-planetarium', section: 'upper-floor', corner: 'nw', tiles: [[9, 1]] },
+  { room: 'room-planetarium', section: 'upper-floor', corner: 'ne', tiles: [[16, 1], [17, 1]] },
+  { room: 'room-planetarium', section: 'upper-floor', corner: 'sw', tiles: [[9, 4]] },
+  { room: 'room-planetarium', section: 'upper-floor', corner: 'se', tiles: [[16, 4], [17, 4]] },
+  // The octagonal Gazebo.
+  { room: 'room-gazebo', section: 'grounds', corner: 'nw', tiles: [[0, 8]] },
+  { room: 'room-gazebo', section: 'grounds', corner: 'ne', tiles: [[3, 8]] },
+  { room: 'room-gazebo', section: 'grounds', corner: 'sw', tiles: [[0, 11]] },
+  { room: 'room-gazebo', section: 'grounds', corner: 'se', tiles: [[3, 11]] },
 ];
 
 // ---- start tiles: every suspect starts near a room that suits them, 3–4 steps from its door ---
@@ -258,6 +291,7 @@ function buildBoard(): Board {
         else if (ch === ',') put({ x: gx, y: gy, type: 'obstacle', obstacleKind: 'lawn', sectionId: map.id });
         else if (ch === 'H') put({ x: gx, y: gy, type: 'obstacle', obstacleKind: 'hedge', sectionId: map.id });
         else if (ch === 'x') put({ x: gx, y: gy, type: 'obstacle', obstacleKind: 'wall', sectionId: map.id });
+        else if (ch === '/') put({ x: gx, y: gy, type: 'obstacle', obstacleKind: 'chamfer', sectionId: map.id });
         else if (ROOM_KEY[ch]) {
           const roomId = ROOM_KEY[ch];
           put({ x: gx, y: gy, type: 'room', roomId, sectionId: map.id });
@@ -312,6 +346,24 @@ function buildBoard(): Board {
   }
   for (const r of ROOMS) if (!rooms[r.id]) errors.push(`room ${r.id} is missing from the board maps`);
   for (const r of Object.values(rooms)) if (!r.entrances.length) errors.push(`room ${r.id} has no door`);
+
+  // ---- chamfers: every '/' tile belongs to exactly one cut, and every cut touches its room ----
+  const chamferTiles = new Set(cells.filter((c) => c.obstacleKind === 'chamfer').map((c) => coordKey(c)));
+  const claimed = new Set<string>();
+  const chamfers: Chamfer[] = CHAMFER_DEFS.map((d) => {
+    const tiles = d.tiles.map(([x, y]) => local(d.section, x, y));
+    for (const t of tiles) {
+      const k = coordKey(t);
+      if (!chamferTiles.has(k)) errors.push(`chamfer on ${d.room}: ${k} is not a '/' tile`);
+      if (claimed.has(k)) errors.push(`chamfer on ${d.room}: ${k} is claimed twice`);
+      claimed.add(k);
+    }
+    const room = rooms[d.room];
+    const touches = !!room && tiles.some((t) => ORTHO.some((o) => room.tiles.some((r) => r.x === t.x + o.x && r.y === t.y + o.y)));
+    if (!touches) errors.push(`chamfer on ${d.room}: ${tiles.map((t) => coordKey(t)).join(' ')} does not touch the room`);
+    return { roomId: d.room, corner: d.corner, tiles };
+  });
+  for (const k of chamferTiles) if (!claimed.has(k)) errors.push(`'/' tile ${k} belongs to no chamfer`);
   if (errors.length) throw new Error('board maps: ' + errors.join(' | '));
 
   // ---- elevators ----
@@ -421,7 +473,7 @@ function buildBoard(): Board {
 
   const width = Math.max(...cells.map((c) => c.x)) + 1;
   const height = Math.max(...cells.map((c) => c.y)) + 1;
-  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, elevators, stairs, fountain };
+  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, elevators, stairs, fountain, chamfers };
 }
 
 export const BOARD: Board = buildBoard();

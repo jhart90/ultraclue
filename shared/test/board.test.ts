@@ -253,6 +253,30 @@ describe('board (2D themed sections)', () => {
     for (let i = 2; i < sections.length; i++) expect(sections[i] === sections[i - 1] && sections[i] === sections[i - 2], `seats ${i - 1}-${i + 1} all in ${sections[i]}`).toBe(false);
   });
 
+  it('cuts the Planetarium and Gazebo corners on the diagonal', () => {
+    const forRoom = (id: string) => BOARD.chamfers.filter((c) => c.roomId === id);
+    expect(forRoom('room-planetarium').map((c) => c.corner).sort()).toEqual(['ne', 'nw', 'se', 'sw']);
+    expect(forRoom('room-gazebo').map((c) => c.corner).sort()).toEqual(['ne', 'nw', 'se', 'sw']);
+    for (const ch of BOARD.chamfers) {
+      const room = BOARD.rooms[ch.roomId];
+      const xs = room.tiles.map((t) => t.x), ys = room.tiles.map((t) => t.y);
+      const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+      // a strip of one or two tiles, all obstacles nothing walks on
+      expect(ch.tiles.length).toBeGreaterThanOrEqual(1);
+      expect(ch.tiles.length).toBeLessThanOrEqual(2);
+      for (const t of ch.tiles) {
+        const c = cellAt(t);
+        expect(c?.type, coordKey(t)).toBe('obstacle');
+        expect(c?.obstacleKind, coordKey(t)).toBe('chamfer');
+        // sitting in the named corner of the room's bounding box (a two-tile strip runs inward along the edge)
+        const n = ch.tiles.length;
+        const yOk = ch.corner.includes('n') ? t.y === minY : t.y === maxY;
+        const xOk = ch.corner.includes('w') ? t.x >= minX && t.x < minX + n : t.x <= maxX && t.x > maxX - n;
+        expect(yOk && xOk, `${ch.roomId} ${ch.corner} ${coordKey(t)}`).toBe(true);
+      }
+    }
+  });
+
   it('has 8 secret passages, each with a story and each saving a long walk', () => {
     expect(BOARD.shortcuts).toHaveLength(8);
     const seen = new Set<string>();

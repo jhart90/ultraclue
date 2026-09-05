@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { BOARD, coordKey, getCard, type Coord, type PlayerView, type RoomLayout, type SectionTheme } from 'shared';
+import { BOARD, coordKey, getCard, type Chamfer, type ChamferCorner, type Coord, type PlayerView, type RoomLayout, type SectionTheme } from 'shared';
 import { resolveOverrideThumb } from '../render/overrides';
 import { resolveBoardArt, sharedArtGroup } from '../render/boardArt';
 import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
@@ -195,6 +195,8 @@ function tileTexture(c: { x: number; y: number; type: string; sectionId: string;
   const theme = THEME_OF.get(c.sectionId);
   if (c.type === 'obstacle') {
     if (theme === 'grounds' && c.obstacleKind === 'lawn') return 'grass';
+    // a cut corner shows its surroundings under the room's diagonal: lawn outdoors, the hall floor inside
+    if (c.obstacleKind === 'chamfer') return theme === 'grounds' ? 'grass' : theme === 'upper-floor' ? 'wood_floor_horizontal' : theme === 'ground-floor' ? 'wood_floor_vertical_light' : 'cobblestone';
     if (theme === 'ground-floor' && c.obstacleKind === 'wall') return 'wood_floor_vertical_light_pillar'; // the hall pillars
     if (theme === 'basement' && c.obstacleKind === 'wall') return 'cobblestone_pillar'; // cellar pillars and blocked stubs
     return undefined;
@@ -334,8 +336,10 @@ function packFor(room: RoomLayout, pawns: number, weapons: number): Packing {
   return pk;
 }
 
-function roomOutline(tiles: Coord[]): string {
-  const inRoom = new Set(tiles.map(coordKey));
+function roomOutline(tiles: Coord[], chamfers: Chamfer[] = []): string {
+  // Chamfer tiles count as room for the edge test, so the edges facing them vanish and the
+  // diagonal takes their place.
+  const inRoom = new Set([...tiles, ...chamfers.flatMap((c) => c.tiles)].map(coordKey));
   const has = (x: number, y: number) => inRoom.has(`${x},${y}`);
   const segs: string[] = [];
   for (const tl of tiles) {
@@ -345,8 +349,34 @@ function roomOutline(tiles: Coord[]): string {
     if (!has(tl.x - 1, tl.y)) segs.push(`M${x0} ${y0}L${x0} ${y1}`);
     if (!has(tl.x + 1, tl.y)) segs.push(`M${x1} ${y0}L${x1} ${y1}`);
   }
+  for (const ch of chamfers) segs.push(chamferEdge(ch));
   return segs.join('');
 }
+
+/** The pixel box a chamfer's tile strip covers. */
+function chamferBox(ch: Chamfer) {
+  const xs = ch.tiles.map((t) => t.x), ys = ch.tiles.map((t) => t.y);
+  return { X0: Math.min(...xs) * TS, Y0: Math.min(...ys) * TS, X1: (Math.max(...xs) + 1) * TS, Y1: (Math.max(...ys) + 1) * TS };
+}
+/** The room-side half of a chamfer's box as polygon points: the box is cut corner to corner and
+ *  the triangle nearest the room is kept. */
+function chamferPoints(ch: Chamfer): string {
+  const { X0, Y0, X1, Y1 } = chamferBox(ch);
+  const tri: Record<ChamferCorner, [number, number][]> = {
+    nw: [[X1, Y0], [X1, Y1], [X0, Y1]],
+    ne: [[X0, Y0], [X1, Y1], [X0, Y1]],
+    sw: [[X0, Y0], [X1, Y0], [X1, Y1]],
+    se: [[X0, Y0], [X1, Y0], [X0, Y1]],
+  };
+  return tri[ch.corner].map((p) => p.join(',')).join(' ');
+}
+/** A chamfer's diagonal as a path segment, for the room border. */
+function chamferEdge(ch: Chamfer): string {
+  const { X0, Y0, X1, Y1 } = chamferBox(ch);
+  return ch.corner === 'nw' || ch.corner === 'se' ? `M${X0} ${Y1}L${X1} ${Y0}` : `M${X0} ${Y0}L${X1} ${Y1}`;
+}
+const CHAMFERS_OF = new Map<string, Chamfer[]>();
+for (const ch of BOARD.chamfers) CHAMFERS_OF.set(ch.roomId, [...(CHAMFERS_OF.get(ch.roomId) ?? []), ch]);
 
 type TipFn = (t: { x: number; y: number; text: string } | null) => void;
 
@@ -892,6 +922,10 @@ export function Board({
             if (!obstacles.length) return null;
             const kind = (k: string) => obstacles.filter((c) => c.obstacleKind === k);
             const FILL: Record<string, string> = { water: '#2a6f8c', lawn: '#3d6b3b', hedge: '#1e3d21', wall: '#4a4356' };
+            const chamferFallback = (c: { sectionId: string }) => {
+              const theme = THEME_OF.get(c.sectionId) ?? 'ground-floor';
+              return theme === 'grounds' ? FILL.lawn : THEME[theme].path;
+            };
             return (
               <g style={{ pointerEvents: 'none' }}>
                 {obstacles.map((c) => {
@@ -911,7 +945,7 @@ export function Board({
                       />
                     );
                   }
-                  return <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={tileFill(c, FILL[c.obstacleKind ?? 'wall'])} />;
+                  return <rect key={`o${c.x}-${c.y}`} x={c.x * TS} y={c.y * TS} width={TS} height={TS} fill={tileFill(c, c.obstacleKind === 'chamfer' ? chamferFallback(c) : FILL[c.obstacleKind ?? 'wall'])} />;
                 })}
                 {/* The painted shoreline and ripples only stand in while the pond has no texture. */}
                 {kind('water').length > 0 && !textureUrl('water') && (
@@ -1025,6 +1059,7 @@ export function Board({
             // a notch and must be drawn from its actual tiles so the L-shape shows.
             // name bubble: centred for rectangles, on the label tile for L-shapes
             const { isRect, cx: cxr, cy: cyr, fs, w: bubbleW, h: bubbleH } = labelGeom(room, title);
+            const chamfers = CHAMFERS_OF.get(room.id) ?? [];
             return (
               <g key={room.id}>
                 {isRect ? (
@@ -1061,6 +1096,10 @@ export function Board({
                     {room.tiles.map((tl) => (
                       <rect key={`${tl.x}-${tl.y}`} x={tl.x * TS - 0.3} y={tl.y * TS - 0.3} width={TS + 0.6} height={TS + 0.6} fill={t.floor} />
                     ))}
+                    {/* a cut corner: the half of the tile nearest the room is room */}
+                    {chamfers.map((ch, i) => (
+                      <polygon key={`ch${i}`} points={chamferPoints(ch)} fill={t.floor} />
+                    ))}
                     {/* board art is painted over the whole bounding box, and the notches are cut out
                         by clipping to the room's actual tiles */}
                     {boardArt && (
@@ -1068,6 +1107,9 @@ export function Board({
                         <clipPath id={`roomclip-${room.id}`}>
                           {artTiles(room).map((tl) => (
                             <rect key={`${tl.x}-${tl.y}`} x={tl.x * TS - 0.3} y={tl.y * TS - 0.3} width={TS + 0.6} height={TS + 0.6} />
+                          ))}
+                          {chamfers.map((ch, i) => (
+                            <polygon key={`ch${i}`} points={chamferPoints(ch)} />
                           ))}
                         </clipPath>
                         <image
@@ -1084,7 +1126,7 @@ export function Board({
                     )}
                     {/* trace the painted footprint, not the bare tiles: the fountain and the grave plots
                         stand inside the room, and a border around each would cut the art into pieces */}
-                    <path d={roomOutline(artTiles(room))} fill="none" stroke="#e7c66a" strokeWidth="2" strokeLinejoin="round" />
+                    <path d={roomOutline(artTiles(room), chamfers)} fill="none" stroke="#e7c66a" strokeWidth="2" strokeLinejoin="round" />
                   </>
                 )}
                 {/* thematic glyph, centred just above the room name */}

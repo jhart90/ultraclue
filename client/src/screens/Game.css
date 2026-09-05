@@ -585,16 +585,47 @@
   .game__board {
     grid-template-rows: auto auto minmax(460px, 1fr);
   }
-  /* the chat is stacked below the board here, so the fan takes the full width and the tabs sit on
-     the board's bottom-right corner, just above the fan */
+  /* the chat is stacked below the board here, so the fan takes the full width */
   .game--fan .fan {
     right: var(--pad);
   }
+  /* On phones the Manor Map / Detective Notes folder tabs would float over the cards in the hand, so
+     they become small round icon buttons stacked just above the settings wheel, all on the left. */
+  .dock__tabs,
   .game--fan .dock__tabs {
-    left: auto;
-    right: var(--pad);
+    left: 12px;
+    right: auto;
     width: auto;
-    bottom: var(--fan-band);
+    bottom: 58px; /* the wheel is 40px tall and sits 10px up */
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+  .dock__tab,
+  .game--fan .dock__tab {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(200, 162, 74, 0.5);
+    background: #221a38;
+    color: var(--accent, #c8a24a);
+    font-size: 1.2rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
+  }
+  .dock__tab:hover,
+  .dock__tab--active {
+    background: #2a2046;
+    border-color: var(--accent, #c8a24a);
+    transform: none;
+  }
+  .dock__tablabel {
+    display: none;
   }
   /* a slightly smaller notch so it doesn't crowd the top bar on phones */
   .game__turn {

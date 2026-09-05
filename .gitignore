@@ -12,3 +12,4 @@ dist/
 # public-table history written by the server at runtime
 server/data/
 /data/
+scripts/.host-table-code

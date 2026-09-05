@@ -112,6 +112,43 @@ function roomBounds(room: RoomLayout) {
   return { x: minX * TS, y: minY * TS, w: (Math.max(...xs) - minX + 1) * TS, h: (Math.max(...ys) - minY + 1) * TS, minX, minY };
 }
 
+/** Obstacles that stand INSIDE a room rather than beside it — the Courtyard's fountain, the
+ *  Cemetery's graves. They are not room tiles, so a room's art would be clipped into a ring around
+ *  them and they would be cut out of their own painting. Where the room has art, it paints them and
+ *  the board's own stand-in for them stands down. */
+function insideObstacles(room: RoomLayout): Coord[] {
+  const xs = room.tiles.map((t) => t.x);
+  const ys = room.tiles.map((t) => t.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const own = new Set(room.tiles.map((t) => coordKey(t)));
+  /** Does the room close in on this tile along `dir`, before the bounding box runs out? */
+  const reaches = (c: Coord, dx: number, dy: number) => {
+    for (let x = c.x + dx, y = c.y + dy; x >= minX && x <= maxX && y >= minY && y <= maxY; x += dx, y += dy) {
+      if (own.has(coordKey({ x, y }))) return true;
+    }
+    return false;
+  };
+  return BOARD.cells.filter((c) => {
+    if (c.type !== 'obstacle' && c.type !== 'fountain') return false;
+    if (c.x < minX || c.x > maxX || c.y < minY || c.y > maxY || own.has(coordKey(c))) return false;
+    // Enclosed, not merely inside the box: the room must close in on both sides along one axis.
+    // That takes in the Cemetery's graves and the Courtyard's fountain while leaving out the tiles
+    // bitten off an octagonal room's corners, which lie outside it and belong to the grounds.
+    return (reaches(c, -1, 0) && reaches(c, 1, 0)) || (reaches(c, 0, -1) && reaches(c, 0, 1));
+  });
+}
+/** Tiles a room's floor art is painted over: its own, plus the obstacles standing inside it. */
+function artTiles(room: RoomLayout): Coord[] {
+  const extra = insideObstacles(room);
+  return extra.length ? [...room.tiles, ...extra] : room.tiles;
+}
+/** Obstacle tiles already painted by some room's own art, so the board leaves them alone. */
+const PAINTED_OBSTACLES = new Set(
+  Object.values(BOARD.rooms)
+    .filter((room) => !!resolveBoardArt(room.id, getCard(room.id)?.title ?? room.id))
+    .flatMap((room) => insideObstacles(room).map((c) => coordKey(c))),
+);
+
 /** The rectangle a room's floor art is stretched onto. Normally its own bounds; for rooms that
  *  share one painting it is the union of the group's bounds, so every room in the group lays the
  *  image down on the same rectangle and their shares line up. */
@@ -851,7 +888,7 @@ export function Board({
           {/* obstacles — things pieces walk around: lawns and the pond outdoors, hedge walls in the
               maze, graves in the Cemetery, pillars and blocked stubs indoors */}
           {(() => {
-            const obstacles = BOARD.cells.filter((c) => c.type === 'obstacle');
+            const obstacles = BOARD.cells.filter((c) => c.type === 'obstacle' && !PAINTED_OBSTACLES.has(coordKey(c)));
             if (!obstacles.length) return null;
             const kind = (k: string) => obstacles.filter((c) => c.obstacleKind === k);
             const FILL: Record<string, string> = { water: '#2a6f8c', lawn: '#3d6b3b', hedge: '#1e3d21', wall: '#4a4356' };
@@ -897,8 +934,10 @@ export function Board({
             );
           })()}
 
-          {/* the Courtyard fountain — an impassable obstacle in the middle of the Ground Floor */}
+          {/* The Courtyard fountain, drawn as a stand-in only while the room it sits in has no board
+              art of its own; once that art exists it paints its own basin. */}
           {BOARD.fountain.length > 0 &&
+            !BOARD.fountain.some((f) => PAINTED_OBSTACLES.has(coordKey(f))) &&
             (() => {
               const xs = BOARD.fountain.map((t) => t.x);
               const ys = BOARD.fountain.map((t) => t.y);
@@ -1027,7 +1066,7 @@ export function Board({
                     {boardArt && (
                       <>
                         <clipPath id={`roomclip-${room.id}`}>
-                          {room.tiles.map((tl) => (
+                          {artTiles(room).map((tl) => (
                             <rect key={`${tl.x}-${tl.y}`} x={tl.x * TS - 0.3} y={tl.y * TS - 0.3} width={TS + 0.6} height={TS + 0.6} />
                           ))}
                         </clipPath>

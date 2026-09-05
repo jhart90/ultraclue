@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getCard, shortcutDestForRoom, PUBLIC_ROOM_CODE, DICE_ANIM_MS, TURN_FLASH_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
+import { getCard, shortcutDestForRoom, PUBLIC_ROOM_CODE, DICE_ANIM_MS, TURN_FLASH_MS, TURN_GAP_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
 import { useStore, savedDice } from '../store';
 import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
 import { DiceOverlay, DICE_FADE_MS, type DiceRollShow } from '../components/DiceOverlay';
@@ -223,11 +223,20 @@ export function Game() {
   // straight into the next player's dice.
   const turnKey = game ? `${game.round ?? 0}:${game.activeIdx}` : '';
   const turnKeyRef = useRef(turnKey);
+  /** When the current turn's flash shows (or showed): a turn is announced TURN_GAP_MS after it begins. */
   const flashAtRef = useRef(0);
+  /** The player the top notch names — it follows the real turn after the same gap. */
+  const [notchActiveId, setNotchActiveId] = useState<string | undefined>(undefined);
+  // On arrival (or a reload) the notch shows whoever is up right now — there is no previous turn to
+  // give a beat to; from then on it lags each new turn by the gap.
+  useEffect(() => {
+    if (game && notchActiveId === undefined) setNotchActiveId(game.turnOrder[game.activeIdx]);
+  }, [game, notchActiveId]);
   useEffect(() => {
     if (!game || game.phase !== 'play' || turnKey === turnKeyRef.current) return;
     turnKeyRef.current = turnKey;
-    flashAtRef.current = Date.now();
+    const gap = TURN_GAP_MS;
+    flashAtRef.current = Date.now() + gap;
     // Dice still resting from the previous turn fade out as this one begins — and are gone before
     // this turn's own roll (which waits out the flash) lands.
     let fadeT: ReturnType<typeof setTimeout> | undefined;
@@ -242,11 +251,18 @@ export function Game() {
     }
     const active = game.players.find((p) => p.id === game.turnOrder[game.activeIdx]);
     if (!active) return () => clearTimeout(fadeT);
-    pushNotice(
-      { id: `flash:${turnKey}`, kind: 'flash', text: active.id === myId ? 'Your turn' : `${active.name}'s turn`, color: suspectColor(active.suspectId) },
-      NOTICE_MS,
-    );
-    return () => clearTimeout(fadeT);
+    // The previous turn's last pill keeps the spotlight for the gap; then this turn is announced.
+    const flashT = setTimeout(() => {
+      setNotchActiveId(active.id);
+      pushNotice(
+        { id: `flash:${turnKey}`, kind: 'flash', text: active.id === myId ? 'Your turn' : `${active.name}'s turn`, color: suspectColor(active.suspectId) },
+        NOTICE_MS,
+      );
+    }, gap);
+    return () => {
+      clearTimeout(fadeT);
+      clearTimeout(flashT);
+    };
   }, [turnKey, game?.phase, pushNotice]);
 
   useEffect(() => {
@@ -254,9 +270,9 @@ export function Game() {
     if (rs > rollSeqRef.current && game?.lastRoll) {
       const roller = game.players.find((p) => p.id === game.turnOrder[game.activeIdx]);
       const style = roller?.dice ?? defaultDice(roller?.suspectId);
-      // A roll that arrived together with the turn flash waits for it; a mid-turn roll shows at once.
-      const flashing = Date.now() - flashAtRef.current < TURN_FLASH_MS;
-      const wait = rollSeqRef.current > 0 && flashing ? TURN_FLASH_MS : 0;
+      // A roll that arrived together with the turn flash waits for the gap and the flash; a mid-turn
+      // roll shows at once.
+      const wait = rollSeqRef.current > 0 ? Math.max(0, flashAtRef.current + TURN_FLASH_MS - Date.now()) : 0;
       animUntilRef.current = Date.now() + wait + DICE_ANIM_MS;
       const show = { seq: rs, values: game.lastRoll, color: style.color, pips: style.pips, name: roller?.name ?? 'Someone' };
       rollSeqRef.current = rs;
@@ -298,12 +314,14 @@ export function Game() {
     const tilesToWalk = mv && mv.playerId === myId ? mv.path.length - 1 : 0;
     // Likewise, if my dice are still tumbling, let them land before the "You rolled N" window.
     const diceWait = Math.max(0, animUntilRef.current - Date.now());
-    if (tilesToWalk <= 0 && diceWait <= 0) {
+    // And a turn that opens in a room (no dice) still waits for its own announcement.
+    const gapWait = Math.max(0, flashAtRef.current - Date.now());
+    if (tilesToWalk <= 0 && diceWait <= 0 && gapWait <= 0) {
       setStatusOpen(true);
       return;
     }
     setStatusOpen(false);
-    const t = setTimeout(() => setStatusOpen(true), Math.max(tilesToWalk * WALK_STEP_MS + 80, diceWait));
+    const t = setTimeout(() => setStatusOpen(true), Math.max(tilesToWalk * WALK_STEP_MS + 80, diceWait, gapWait));
     return () => clearTimeout(t);
     // lastMove is intentionally omitted: it changes in lock-step with turnPhase/inRoomId (which are
     // listed), and including the fresh object each tick would cancel the pending timeout.
@@ -338,7 +356,10 @@ export function Game() {
   const activePlayer = game.players.find((p) => p.id === activeId);
   const me = game.players.find((p) => p.id === myId);
   const myTurn = activeId === myId;
-  const turnLabel = myTurn ? 'Your turn' : `${activePlayer?.name ?? '—'}'s turn`;
+  // The notch lags the real turn by TURN_GAP_MS (see the flash effect); before it has caught up
+  // once it simply shows the live player.
+  const notchPlayer = game.players.find((p) => p.id === notchActiveId) ?? activePlayer;
+  const turnLabel = notchPlayer?.id === myId ? 'Your turn' : `${notchPlayer?.name ?? '—'}'s turn`;
   const orderedPlayers = game.turnOrder
     .map((id) => game.players.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => !!p);
@@ -438,7 +459,7 @@ export function Game() {
         </div>
         <div
           className="game__turn"
-          style={{ background: suspectColor(activePlayer?.suspectId), color: contrastInk(suspectColor(activePlayer?.suspectId)) }}
+          style={{ background: suspectColor(notchPlayer?.suspectId), color: contrastInk(suspectColor(notchPlayer?.suspectId)) }}
         >
           {turnLabel}
         </div>
@@ -574,14 +595,14 @@ export function Game() {
             setDock((d) => (d === 'map' ? null : 'map'));
           }}
         >
-          🗺️ Manor Map
+          <span className="dock__tabicon">🗺️</span> <span className="dock__tablabel">Manor Map</span>
         </button>
         {!observer && (
           <button
             className={`dock__tab${dock === 'notes' ? ' dock__tab--active' : ''}`}
             onClick={() => setDock((d) => (d === 'notes' ? null : 'notes'))}
           >
-            📓 Detective Notes
+            <span className="dock__tabicon">📓</span> <span className="dock__tablabel">Detective Notes</span>
           </button>
         )}
       </div>

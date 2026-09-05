@@ -1082,7 +1082,9 @@ export function Board({
                         />
                       </>
                     )}
-                    <path d={roomOutline(room.tiles)} fill="none" stroke="#e7c66a" strokeWidth="2" strokeLinejoin="round" />
+                    {/* trace the painted footprint, not the bare tiles: the fountain and the grave plots
+                        stand inside the room, and a border around each would cut the art into pieces */}
+                    <path d={roomOutline(artTiles(room))} fill="none" stroke="#e7c66a" strokeWidth="2" strokeLinejoin="round" />
                   </>
                 )}
                 {/* thematic glyph, centred just above the room name */}

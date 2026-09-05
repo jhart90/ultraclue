@@ -59,6 +59,8 @@
   border-radius: 10px;
   padding: 0.4rem 1rem;
   font-family: var(--font-display);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
   font-weight: 700;
   font-size: 0.95rem;
   letter-spacing: 0.02em;

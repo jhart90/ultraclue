@@ -17,6 +17,8 @@
 }
 .profile__name {
   font-family: var(--font-display, 'Georgia', serif);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
   font-size: 1.6rem;
   color: var(--accent, #c8a24a);
   letter-spacing: 0.04em;

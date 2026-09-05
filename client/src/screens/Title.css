@@ -15,6 +15,8 @@
    bubbles on the board. */
 .title .btn {
   font-family: var(--font-display);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
   border-radius: 999px;
   letter-spacing: 0.04em;
 }
@@ -136,6 +138,8 @@
 
 .title__form input {
   font-family: var(--font-display);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
   font-size: 1.1rem;
   padding: 0.6rem 0.8rem;
   background: #1c1830;

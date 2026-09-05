@@ -53,6 +53,8 @@
 .chatcard__total {
   margin-left: auto;
   font-family: var(--font-display, 'Georgia', serif);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
   font-size: 1.5rem;
   font-weight: 900;
   color: var(--accent, #c8a24a);

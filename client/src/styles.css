@@ -7,13 +7,17 @@
   --accent: #c8a24a;
   --green: #4caf50;
   --red: #e0556b;
-  /* Display font for all screen + pop-up headers and titles (served via the @font-face below). */
-  --font-display: 'Chantilly Serial Heavy', 'Georgia', 'Times New Roman', serif;
+  /* Display font for all screen + pop-up headers and titles (served via the @font-face below).
+     Alegreya Sans Black (SIL Open Font Licence, see assets/fonts/OFL-alegreya-sans.txt). The face has
+     no heavier cut, so every display-font rule also paints a thin stroke behind the fill
+     (--display-stroke) to thicken it a touch. */
+  --font-display: 'Alegreya Sans', 'Georgia', 'Times New Roman', serif;
+  --display-stroke: 0.03em currentColor;
 }
 
 @font-face {
-  font-family: 'Chantilly Serial Heavy';
-  src: url(../../assets/fonts/chantilly-serial-heavy.woff2) format('woff2');
+  font-family: 'Alegreya Sans';
+  src: url(../../assets/fonts/alegreya-sans-black.woff2) format('woff2');
   font-weight: 100 900; /* one heavy face covers every requested weight (no faux bold) */
   font-style: normal;
   font-display: swap;
@@ -30,6 +34,8 @@ h3,
 .popup__title,
 .statpop__line1 {
   font-family: var(--font-display);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
 }
 
 * {

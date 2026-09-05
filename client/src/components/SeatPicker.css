@@ -24,6 +24,8 @@
   margin: 0;
   color: var(--accent, #c8a24a);
   font-family: var(--font-display, 'Georgia', serif);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
 }
 .seatpick__hint {
   margin: 0;

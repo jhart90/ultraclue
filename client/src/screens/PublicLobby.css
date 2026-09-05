@@ -49,6 +49,8 @@
 .plobby__settings select,
 .plobby__settings strong {
   font-family: var(--font-display, 'Georgia', serif);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
   font-size: 1.1rem;
   color: var(--ink, #ece8f5);
   background: #1c1830;

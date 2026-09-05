@@ -1,6 +1,15 @@
 import type { GameState, GameStats, GameView, Participant, PlayerStats } from '../game';
 
-const emptyPlayer = (): PlayerStats => ({ turns: 0, tiles: 0, roomsVisited: [], suggestions: 0, reveals: 0, accusations: 0 });
+const emptyPlayer = (): PlayerStats => ({
+  turns: 0,
+  tiles: 0,
+  roomsVisited: [],
+  suggestions: 0,
+  reveals: 0,
+  accusations: 0,
+  accusationsCorrect: 0,
+  suggested: { suspects: {}, weapons: {}, rooms: {} },
+});
 
 /** Fresh per-game statistics: one empty tally per dealt player. */
 export function newStats(playerIds: string[], now = Date.now()): GameStats {
@@ -84,15 +93,23 @@ export function noteSuggestion(state: GameState, byId: string, suspectId: string
   bump(st.suspects, suspectId);
   bump(st.weapons, weaponId);
   bump(st.rooms, roomId);
-  playerStats(state, byId).suggestions++;
+  const ps = playerStats(state, byId);
+  ps.suggestions++;
+  // per-player card tallies (a game saved before these existed gets them from here on)
+  if (!ps.suggested) ps.suggested = { suspects: {}, weapons: {}, rooms: {} };
+  bump(ps.suggested.suspects, suspectId);
+  bump(ps.suggested.weapons, weaponId);
+  bump(ps.suggested.rooms, roomId);
 }
 
 export function noteReveal(state: GameState, responderId: string): void {
   playerStats(state, responderId).reveals++;
 }
 
-export function noteAccusation(state: GameState, byId: string): void {
-  playerStats(state, byId).accusations++;
+export function noteAccusation(state: GameState, byId: string, correct = false): void {
+  const ps = playerStats(state, byId);
+  ps.accusations++;
+  if (correct) ps.accusationsCorrect = (ps.accusationsCorrect ?? 0) + 1;
 }
 
 // ---- summary for the end-of-game screen -----------------------------------------------------

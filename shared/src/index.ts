@@ -8,3 +8,4 @@ export * from './dice';
 export * from './rng';
 export * from './engine';
 export * from './publicStats';
+export * from './profile';

@@ -10,6 +10,10 @@ export type SlotStatus = 'open' | 'closed' | 'bot';
 export const DICE_ANIM_MS = 2600;
 /** Beat at the start of every turn ("X's turn" flashes on screen) before that turn's dice roll shows. */
 export const TURN_FLASH_MS = 1000;
+/** Pause after a turn ends before the next player's turn is announced, so the last thing that
+ *  happened ("Mr. Green reveals…") has the screen to itself for a moment. Clients hold the turn
+ *  flash, the turn pill and the opening roll back by this much; bots wait it out too. */
+export const TURN_GAP_MS = 1000;
 /** Public games: a human on the clock has this long to act before the turn is passed for them. */
 export const PUBLIC_TURN_MS = 90_000;
 
@@ -140,6 +144,16 @@ export interface PlayerStats {
   /** Times this player disproved someone else's suggestion. */
   reveals: number;
   accusations: number;
+  /** Accusations that were right (at most one — a correct accusation ends the game). Absent on
+   *  games saved before it was tracked. */
+  accusationsCorrect?: number;
+  /** Which suspect / weapon / room cards this player named in their own suggestions. Feeds the
+   *  long-term player profile ("most suspected"). Absent on games saved before it was tracked. */
+  suggested?: {
+    suspects: Record<string, number>;
+    weapons: Record<string, number>;
+    rooms: Record<string, number>;
+  };
 }
 
 /** Someone who took part in a game at any point: a dealt human, a computer seat, or a watcher. */

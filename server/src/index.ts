@@ -3,12 +3,14 @@ import path from 'node:path';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { getPublicStats, recordPublicGame } from './publicStats';
+import { describeProfile, findProfile, profileKey, recordProfileGame } from './profiles';
 import express from 'express';
 import { Server, type Socket } from 'socket.io';
 import {
   SOCKET_EVENTS,
   DICE_ANIM_MS,
   TURN_FLASH_MS,
+  TURN_GAP_MS,
   PUBLIC_TURN_MS,
   BOT_SPEED_PACE,
   BOT_SPEED_PASS_PACE,
@@ -69,6 +71,9 @@ import {
   syncParticipants,
   type RosterEntry,
   type PublicStatsPayload,
+  type PlayerProfileRequest,
+  type PlayerProfilePayload,
+  type WinnerProfile,
 } from 'shared';
 import {
   type Room,
@@ -105,6 +110,7 @@ import {
   roomBotSpeed,
   resetPublicRoom,
   electHost,
+  setProfileId,
 } from './rooms';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -177,7 +183,7 @@ const botDelay = (room: Room): number => (room.isPublic ? PUBLIC_BOT_DELAY : BOT
 /** How long a bot waits before its next action: its pacing delay, stretched so a dice roll that is
  *  still animating on players' screens finishes first. */
 function botWait(room: Room): number {
-  const animEnds = (room.lastRollAt ?? 0) + TURN_FLASH_MS + DICE_ANIM_MS + 400;
+  const animEnds = (room.lastRollAt ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS + 400;
   return Math.max(botDelay(room), animEnds - Date.now());
 }
 /** A bot answering a suggestion: the usual pause, but a bot with nothing to show answers much
@@ -334,6 +340,34 @@ function broadcastGame(room: Room): void {
   }
 }
 
+/** The id a finished game is filed under in the public history and in player profiles. */
+function gameStatsId(room: Room): string {
+  return `${room.code}-${room.game?.stats?.startedAt ?? Date.now()}`;
+}
+
+/** Credit a finished game to the long-term profile of every human holding a dealt seat at the end.
+ *  Public and private games alike; computers, watchers and people who left get nothing. */
+function recordProfiles(room: Room): void {
+  const g = room.game;
+  if (!g || g.phase !== 'ended') return;
+  const view = viewFor(g, '');
+  const meta = { id: gameStatsId(room), isPublic: !!room.isPublic };
+  for (const p of g.players) {
+    if (p.isBot) continue;
+    const profileId = room.profileIds?.[p.id];
+    if (profileId) recordProfileGame(profileId, p.name, view, p.id, meta);
+  }
+}
+
+/** The profile a human winner played under, for the public leaderboard (undefined for a computer). */
+function winnerProfile(room: Room): WinnerProfile | undefined {
+  const g = room.game;
+  const w = g?.players.find((p) => p.id === g.winnerId);
+  if (!w || w.isBot) return undefined;
+  const id = room.profileIds?.[w.id];
+  return id ? describeProfile(id, w.name) : undefined;
+}
+
 /** Run an in-game turn intent for the requesting socket, with error reporting. */
 function withGame(socket: Socket, fn: (room: Room, g: GameState) => GameState): void {
   // Rooms/players are keyed by the stable clientId (not socket.id), so resolve through cid().
@@ -381,9 +415,13 @@ function progress(room: Room): void {
   broadcastGame(room);
   emitChat(room);
   maybeAutoSave(room); // snapshot to browsers after each completed round
+  if (g.phase === 'ended' && !room.profilesRecorded) {
+    room.profilesRecorded = true;
+    recordProfiles(room); // every human still at the table banks this game in their profile
+  }
   if (g.phase === 'ended' && room.isPublic && !room.resetsAt) {
     // File this game in the public history (participants were just synced by broadcastGame).
-    recordPublicGame(viewFor(g, ''), `${room.code}-${g.stats?.startedAt ?? Date.now()}`);
+    recordPublicGame(viewFor(g, ''), gameStatsId(room), winnerProfile(room));
     schedulePublicReset(); // the next public lobby forms once the details screen has had its 90s
     broadcastGame(room); // …and everyone gets the countdown right away
   }
@@ -798,6 +836,11 @@ io.on('connection', (socket) => {
   socket.on(SOCKET_EVENTS.PUBLIC_STATS, (_p: unknown, ack?: (p: PublicStatsPayload) => void) => {
     ack?.({ stats: getPublicStats() });
   });
+  // The title screen's "Player Profile": the long-term record behind a name + optional PIN. Only the
+  // requester ever sees it, and the PIN goes no further than profileKey().
+  socket.on(SOCKET_EVENTS.PLAYER_PROFILE, (p: PlayerProfileRequest, ack?: (r: PlayerProfilePayload) => void) => {
+    ack?.({ profile: findProfile(p?.name, p?.pin) });
+  });
 
   const register = (clientId: string) => {
     socketClient.set(socket.id, clientId);
@@ -810,6 +853,7 @@ io.on('connection', (socket) => {
       const clientId = p?.clientId || socket.id;
       register(clientId);
       const room = createRoom(clientId, p?.name ?? '');
+      setProfileId(room, clientId, profileKey(p?.name, p?.pin)?.id);
       socket.join(room.code);
       emitLobby(room);
       emitChat(room);
@@ -831,6 +875,7 @@ io.on('connection', (socket) => {
         return;
       }
       const { room } = joinRoom(p?.code ?? '', clientId, p?.name ?? '');
+      setProfileId(room, clientId, profileKey(p?.name, p?.pin)?.id);
       socket.join(room.code);
       cancelCleanup(room.code);
       addChat(room, 'System', `${nameOf(room, clientId)} joined the game.`, true);
@@ -854,6 +899,7 @@ io.on('connection', (socket) => {
       if (room.phase === 'lobby') {
         if (!seated) {
           joinPublicLobby(room, clientId, p?.name ?? '', !!p?.observer);
+          setProfileId(room, clientId, profileKey(p?.name, p?.pin)?.id);
           addChat(room, 'System', `${nameOf(room, clientId)} ${p?.observer ? 'is watching the public game' : 'joined the public game'}.`, true);
         } else {
           reconnectOccupant(clientId);
@@ -941,6 +987,9 @@ io.on('connection', (socket) => {
     try {
       const clientId = cid(socket);
       takeSeat(room, clientId, p?.name ?? '', p?.index ?? -1);
+      // Stats go to whoever is really playing: their typed name (or the one they gave on the title
+      // screen when the seat keeps its saved name), never the seat's character.
+      setProfileId(room, clientId, profileKey(p?.name?.trim() || p?.profileName, p?.pin)?.id);
       addChat(room, 'System', `${nameOf(room, clientId)} joined the game.`, true);
       emitLobby(room);
       if (room.paused) {

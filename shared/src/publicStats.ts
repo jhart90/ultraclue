@@ -1,4 +1,5 @@
 import type { Envelope, GameView } from './game';
+import { pinlessProfileId } from './profile';
 
 // ---------------------------------------------------------------------------------------------
 // Public-table history: a rolling archive of the last PUBLIC_STATS_RECENT games (each one enough to
@@ -42,8 +43,11 @@ export interface PublicStats {
   /** Turns played in games that ended with a correct accusation (for "turns per solve"). */
   turnsInSolvedGames: number;
   totalSuggestions: number;
-  /** Wins by human players, keyed by name. */
+  /** Wins by human players, keyed by name. Legacy: kept in step with `humanWinners`, which is
+   *  what the leaderboard reads (it can tell two players with the same name apart). */
   humanWins: Record<string, number>;
+  /** Wins by human players, keyed by profile id (name + optional PIN), so two "Jack"s stay apart. */
+  humanWinners: Record<string, HumanWinner>;
   /** Wins by character (suspect card id), human or computer. */
   characterWins: Record<string, number>;
   /** How often each suspect / weapon / room was in the envelope. */
@@ -64,6 +68,21 @@ export interface PublicStats {
   recent: ArchivedPublicGame[];
 }
 
+/** A human on the wins leaderboard. */
+export interface HumanWinner {
+  name: string;
+  /** The profile's public mark, shown when two winners share a name ('' for PIN-less names). */
+  tag: string;
+  wins: number;
+}
+
+/** The profile a finished game's human winner played under (id + how to label it). */
+export interface WinnerProfile {
+  id: string;
+  name: string;
+  tag: string;
+}
+
 export function emptyPublicStats(): PublicStats {
   return {
     totalGames: 0,
@@ -73,6 +92,7 @@ export function emptyPublicStats(): PublicStats {
     turnsInSolvedGames: 0,
     totalSuggestions: 0,
     humanWins: {},
+    humanWinners: {},
     characterWins: {},
     murderers: {},
     weapons: {},
@@ -140,8 +160,10 @@ const bump = (tally: Record<string, number>, key: string | undefined, by = 1) =>
   tally[key] = (tally[key] ?? 0) + by;
 };
 
-/** Fold one finished game into the all-time totals and the rolling archive. Mutates `stats`. */
-export function foldPublicGame(stats: PublicStats, view: GameView, id: string): ArchivedPublicGame {
+/** Fold one finished game into the all-time totals and the rolling archive. Mutates `stats`.
+ *  `winnerProfile` names the profile a human winner played under; without it the win goes to the
+ *  PIN-less profile for their name. */
+export function foldPublicGame(stats: PublicStats, view: GameView, id: string, winnerProfile?: WinnerProfile): ArchivedPublicGame {
   const summary = summarizePublicGame(view, id);
   stats.totalGames++;
   if (summary.solved) {
@@ -151,7 +173,15 @@ export function foldPublicGame(stats: PublicStats, view: GameView, id: string): 
   stats.totalTiles += summary.tiles;
   stats.totalTurns += summary.turns;
   stats.totalSuggestions += summary.suggestions;
-  if (summary.winnerId && !summary.winnerIsBot) bump(stats.humanWins, summary.winnerName);
+  if (summary.winnerId && !summary.winnerIsBot) {
+    bump(stats.humanWins, summary.winnerName);
+    const wp = winnerProfile ?? { id: pinlessProfileId(summary.winnerName), name: summary.winnerName, tag: '' };
+    if (!stats.humanWinners) stats.humanWinners = {};
+    const row = (stats.humanWinners[wp.id] ??= { name: wp.name, tag: wp.tag, wins: 0 });
+    row.name = wp.name; // latest spelling / capitalisation wins
+    row.tag = wp.tag;
+    row.wins++;
+  }
   bump(stats.characterWins, summary.winnerSuspectId);
   bump(stats.murderers, summary.envelope?.suspectId);
   bump(stats.weapons, summary.envelope?.weaponId);
@@ -187,5 +217,13 @@ export function backfillPublicStats(stats: PublicStats, raw: Partial<PublicStats
   };
   rebuild('weaponsSuggested', (g) => g.view.stats?.weapons);
   rebuild('roomsSuggested', (g) => g.view.stats?.rooms);
+  // Wins recorded by name before profiles existed become PIN-less profiles of the same name.
+  if (!raw.humanWinners) {
+    stats.humanWinners = {};
+    for (const [name, wins] of Object.entries(stats.humanWins ?? {})) {
+      stats.humanWinners[pinlessProfileId(name)] = { name, tag: '', wins };
+    }
+    changed = true;
+  }
   return changed;
 }

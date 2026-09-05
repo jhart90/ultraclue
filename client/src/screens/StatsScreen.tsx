@@ -3,6 +3,7 @@ import { getCard, SUSPECTS, WEAPONS, ROOMS, type ArchivedPublicGame, type Public
 import { useStore } from '../store';
 import { Wordmark } from '../components/Wordmark';
 import { EndScreen } from '../components/EndScreen';
+import { Ranking, humanWinnerRows } from '../components/Ranking';
 import { contrastInk } from '../render/colorUtils';
 import './StatsScreen.css';
 import { CardName } from '../components/CardName';
@@ -70,65 +71,6 @@ function GameTile({ g, onOpen }: { g: ArchivedPublicGame; onOpen: () => void }) 
   );
 }
 
-/** A ranked list with a bar per row; `all` supplies the full set so zero-count entries still show.
- *  `per` divides each count by that character's entry in another tally (a per-game rate). */
-function Ranking({
-  title,
-  tally,
-  all,
-  top,
-  human,
-  per,
-  note,
-}: {
-  title: string;
-  tally: Record<string, number>;
-  all?: { id: string; title: string }[];
-  top?: number;
-  human?: boolean;
-  per?: Record<string, number>;
-  note?: string;
-}) {
-  const rows = useMemo(() => {
-    const value = (id: string) => {
-      const raw = tally[id] ?? 0;
-      if (!per) return raw;
-      const den = per[id] ?? 0;
-      return den ? raw / den : 0;
-    };
-    const base = all ? all.map((c) => ({ id: c.id, label: c.title, count: value(c.id) })) : Object.entries(tally).map(([id]) => ({ id, label: id, count: value(id) }));
-    base.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-    return top ? base.slice(0, top) : base;
-  }, [tally, all, top, per]);
-  const max = rows.reduce((m, r) => Math.max(m, r.count), 0);
-  const show = (v: number) => (per ? (Number.isInteger(v) ? v.toFixed(1) : v.toFixed(2).replace(/0$/, '')) : n(v));
-  return (
-    <section className="stats__section">
-      <h3 className="stats__h3">{title}</h3>
-      {note && <div className="stats__note">{note}</div>}
-      {rows.length === 0 ? (
-        <div className="stats__none">{human ? 'No human has won a public game yet.' : 'Nothing recorded yet.'}</div>
-      ) : (
-        <ol className="rank">
-          {rows.map((r, i) => (
-            <li key={r.id} className={`rank__row${r.count === 0 ? ' rank__row--zero' : ''}`}>
-              <span className="rank__pos">{i + 1}</span>
-              <span className="rank__label">
-                {!human && getCard(r.id)?.type === 'suspect' && <span className="rank__dot" style={{ background: suspectColor(r.id) }} />}
-                {!human && getCard(r.id) ? <CardName id={r.id} /> : r.label}
-              </span>
-              <span className="rank__bar">
-                <span className="rank__fill" style={{ width: max ? `${(r.count / max) * 100}%` : 0 }} />
-              </span>
-              <span className="rank__count">{show(r.count)}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
-  );
-}
-
 /** "Statistics" from the title: the last 50 public games, each re-opening its details screen, and
  *  the all-time numbers across every public game ever played. */
 export function StatsScreen() {
@@ -153,6 +95,8 @@ export function StatsScreen() {
     return () => window.removeEventListener('resize', measure);
   }, [stats]);
   const gamesForAll = useMemo(() => Object.fromEntries(SUSPECTS.map((c) => [c.id, stats?.totalGames ?? 0])), [stats?.totalGames]);
+  // Human winners are profiles (name + optional PIN), so two players called "Jack" get their own rows.
+  const winners = useMemo(() => humanWinnerRows(stats?.humanWinners ?? {}, stats?.humanWins ?? {}), [stats?.humanWinners, stats?.humanWins]);
 
   useEffect(() => {
     let alive = true;
@@ -231,7 +175,7 @@ export function StatsScreen() {
           </div>
 
           <div className="stats__grid">
-            <Ranking title="Top human winners" tally={stats.humanWins} top={10} human />
+            <Ranking title="Top human winners" tally={winners.tally} all={winners.all} top={10} human note="players with a PIN show their profile mark when names collide" />
             <Ranking title="Characters by wins" tally={stats.characterWins} all={SUSPECTS} />
           </div>
 

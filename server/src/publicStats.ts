@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { backfillPublicStats, emptyPublicStats, foldPublicGame, type GameView, type PublicStats } from 'shared';
+import { backfillPublicStats, emptyPublicStats, foldPublicGame, type GameView, type PublicStats, type WinnerProfile } from 'shared';
 
 // Persistent history of the public table: all-time aggregates plus the last 50 games, kept in a
 // JSON file so it survives restarts. DATA_DIR overrides where it lives (mount a volume there in
@@ -35,9 +35,9 @@ function save(): void {
 }
 
 /** Fold a finished public game into the history and persist it. */
-export function recordPublicGame(view: GameView, id: string): void {
+export function recordPublicGame(view: GameView, id: string, winner?: WinnerProfile): void {
   if (stats.recent.some((g) => g.id === id)) return; // already recorded
-  foldPublicGame(stats, view, id);
+  foldPublicGame(stats, view, id, winner);
   save();
 }
 

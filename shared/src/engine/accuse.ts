@@ -30,11 +30,11 @@ export function makeAccusation(
   if (currentPlayerId(s) !== accuserId) throw new Error('Not your turn.');
 
   const accuser = requirePlayer(s, accuserId);
-  noteAccusation(s, accuserId);
   const correct =
     s.envelope.suspectId === suspectId &&
     s.envelope.weaponId === weaponId &&
     s.envelope.roomId === roomId;
+  noteAccusation(s, accuserId, correct);
 
   s.announcement = {
     seq: (s.announcement?.seq ?? 0) + 1,

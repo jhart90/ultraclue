@@ -206,3 +206,65 @@
 .btn--danger:hover:not(:disabled) {
   border-color: #ef6d82;
 }
+
+/* Optional profile PIN (NBA Jam style): a short masked field with a show/hide toggle and a hint.
+   The head row is uppercase like the other field labels; the hint sits below in normal case. */
+.title__form label.title__pinlabel {
+  gap: 0.35rem;
+}
+.title__pinhead {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.title__optional {
+  color: var(--muted, #9a93b3);
+  opacity: 0.7;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+.title__pinrow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+.title__form input.title__pin {
+  width: 7.5rem;
+  letter-spacing: 0.45em;
+  text-align: center;
+  font-size: 1.3rem;
+  text-transform: uppercase;
+}
+.title__form input.title__pin::placeholder {
+  letter-spacing: 0.3em;
+  opacity: 0.45;
+}
+.title__pineye {
+  background: #1c1830;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-radius: 8px;
+  color: var(--ink, #ece8f5);
+  padding: 0 0.7rem;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.title__pineye:hover {
+  border-color: var(--accent, #c8a24a);
+}
+.title__pinhint {
+  color: var(--muted, #9a93b3);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* The forms sit over the strewn cards; a translucent slate behind them keeps the small print
+   (PIN hint, public-game blurb) readable whatever card art happens to lie underneath. */
+.title__form {
+  background: rgba(20, 14, 30, 0.74);
+  border: 1px solid rgba(200, 162, 74, 0.22);
+  border-radius: 14px;
+  padding: 1.1rem 1.2rem 1.2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}

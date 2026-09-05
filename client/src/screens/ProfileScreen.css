@@ -1,0 +1,113 @@
+/* Player Profile screen — shares the Statistics screen's panes, number tiles and rankings, and the
+   title screen's form fields. */
+.profile__form {
+  margin: 0.4rem auto 1.4rem;
+  max-width: 420px;
+}
+.profile__form .title__row {
+  justify-content: flex-end;
+}
+
+.profile__card {
+  background: #181426;
+  border: 1px solid rgba(200, 162, 74, 0.35);
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 0.8rem;
+}
+.profile__name {
+  font-family: var(--font-display, 'Georgia', serif);
+  font-size: 1.6rem;
+  color: var(--accent, #c8a24a);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.profile__lock {
+  font-size: 1rem;
+}
+.profile__nopin {
+  font-family: 'Georgia', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted, #9a93b3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+.profile__since {
+  color: var(--muted, #9a93b3);
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+  line-height: 1.4;
+}
+.profile__good {
+  color: #8fd694;
+}
+.profile__bad {
+  color: #ef6d82;
+}
+.profile__empty {
+  text-align: center;
+  padding: 1.2rem 0;
+}
+
+/* recent games list: one card per game, coloured by the character played */
+.pgames {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.pgame {
+  background: #221b33;
+  border: 1px solid rgba(200, 162, 74, 0.25);
+  border-left: 6px solid #6b6480;
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem 0.6rem;
+}
+.pgame__top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.pgame__result {
+  font-weight: 700;
+  color: #d9d2e8;
+}
+.pgame__result--won {
+  color: #8fd694;
+}
+.pgame__result--eliminated {
+  color: #ef6d82;
+}
+.pgame__as {
+  display: inline-block;
+  padding: 0.05rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+.pgame__when {
+  margin-left: auto;
+  color: var(--muted, #9a93b3);
+  font-size: 0.8rem;
+}
+.pgame__meta {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--muted, #9a93b3);
+}
+
+@media (max-width: 820px) {
+  .pgame__when {
+    margin-left: 0;
+  }
+}

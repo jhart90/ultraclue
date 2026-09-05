@@ -28,6 +28,7 @@ import {
   type SuggestionEvent,
   DICE_ANIM_MS,
   TURN_FLASH_MS,
+  TURN_GAP_MS,
 } from 'shared';
 
 export interface Room {
@@ -66,6 +67,18 @@ export interface Room {
   /** When the last dice roll was broadcast, so bots let the roll animation finish before acting. */
   lastRollAt?: number;
   lastRollSeq?: number;
+  /** SERVER-ONLY: each human occupant's long-term profile id (from their name + optional PIN),
+   *  keyed by occupant id. Never part of a lobby view, game view, or save. */
+  profileIds?: Record<string, string>;
+  /** Set once the finished game has been folded into its players' profiles. */
+  profilesRecorded?: boolean;
+}
+
+/** Attach (or, with undefined, detach) the profile behind an occupant's seat. */
+export function setProfileId(room: Room, occupantId: string, profileId: string | undefined): void {
+  if (!room.profileIds) room.profileIds = {};
+  if (profileId) room.profileIds[occupantId] = profileId;
+  else delete room.profileIds[occupantId];
 }
 
 const rooms = new Map<string, Room>();
@@ -298,6 +311,8 @@ export function resetPublicRoom(): Room {
     : [];
   rooms.delete(PUBLIC_ROOM_CODE);
   const room = createPublicRoom(total, difficulty, speed);
+  // The humans who stay on carry their profiles into the next game.
+  for (const h of humans) setProfileId(room, h.id, old?.profileIds?.[h.id]);
   for (const h of humans) {
     if (h.observer) {
       appendObserverSlot(room, { ...h, connected: true });
@@ -488,19 +503,35 @@ export function mirrorLog(room: Room, defer?: (apply: () => boolean, ms: number)
   for (const entry of room.game.log) {
     if (entry.id > room.mirroredLogId) {
       const card = entry.card;
-      if (card?.kind === 'roll' && defer) {
-        const id = room.nextChatId++;
-        const name = room.game.players.find((p) => p.id === card.playerId)?.name ?? 'Someone';
-        room.chat.push({ id, from: '', text: `${name} is rolling…`, system: true });
-        // A roll that opens a turn shows on clients only after the "<name>'s turn" beat.
-        const ms = (card.opensTurn ? TURN_FLASH_MS : 0) + DICE_ANIM_MS + 250;
-        const text = entry.text;
-        defer(() => {
+      // Swap a placeholder line for its final form later, keeping its place in the feed.
+      const swap = (id: number, msg: ChatMsg, ms: number) =>
+        defer?.(() => {
           const i = room.chat.findIndex((m) => m.id === id);
           if (i === -1) return false; // trimmed away, or the room has since been reset
-          room.chat[i] = { id, from: '', text, system: true, card };
+          room.chat[i] = msg;
           return true;
         }, ms);
+      if (card?.kind === 'turn' && defer) {
+        // The turn header waits TURN_GAP_MS so whatever ended the last turn (a reveal, a pass) gets
+        // a beat to itself. Until then the line is in the feed but addressed to nobody.
+        const id = room.nextChatId++;
+        const msg: ChatMsg = { id, from: '', text: entry.text, system: true, card };
+        room.chat.push({ ...msg, to: [] });
+        swap(id, msg, TURN_GAP_MS);
+      } else if (card?.kind === 'roll' && defer) {
+        const id = room.nextChatId++;
+        const name = room.game.players.find((p) => p.id === card.playerId)?.name ?? 'Someone';
+        const rolling: ChatMsg = { id, from: '', text: `${name} is rolling…`, system: true };
+        if (card.opensTurn) {
+          // A roll that opens a turn follows the turn header: hidden through the gap, then "rolling…"
+          room.chat.push({ ...rolling, to: [] });
+          swap(id, rolling, TURN_GAP_MS);
+        } else {
+          room.chat.push(rolling);
+        }
+        // …and the roll card itself lands only once the "<name>'s turn" beat and the dice animation are done.
+        const ms = (card.opensTurn ? TURN_GAP_MS + TURN_FLASH_MS : 0) + DICE_ANIM_MS + 250;
+        swap(id, { id, from: '', text: entry.text, system: true, card }, ms);
       } else if (card?.kind === 'reveal' && card.cardId) {
         // Everyone sees a face-down reveal card; the two players in on it get the face-up version.
         // The face-down half is addressed by exclusion rather than a fixed list of the humans
@@ -589,6 +620,7 @@ export function removeOccupant(id: string): { room?: Room; deleted: boolean } {
   if (!room) return { deleted: false };
 
   const slot = room.slots.find((s) => s.occupant?.id === id);
+  setProfileId(room, id, undefined);
   if (slot) {
     if (room.isPublic && isPublicObserverSlot(room, slot)) {
       dropSlot(room, slot); // a watcher's extra seat goes away with them
@@ -662,6 +694,10 @@ function remapId(saved: Room, oldId: string, newId: string): void {
   if (oldId === newId) return;
   for (const slot of saved.slots) if (slot.occupant?.id === oldId) slot.occupant.id = newId;
   if (saved.hostId === oldId) saved.hostId = newId;
+  if (saved.profileIds && saved.profileIds[oldId] !== undefined) {
+    saved.profileIds[newId] = saved.profileIds[oldId];
+    delete saved.profileIds[oldId];
+  }
   if (saved.notes && saved.notes[oldId] !== undefined) {
     saved.notes[newId] = saved.notes[oldId]; // notes follow the seat to its new owner
     delete saved.notes[oldId];

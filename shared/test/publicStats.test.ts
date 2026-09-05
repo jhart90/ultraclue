@@ -96,4 +96,27 @@ describe('suggestion tallies across public games', () => {
     // a file that already has them is left alone
     expect(backfillPublicStats(loaded, loaded)).toBe(false);
   });
+it('keeps two humans with the same name apart on the winners board via their profiles', () => {
+    const stats = emptyPublicStats();
+    const view = finishedGame(15, true); // P1 wins
+    foldPublicGame(stats, view, 'g1', { id: 'p:aaa', name: 'P1', tag: 'K7Q' });
+    foldPublicGame(stats, view, 'g2', { id: 'p:bbb', name: 'P1', tag: '2FD' });
+    foldPublicGame(stats, view, 'g3'); // no profile given → the PIN-less profile for the name
+    foldPublicGame(stats, view, 'g4', { id: 'p:aaa', name: 'p1', tag: 'K7Q' });
+    expect(stats.humanWins).toEqual({ P1: 4 }); // legacy by-name tally still adds up
+    expect(stats.humanWinners).toEqual({
+      'p:aaa': { name: 'p1', tag: 'K7Q', wins: 2 },
+      'p:bbb': { name: 'P1', tag: '2FD', wins: 1 },
+      'n:p1': { name: 'P1', tag: '', wins: 1 },
+    });
+  });
+
+  it('turns legacy by-name wins into PIN-less profiles when an older file has no winners table', () => {
+    const raw = { ...emptyPublicStats(), humanWins: { Jack: 3, Jill: 1 } } as Partial<ReturnType<typeof emptyPublicStats>>;
+    delete raw.humanWinners;
+    const loaded = { ...emptyPublicStats(), ...raw };
+    expect(backfillPublicStats(loaded, raw)).toBe(true);
+    expect(loaded.humanWinners).toEqual({ 'n:jack': { name: 'Jack', tag: '', wins: 3 }, 'n:jill': { name: 'Jill', tag: '', wins: 1 } });
+    expect(backfillPublicStats(loaded, loaded)).toBe(false);
+  });
 });

@@ -18,10 +18,13 @@ import {
   type SaveGameDataPayload,
   type PublicStats,
   type PublicStatsPayload,
+  type PlayerProfile,
+  type PlayerProfilePayload,
+  cleanPin,
 } from 'shared';
 import { socket } from './socket';
 
-export type Screen = 'title' | 'lobby' | 'game' | 'gallery' | 'stats';
+export type Screen = 'title' | 'lobby' | 'game' | 'gallery' | 'stats' | 'profile';
 
 // Stable per-device id so a refresh re-attaches to the same seat; the active room code is saved
 // so we can rejoin it automatically on reconnect.
@@ -94,6 +97,32 @@ function writeSave(payload: SaveSlot): void {
 const notesKey = (code: string) => `ultraclue-notes-${code}`;
 let pendingNotes: string | null = null; // notes to restore once the loaded game's (new) code arrives
 let pendingName = ''; // the name typed on the Join form, reused if we have to pick a seat
+// The profile this browser is playing under: the name + PIN typed on the title screen this session.
+// The PIN lives only in memory (never in storage), so a shared computer can't leak it; the name is
+// remembered across visits as a convenience.
+let profileName = '';
+let profilePin = '';
+const NAME_KEY = 'ultraclue-name';
+function rememberName(name: string): void {
+  try {
+    localStorage.setItem(NAME_KEY, name.trim());
+  } catch {
+    /* ignore */
+  }
+}
+/** The name last typed on the title screen, to pre-fill the forms. */
+export function savedName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+function setProfile(name: string, pin: string): void {
+  profileName = name.trim();
+  profilePin = cleanPin(pin);
+  rememberName(name);
+}
 function readNotes(code: string): string | null {
   try {
     return localStorage.getItem(notesKey(code));
@@ -133,10 +162,12 @@ interface StoreState {
   goto: (screen: Screen) => void;
   /** Fetch the public table's history and all-time numbers (for the Statistics screen). */
   fetchPublicStats: () => Promise<PublicStats>;
+  /** Look up the long-term profile behind a name + optional PIN (null if it has no games yet). */
+  fetchProfile: (name: string, pin: string) => Promise<PlayerProfile | null>;
   syncNotes: (json: string) => void;
-  createGame: (name: string) => void;
-  joinGame: (code: string, name: string) => void;
-  joinPublic: (name: string, observer?: boolean) => void;
+  createGame: (name: string, pin?: string) => void;
+  joinGame: (code: string, name: string, pin?: string) => void;
+  joinPublic: (name: string, observer?: boolean, pin?: string) => void;
   setRoomSettings: (patch: { totalPlayers?: number; botDifficulty?: BotDifficulty; botSpeed?: BotSpeed }) => void;
   setBotDifficulty: (index: number, difficulty: BotDifficulty) => void;
   setDice: (color: string, pips: string) => void;
@@ -183,15 +214,28 @@ export const useStore = create<StoreState>((set) => ({
         resolve(p.stats);
       });
     }),
+  fetchProfile: (name, pin) =>
+    new Promise<PlayerProfile | null>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('The server did not answer.')), 8000);
+      socket.emit(SOCKET_EVENTS.PLAYER_PROFILE, { name, pin: cleanPin(pin) }, (p: PlayerProfilePayload) => {
+        clearTimeout(t);
+        resolve(p.profile);
+      });
+    }),
   syncNotes: (json) => socket.emit(SOCKET_EVENTS.SET_NOTES, { notes: json }),
-  createGame: (name) => socket.emit(SOCKET_EVENTS.CREATE_GAME, { name, clientId: CLIENT_ID }),
-  joinGame: (code, name) => {
-    pendingName = name; // remembered in case we land on a seat-picker for an in-progress game
-    socket.emit(SOCKET_EVENTS.JOIN_GAME, { code: code.toUpperCase(), name, clientId: CLIENT_ID });
+  createGame: (name, pin = '') => {
+    setProfile(name, pin);
+    socket.emit(SOCKET_EVENTS.CREATE_GAME, { name, clientId: CLIENT_ID, pin: profilePin });
   },
-  joinPublic: (name, observer = false) => {
+  joinGame: (code, name, pin = '') => {
+    pendingName = name; // remembered in case we land on a seat-picker for an in-progress game
+    setProfile(name, pin);
+    socket.emit(SOCKET_EVENTS.JOIN_GAME, { code: code.toUpperCase(), name, clientId: CLIENT_ID, pin: profilePin });
+  },
+  joinPublic: (name, observer = false, pin = '') => {
     pendingName = name; // reused on the seat picker if the public game is already running
-    socket.emit(SOCKET_EVENTS.JOIN_PUBLIC, { name, clientId: CLIENT_ID, observer });
+    setProfile(name, pin);
+    socket.emit(SOCKET_EVENTS.JOIN_PUBLIC, { name, clientId: CLIENT_ID, observer, pin: profilePin });
   },
   setRoomSettings: (patch) => socket.emit(SOCKET_EVENTS.SET_ROOM_SETTINGS, patch),
   setBotDifficulty: (index, difficulty) => socket.emit(SOCKET_EVENTS.SET_BOT_DIFFICULTY, { index, difficulty }),
@@ -205,7 +249,8 @@ export const useStore = create<StoreState>((set) => ({
   },
   takeSeat: (index) => {
     const { seatPick } = useStore.getState();
-    if (seatPick) socket.emit(SOCKET_EVENTS.TAKE_SEAT, { code: seatPick.code, index, name: pendingName });
+    // The seat may keep its saved name (blank pendingName), but the stats belong to this player.
+    if (seatPick) socket.emit(SOCKET_EVENTS.TAKE_SEAT, { code: seatPick.code, index, name: pendingName, profileName, pin: profilePin });
   },
   joinAsObserver: () => {
     const { seatPick } = useStore.getState();

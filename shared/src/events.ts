@@ -1,6 +1,7 @@
 import type { SlotStatus, GameView, BotDifficulty, BotSpeed } from './game';
 import type { LobbyView, ChatMsg } from './lobby';
 import type { PublicStats } from './publicStats';
+import type { PlayerProfile } from './profile';
 import type { Coord } from './data/board';
 
 // The socket protocol shared by client and server. Every client->server intent and
@@ -45,6 +46,7 @@ export const SOCKET_EVENTS = {
   SET_NOTES: 'setNotes', // client pushes its Detective Notes so they ride along in every save
   SET_DICE: 'setDice', // a human picks the colours of their dice
   PUBLIC_STATS: 'publicStats', // ask for the public table's history + all-time numbers (answered via ack)
+  PLAYER_PROFILE: 'playerProfile', // look up the long-term profile for a name + optional PIN (answered via ack)
 
   // --- server -> client ---
   YOU_ARE: 'youAre',
@@ -64,6 +66,15 @@ export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
 export interface PublicStatsPayload {
   stats: PublicStats;
 }
+export interface PlayerProfileRequest {
+  name: string;
+  /** Optional 4-character PIN. Only ever travels client → server; never echoed to anyone. */
+  pin?: string;
+}
+export interface PlayerProfilePayload {
+  /** null when nobody has finished a game under that name + PIN yet. */
+  profile: PlayerProfile | null;
+}
 
 export interface HelloPayload {
   name: string;
@@ -76,11 +87,14 @@ export interface HelloAckPayload {
 export interface CreateGamePayload {
   name: string;
   clientId: string;
+  /** Optional profile PIN (4 letters/digits). Kept server-side only. */
+  pin?: string;
 }
 export interface JoinGamePayload {
   code: string;
   name: string;
   clientId: string;
+  pin?: string;
 }
 export interface RejoinPayload {
   clientId: string;
@@ -88,6 +102,7 @@ export interface RejoinPayload {
 export interface JoinPublicPayload {
   name: string;
   clientId: string;
+  pin?: string;
   /** Watch only: take an observer seat rather than a playing seat. */
   observer?: boolean;
 }
@@ -152,6 +167,10 @@ export interface TakeSeatPayload {
   code: string;
   index: number; // slot index of the bot/empty seat to take over
   name: string;
+  /** The name the joiner's profile goes by when `name` is left blank (loading a save keeps each
+   *  seat's saved name, but the stats still belong to whoever is playing). */
+  profileName?: string;
+  pin?: string;
 }
 export interface JoinObserverPayload {
   code: string;

@@ -3,8 +3,10 @@ import type { Coord } from 'shared';
 // Packs the tokens standing in a room — player pawns and weapon tokens — onto a lattice of slots
 // that all lie strictly inside the room's own tiles, never on its border and never over a notch.
 // The lattice pitch is the largest that gives every token a slot, so a couple of pawns sit at full
-// size and a crowd of forty shrinks and closes ranks. Weapons take the topmost slots (they read as
-// sitting on the mantel); pawns gather just under the name bubble and spread outward from there.
+// size and a crowd of forty shrinks and closes ranks. Tokens prefer to keep off the room's name
+// bubble, but will sit over it rather than shrink: a token is the same size in a broom cupboard as
+// in a ballroom. Weapons take the topmost slots (they read as sitting on the mantel); pawns gather
+// just under the name bubble and spread outward from there.
 
 export interface Pt {
   x: number;
@@ -98,15 +100,26 @@ export function packRoom(o: PackOptions): Packing {
   const rMin = o.rMin ?? 2.5;
   if (need === 0) return { r: o.rMax, pawnSlots: [], weaponSlots: [], overflow: false };
 
+  // At each size, try to keep off the name bubble first, then allow sitting over it — only shrink
+  // when even that can't seat everyone. Size consistency matters more than a clear nameplate: a
+  // small room's bubble covers most of its floor, so treating it as a hard keep-out used to drive
+  // the Walk-in Closet down to the minimum radius for as few as four tokens, while every other
+  // room on the board drew them at full size.
   let r = o.rMax;
   let slots = slotsFor(tiles, bounds, o.ts, r, o.reserved);
-  while (slots.length < need && r - STEP >= rMin) {
+  while (slots.length < need && r >= rMin) {
+    const over = slotsFor(tiles, bounds, o.ts, r, []);
+    if (over.length >= need) {
+      slots = over;
+      break;
+    }
+    if (r - STEP < rMin) {
+      slots = over.length > slots.length ? over : slots;
+      break;
+    }
     r = Math.round((r - STEP) * 2) / 2;
     slots = slotsFor(tiles, bounds, o.ts, r, o.reserved);
   }
-  // Last resort for a room too small even at the minimum size: let go of the reserved areas,
-  // and if that still isn't enough, seat the extras on already-taken slots (still inside).
-  if (slots.length < need) slots = slotsFor(tiles, bounds, o.ts, r, []);
   if (slots.length === 0) slots = [{ x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 }];
   const overflow = slots.length < need;
 

@@ -49,7 +49,7 @@ for (const room of Object.values(BOARD.rooms)) {
     const distinct = new Set(all.map((p) => `${p.x},${p.y}`)).size;
     if (bad.length) failures++;
     const line = `${title.padEnd(16)} ${room.tiles.length.toString().padStart(2)} tiles  ${sc.pawns}p+${sc.weapons}w  r=${pk.r.toFixed(1)}  slots used=${distinct}/${all.length}${pk.overflow ? '  OVERFLOW' : ''}${bad.length ? `  OUTSIDE=${bad.length}` : ''}`;
-    if (sc.pawns === 24 || sc.pawns === 40 || pk.overflow || bad.length) console.log(line);
+    if (process.env.PACK_ALL || sc.pawns === 24 || sc.pawns === 40 || pk.overflow || bad.length) console.log(line);
     out[`${room.id}:${sc.pawns}:${sc.weapons}`] = { room: room.id, tiles: room.tiles, label: lg, r: pk.r, pawns: pk.pawnSlots, weapons: pk.weaponSlots, overflow: pk.overflow };
   }
 }

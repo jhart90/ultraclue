@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { AnyCard } from 'shared';
 import { CardArt } from '../render/cardArt';
 import { resolveOverride, resolveOverrideThumb } from '../render/overrides';
@@ -21,6 +22,10 @@ const TYPE_LABEL: Record<AnyCard['type'], string> = {
 export function Card({ card, zoomable = true, hiRes = false }: { card: AnyCard; zoomable?: boolean; hiRes?: boolean }) {
   const override = hiRes ? resolveOverride(card.id, card.type, card.title) : resolveOverrideThumb(card.id, card.type, card.title);
   const thumb = hiRes ? resolveOverrideThumb(card.id, card.type, card.title) : undefined;
+  // The cached thumbnail stands in behind the full-size file only until that file has arrived —
+  // once it has, the placeholder goes, so a stray pixel of it can never show around the master.
+  const [loaded, setLoaded] = useState(false);
+  const placeholder = thumb && thumb !== override && !loaded;
   const zoomProps = zoomable
     ? {
         role: 'button' as const,
@@ -40,20 +45,23 @@ export function Card({ card, zoomable = true, hiRes = false }: { card: AnyCard; 
     : {};
   return (
     <div className={`card card--${card.type}${zoomable ? ' card--zoomable' : ''}`} {...zoomProps}>
+      <div className="card__head">
+        <div className="card__title">{card.title}</div>
+        <div className="card__type">{TYPE_LABEL[card.type]}</div>
+      </div>
       <div
         className={`card__art${override ? ' card__art--img' : ''}`}
-        // While the full-size file downloads, the already-cached thumbnail stands in behind it.
-        style={thumb && thumb !== override ? { backgroundImage: `url(${thumb})`, backgroundSize: 'cover' } : undefined}
+        // While the full-size file downloads, the already-cached thumbnail stands in behind it,
+        // cropped exactly as the <img> will be (cover, centred) so the two never show as a double.
+        style={placeholder ? { backgroundImage: `url(${thumb})`, backgroundSize: 'auto 106%', backgroundPosition: 'center top' } : undefined}
       >
         {override ? (
-          <img src={override} alt={card.title} className="card__override" />
+          <img src={override} alt={card.title} className="card__override" onLoad={() => setLoaded(true)} />
         ) : (
           <CardArt card={card} />
         )}
       </div>
       <div className="card__body">
-        <div className="card__type">{TYPE_LABEL[card.type]}</div>
-        <div className="card__title">{card.title}</div>
         <div className="card__phrase">{card.phrase}</div>
       </div>
     </div>

@@ -3,7 +3,7 @@
   /* Every card shares one shape, sized to the deck's tallest card (200×306). Height follows from the
      width via this ratio, so cards stay uniform at any width (gallery, pop-ups, the title scatter). */
   aspect-ratio: 200 / 306;
-  background: linear-gradient(180deg, #2b2540, #211c30);
+  background: #262038;
   border: 2px solid var(--accent, #c8a24a);
   border-radius: 12px;
   overflow: hidden;
@@ -25,62 +25,97 @@
   outline: none;
 }
 
-.card__art {
-  width: 100%;
-  flex: 1 1 auto; /* fill all the space above the body so every card lands at the same height */
-  min-height: 0;
-  background: #1b1f26;
-  border-bottom: 2px solid rgba(200, 162, 74, 0.5);
-  line-height: 0;
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
-  overflow: hidden; /* keep art inside the rounded top — no square corners poking past the frame */
+/* Name band across the top: the title with the card's type in small capitals just under it. A
+   fixed share of the card so the band's bottom edge (and so the art's top) sits at the same height
+   on all 120 cards. The title is one line: the longest, "Chancellor Charcoal", fits with room to
+   spare. No rule under the band — the art starts straight after. */
+.card__head {
+  /* The band is taller than the strip it occupies: it reaches ~12px down into the art's
+     transparent top margin (the negative margin hands that space back, so the picture does not
+     move), and the name + type block is centred in it — i.e. centred between the card's top edge
+     and where the art actually begins, rather than crammed against the top. */
+  flex: 0 0 13.4%;
+  margin-bottom: -6.1%; /* % of the card's width, like every vertical margin; ≈ 12px at 200px */
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4rem;
 }
 
-/* Override art fills the art box (cropping as needed); the procedural SVG scales to fit. */
+.card__art {
+  width: 100%;
+  flex: 1 1 auto; /* fill all the space between the name band and the body, so the art box is the same on every card */
+  min-height: 0;
+  position: relative;
+  /* no background of its own: the art's margins are transparent, so the card's surface runs
+     unbroken behind the name band, the picture and the text */
+  background: transparent;
+  line-height: 0;
+  overflow: hidden;
+}
+
+/* Override art is a square whose painted frame ends 94.3% of the way down (every card's art is
+   aligned to that line, see scripts/align_frames.py). Drawn 106% of the box's height and anchored
+   to its top, that frame edge lands exactly on the box's bottom edge, so the flavour text below
+   sits a fixed gap under the picture. Wider than the box, it is centred and the sides crop a little.
+   The procedural SVG scales to fit. */
 .card__override {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 106%;
+  width: auto;
+  max-width: none;
+  transform: translateX(-50%);
 }
 
 .card__body {
   /* Fixed share of the card so the line between art and text sits at the same height on all 120
-     cards, whatever the title or phrase length. Long text is clamped rather than pushing it. */
-  flex: 0 0 35%;
+     cards, whatever the phrase length. Long text is clamped rather than pushing it. The flavour
+     text sits under the art and the card type is pinned to the bottom, with a little breathing room
+     below it. Kept as small as two lines of phrase allow, so the art above gets the rest. */
+  flex: 0 0 20%;
   box-sizing: border-box;
   overflow: hidden;
-  padding: 0.45rem 0.65rem 0.5rem;
+  /* the flavour text floats in the middle of whatever is left under the picture */
+  padding: 5px 0.55rem;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .card__type {
   font-size: 0.6rem;
+  line-height: 1;
+  margin-top: 1px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--muted, #9a93b3);
 }
 
 .card__title {
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--accent, #c8a24a);
-  margin: 0.1rem 0 0.2rem;
-  line-height: 1.15;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  line-height: 1.1;
+  white-space: nowrap;
   overflow: hidden;
+  max-width: 100%;
 }
 
 .card__phrase {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-style: italic;
   color: #d9d3e6;
-  line-height: 1.25;
+  line-height: 1.22;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

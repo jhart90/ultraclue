@@ -19,6 +19,23 @@ const CARD_W = 160;
 const CARD_H = 245;
 const MARGIN = 2;
 
+// The scatter lives in a strip along the bottom of the screen (.title__cards: 56vh tall, overflow
+// hidden), so a card must not reach above the strip's top or it is sliced off. The card's layout
+// box is 204×310 (200×306 plus border) with the tilt and the 0.8 scale applied about its centre.
+const STRIP_VH = 56;
+const BOX_W = 204;
+const BOX_H = 310;
+const SCALE = 0.8;
+
+/** The highest `bottom` (vh) a card tilted by `angle` may sit at without its top corner poking
+ *  above the strip: bottom + half the box (the centre) + half the rotated, scaled height. */
+function maxBottomVh(angle: number, vh: number): number {
+  const rad = (Math.abs(angle) * Math.PI) / 180;
+  const rotH = (Math.abs(Math.cos(rad)) * BOX_H + Math.abs(Math.sin(rad)) * BOX_W) * SCALE;
+  const topOfCentre = BOX_H / 2 + rotH / 2; // px above the card's layout bottom that it reaches
+  return ((STRIP_VH / 100) * vh - topOfCentre) / vh * 100;
+}
+
 /** Does a card centred at horizontal `cx%` and tilted by `angle` intrude on the central 10% column
  *  (45–55% of width, plus margin) at any height? Uses the rotated width so a steeply tilted card's
  *  corners are accounted for, keeping the central strip — under the logo and menu — fully clear. */
@@ -34,6 +51,7 @@ function hitsCentre(cx: number, angle: number, vw: number): boolean {
  *  menu. */
 function buildScatter(): Placed[] {
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const mobile = vw <= 760;
   const count = (mobile ? 2 : 4) + Math.floor(Math.random() * 4); // 2..5 on mobile, 4..7 otherwise
   const pool = [...ALL_CARDS].sort(() => Math.random() - 0.5).slice(0, count);
@@ -45,10 +63,15 @@ function buildScatter(): Placed[] {
   }
   return pool.map((card, i) => {
     const angle = Math.round(-75 + Math.random() * 150);
+    // No card may rise above the strip it lives in, or its top is sliced off: cap how high it
+    // sits by its tilt (a steep tilt is shorter, an upright card taller). On a very short screen
+    // even the floor may not fit; then the card sinks further off the bottom edge instead.
+    const cap = Math.max(-12, maxBottomVh(angle, vh));
     // Always anchor one card running off the lower-left corner and one off the lower-right corner.
-    if (i === 0) return { card, faceUp: faces[i], left: 1 + Math.random() * 5, bottom: -8 + Math.random() * 5, angle };
-    if (i === 1) return { card, faceUp: faces[i], left: 94 + Math.random() * 5, bottom: -8 + Math.random() * 5, angle };
-    const bottom = Math.random() * 20;
+    if (i === 0) return { card, faceUp: faces[i], left: 1 + Math.random() * 5, bottom: Math.min(cap, -8 + Math.random() * 5), angle };
+    if (i === 1) return { card, faceUp: faces[i], left: 94 + Math.random() * 5, bottom: Math.min(cap, -8 + Math.random() * 5), angle };
+    const hi = Math.min(20, cap);
+    const bottom = hi >= 0 ? Math.random() * hi : hi;
     let left = clamp(((i + 0.5) / count) * 100 + (Math.random() * 16 - 8), 7, 93);
     // Re-roll the horizontal position until the card clears the central 10% column entirely.
     for (let tries = 0; tries < 40 && hitsCentre(left, angle, vw); tries++) {

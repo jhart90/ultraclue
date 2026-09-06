@@ -1178,7 +1178,7 @@ export function Board({
                       <feDropShadow dx="0" dy="10" stdDeviation="9" floodColor="#000" floodOpacity="0.6" />
                     </filter>
                   </defs>
-                  <EnvelopeArt idPrefix="board-env" />
+                  <EnvelopeArt idPrefix="board-env" stamp="CLASSIFIED" />
                 </svg>
               </g>
             );

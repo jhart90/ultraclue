@@ -4,9 +4,12 @@
  *  `idPrefix` keeps the gradient/filter ids distinct when two copies share one document. */
 export const ENVELOPE_VIEWBOX = { w: 640, h: 440 };
 
-export function EnvelopeArt({ idPrefix = 'env' }: { idPrefix?: string }) {
+export function EnvelopeArt({ idPrefix = 'env', stamp }: { idPrefix?: string; stamp?: string }) {
   const id = (s: string) => `${idPrefix}-${s}`;
   const url = (s: string) => `url(#${id(s)})`;
+  // The stamp sits on the top flap, above the seal, where the flap is still wide enough: the flap
+  // runs from 604 wide at y=60 to its apex at y=252, so a 270x54 box centred at y=124 clears its edges.
+  const stampBox = { x: 185, y: 97, w: 270, h: 54 };
   return (
     <>
       <defs>
@@ -36,6 +39,14 @@ export function EnvelopeArt({ idPrefix = 'env' }: { idPrefix?: string }) {
         <clipPath id={id('clip')}>
           <rect x="18" y="60" width="604" height="340" rx="12" />
         </clipPath>
+        {/* rubber-stamp ink: coarse noise eats into the letters and border so the impression is
+            patchy and slightly ragged, the way a hand stamp prints on paper */}
+        <filter id={id('ink')} x="-5%" y="-10%" width="110%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="3" seed="7" result="noise" />
+          <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 1.7" result="wear" />
+          <feComposite in="SourceGraphic" in2="wear" operator="in" result="worn" />
+          <feGaussianBlur in="worn" stdDeviation="0.35" />
+        </filter>
       </defs>
 
       {/* envelope body */}
@@ -50,6 +61,31 @@ export function EnvelopeArt({ idPrefix = 'env' }: { idPrefix?: string }) {
       <path d="M18 60 L622 60 L320 252 Z" fill={url('flap')} stroke="#bda878" strokeWidth="2" strokeLinejoin="round" />
       {/* highlight along the flap fold */}
       <path d="M18 60 L622 60" fill="none" stroke="rgba(255,250,232,0.6)" strokeWidth="2" />
+
+      {/* a red ink stamp across the top flap, pressed on a little crooked */}
+      {stamp && (
+        <g
+          transform={`rotate(-7 ${stampBox.x + stampBox.w / 2} ${stampBox.y + stampBox.h / 2})`}
+          filter={url('ink')}
+          opacity="0.82"
+          style={{ mixBlendMode: 'multiply' }}
+        >
+          <rect x={stampBox.x} y={stampBox.y} width={stampBox.w} height={stampBox.h} rx="4" fill="none" stroke="#b8121c" strokeWidth="4" />
+          <rect x={stampBox.x + 7} y={stampBox.y + 7} width={stampBox.w - 14} height={stampBox.h - 14} rx="2" fill="none" stroke="#b8121c" strokeWidth="1.5" />
+          <text
+            x={stampBox.x + stampBox.w / 2}
+            y={stampBox.y + stampBox.h / 2 + 13}
+            textAnchor="middle"
+            fontFamily="Impact, 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif"
+            fontWeight="900"
+            fontSize="36"
+            letterSpacing="5"
+            fill="#b8121c"
+          >
+            {stamp}
+          </text>
+        </g>
+      )}
 
       {/* wax seal at the flap tip */}
       <g>

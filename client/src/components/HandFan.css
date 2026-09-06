@@ -1,7 +1,7 @@
 /* The hand fan: a fixed band along the screen bottom spanning the map area, between the settings
    wheel on the left and the chat column on the right. Cards hang below its bottom edge (only their
-   top half shows), and the raised card reaches up above it, over the board. Above the dice and
-   pop-ups, below the folders. */
+   top half shows), and the raised card reaches up above it, over the board. Above the dice, below
+   the pop-ups (245) and the folders (250), so a pop-up is always clickable over the cards. */
 .fan {
   position: fixed;
   bottom: 0;

@@ -30,11 +30,23 @@ export function TurnOrder({
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(players.length);
   const [width, setWidth] = useState(0);
+  // How many chips the upper row holds (measured), so the player to move can be kept at its centre.
+  const [perRow, setPerRow] = useState(0);
 
-  // Reset to "show everyone" whenever the roster or the available width changes, then re-measure.
+  // The strip cycles through the table in turn order: once the player to move has passed the
+  // centre of the upper row (the first few turns of the game), the window rotates so that whoever
+  // is up always sits in that centre spot, with the rest following in order.
+  const n = players.length;
+  const activeIdx = Math.max(0, players.findIndex((p) => p.id === activeId));
+  const centre = Math.floor(perRow / 2);
+  const start = n && activeIdx > centre ? (activeIdx - centre) % n : 0;
+  const ordered = players.map((_, i) => players[(start + i) % n]);
+
+  // Reset to "show everyone" whenever the roster, the rotation or the available width changes,
+  // then re-measure.
   useLayoutEffect(() => {
     setVisible(players.length);
-  }, [players.length, width]);
+  }, [players.length, width, start]);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -50,17 +62,19 @@ export function TurnOrder({
     const chips = Array.from(el.children) as HTMLElement[];
     if (!chips.length) return;
     const rows = [...new Set(chips.map((c) => c.offsetTop))].sort((a, b) => a - b);
+    const row1 = chips.filter((c) => c.offsetTop === rows[0] && !c.classList.contains('po--more')).length;
+    if (row1 !== perRow) setPerRow(row1);
     if (rows.length <= 2) return; // everything fits (or the "more" chip already sits on row two)
     const row3 = rows[2];
     const fitting = chips.filter((c) => c.offsetTop < row3).length;
     const hasMore = visible < players.length;
     // Keep one fewer than what fits so the "…and N more" chip has room on row two.
     setVisible(Math.max(1, hasMore ? Math.min(visible - 1, fitting - 1) : fitting - 1));
-  }, [visible, players, width]);
+  }, [visible, players, width, perRow]);
 
-  const shown = players.slice(0, visible);
+  const shown = ordered.slice(0, visible);
   const hidden = players.length - shown.length;
-  const activeHidden = hidden > 0 && players.slice(visible).some((p) => p.id === activeId);
+  const activeHidden = hidden > 0 && ordered.slice(visible).some((p) => p.id === activeId);
 
   return (
     <div className="game__turnorder" ref={ref}>

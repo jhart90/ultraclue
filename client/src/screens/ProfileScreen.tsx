@@ -34,7 +34,7 @@ function RecentGame({ g }: { g: ProfileGame }) {
           {g.result === 'won' ? (g.solved ? ' · solved the case' : ' · last detective standing') : ''}
         </span>
         <span className="pgame__as" style={{ background: color, color: contrastInk(color) }}>
-          <CardName id={g.suspectId} />
+          <CardName id={g.suspectId} plain />
         </span>
         <span className="pgame__when">{fmtDate(g.endedAt)}</span>
       </div>

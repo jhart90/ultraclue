@@ -1,12 +1,14 @@
 import { getCard, WEAPONS, ROOMS, type AnyCard } from 'shared';
 import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
+import { readableOnDark } from '../render/colorUtils';
 import './CardName.css';
 
 // How a card's name is written anywhere it appears as text (chat, pop-ups, choosers, lists):
 //  - a room is lettered the way its nameplate on the board is: black Georgia bold in a white
 //    bubble with a dark outline, so the name reads as "that place on the map";
 //  - a weapon carries its pewter board-token glyph just before the word;
-//  - a suspect is bold, tinted by whoever renders it (see highlightChat).
+//  - a suspect is bold in their piece colour, lightened to read on the app's dark backgrounds
+//    (pass `plain` where the name sits on a coloured pill and the tint would clash).
 
 /** A room name drawn as the board's nameplate bubble. */
 export function RoomName({ title }: { title: string }) {
@@ -43,12 +45,16 @@ export function WeaponName({ id, title }: { id: string; title: string }) {
 }
 
 /** Any card's name, styled by its type. Unknown ids fall back to the id as plain text. */
-export function CardName({ id, card }: { id?: string; card?: AnyCard }) {
+export function CardName({ id, card, plain }: { id?: string; card?: AnyCard; plain?: boolean }) {
   const c = card ?? (id ? getCard(id) : undefined);
   if (!c) return <>{id}</>;
   if (c.type === 'room') return <RoomName title={c.title} />;
   if (c.type === 'weapon') return <WeaponName id={c.id} title={c.title} />;
-  return <strong className="suspectname">{c.title}</strong>;
+  return (
+    <strong className="suspectname" style={plain ? undefined : { color: readableOnDark(c.color) }}>
+      {c.title}
+    </strong>
+  );
 }
 
 // Lower-cased title -> card, for text that names cards in prose (chat lines, pop-up sentences).

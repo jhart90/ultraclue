@@ -26,6 +26,17 @@ export function contrastInk(hex: string): string {
   return lum > 0.6 ? '#1c1a16' : '#f7f3ea';
 }
 
+/** Lighten a colour until it reads clearly as text on the app's dark backgrounds. */
+export function readableOnDark(hex: string): string {
+  let c = hex;
+  for (let i = 0; i < 8; i++) {
+    const [r, g, b] = parseHex(c);
+    if ((0.299 * r + 0.587 * g + 0.114 * b) / 255 >= 0.55) break;
+    c = shade(c, 0.22);
+  }
+  return c;
+}
+
 /** Deterministic small hash of a string, for stable per-card art variation. */
 export function hashString(s: string): number {
   let h = 2166136261;

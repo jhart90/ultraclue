@@ -95,6 +95,11 @@ export function StatsScreen() {
     return () => window.removeEventListener('resize', measure);
   }, [stats]);
   const gamesForAll = useMemo(() => Object.fromEntries(SUSPECTS.map((c) => [c.id, stats?.totalGames ?? 0])), [stats?.totalGames]);
+  // Accusations that missed: every accusation the character made less the ones that solved the case.
+  const characterIncorrect = useMemo(
+    () => Object.fromEntries(SUSPECTS.map((c) => [c.id, Math.max(0, (stats?.characterAccusations[c.id] ?? 0) - (stats?.characterCorrect[c.id] ?? 0))])),
+    [stats?.characterAccusations, stats?.characterCorrect],
+  );
   // Human winners are profiles (name + optional PIN), so two players called "Jack" get their own rows.
   const winners = useMemo(() => humanWinnerRows(stats?.humanWinners ?? {}, stats?.humanWins ?? {}), [stats?.humanWinners, stats?.humanWins]);
 
@@ -195,11 +200,11 @@ export function StatsScreen() {
           <div className="stats__grid stats__grid--4">
             <Ranking title="Total tiles moved" tally={stats.characterTiles} all={SUSPECTS} />
             <Ranking title="Tiles moved per game" tally={stats.characterTiles} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
-            <Ranking title="Total times suspected" tally={stats.characterSuspected} all={SUSPECTS} />
+            <Ranking title="Total games played" tally={stats.characterGames} all={SUSPECTS} note="games the character was dealt into" />
             <Ranking title="Times suspected per game" tally={stats.characterSuspected} per={gamesForAll} all={SUSPECTS} note="per public game played" />
             <Ranking title="Total accusations" tally={stats.characterAccusations} all={SUSPECTS} />
             <Ranking title="Accusations per game" tally={stats.characterAccusations} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
-            <Ranking title="Total correct accusations" tally={stats.characterCorrect} all={SUSPECTS} />
+            <Ranking title="Incorrect accusations per game" tally={characterIncorrect} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
             <Ranking title="Correct accusations per game" tally={stats.characterCorrect} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
           </div>
         </>

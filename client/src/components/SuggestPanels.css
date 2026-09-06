@@ -35,14 +35,6 @@
 .statpop {
   animation: uc-pop 0.18s ease;
 }
-/* Announcements, reveals, verdicts and the end screen — pop-ups the player only reads — render at
-   half size so the board stays visible. The ones the player acts in (the turn-status pop-up with
-   its Suggest / Accuse / End Turn buttons, the suggest and accuse pickers, the reveal choice) keep
-   their full size. */
-.sp--end {
-  zoom: 0.5;
-}
-
 .sp {
   width: min(900px, 100%); /* 100% = the map area (backdrop), so it never reaches the chat */
   max-height: 92vh;

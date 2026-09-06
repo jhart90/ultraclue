@@ -1,4 +1,5 @@
 export * from './util';
+export * from './pool';
 export * from './movement';
 export * from './turn';
 export * from './setup';

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { BOARD, coordKey, getCard, type Chamfer, type ChamferCorner, type Coord, type PlayerView, type RoomLayout, type SectionTheme } from 'shared';
+import { BOARD, coordKey, getCard, type Board, type Chamfer, type ChamferCorner, type Coord, type PlayerView, type RoomLayout, type SectionTheme } from 'shared';
 import { resolveOverrideThumb } from '../render/overrides';
 import { resolveBoardArt, sharedArtGroup } from '../render/boardArt';
 import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
@@ -604,11 +604,15 @@ export function Board({
   cameraLock = true,
   activeId,
   round = 0,
+  board = BOARD,
 }: {
   players: PlayerView[];
   /** Completed rounds so far. The faint start-position rings are shown only while the first round
    *  is still being played (round 0); once everyone has had a turn they are gone for good. */
   round?: number;
+  /** The board this game is played on: the whole house, or the house minus the wings the host
+   *  closed (boardFor). Coordinates match the full board, so only what is drawn changes. */
+  board?: Board;
   reachable?: Coord[];
   lastMove?: LastMove;
   weaponLocations?: Record<string, string>;
@@ -752,12 +756,26 @@ export function Board({
   }
   const packing = (rid: string) => packFor(BOARD.rooms[rid], pawnsByRoom.get(rid)?.length ?? 0, weaponsByRoom.get(rid)?.length ?? 0);
 
+  // What is actually drawn: the bounding box of the wings in play. A closed wing leaves its part of
+  // the canvas empty, so the first fit frames only the house that is there.
+  const extent = (() => {
+    const secs = board.sections.length ? board.sections : BOARD.sections;
+    const x0 = Math.min(...secs.map((s) => s.origin.x)) * TS;
+    const y0 = Math.min(...secs.map((s) => s.origin.y)) * TS;
+    const x1 = Math.max(...secs.map((s) => s.origin.x + s.width)) * TS;
+    const y1 = Math.max(...secs.map((s) => s.origin.y + s.height)) * TS;
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  })();
+  const extentRef = useRef(extent);
+  extentRef.current = extent;
+
   // Fit-to-width on first mount.
   useLayoutEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
-    const scale = Math.min(1.1, (el.clientWidth - 16) / BW);
-    setView({ scale, tx: (el.clientWidth - BW * scale) / 2, ty: 8 });
+    const ext = extentRef.current;
+    const scale = Math.min(1.1, (el.clientWidth - 16) / ext.w);
+    setView({ scale, tx: (el.clientWidth - ext.w * scale) / 2 - ext.x * scale, ty: 8 - ext.y * scale });
   }, []);
 
   const zoomAt = useCallback((factor: number, px: number, py: number) => {
@@ -880,7 +898,7 @@ export function Board({
       <div className={`bv__stage${moving ? ' bv__stage--moving' : ''}`} style={{ transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})` }}>
         <svg width={BW} height={BH} className="bv__svg" role="img" aria-label="Mansion board">
           {/* section panels */}
-          {BOARD.sections.map((s) => {
+          {board.sections.map((s) => {
             const t = THEME[s.theme];
             return (
               <g key={s.id}>
@@ -897,8 +915,8 @@ export function Board({
           })}
 
           {/* path cells */}
-          {BOARD.cells.filter((c) => c.type === 'path').map((c) => {
-            const t = THEME[(BOARD.sections.find((s) => s.id === c.sectionId)?.theme) ?? 'ground-floor'];
+          {board.cells.filter((c) => c.type === 'path').map((c) => {
+            const t = THEME[(board.sections.find((s) => s.id === c.sectionId)?.theme) ?? 'ground-floor'];
             const rot = rotatedTexture(c);
             const rotUrl = rot ? textureUrl(rot.name) : undefined;
             if (rot && rotUrl) {
@@ -916,7 +934,7 @@ export function Board({
           {/* obstacles — things pieces walk around: lawns and the pond outdoors, hedge walls in the
               maze, graves in the Cemetery, pillars and blocked stubs indoors */}
           {(() => {
-            const obstacles = BOARD.cells.filter((c) => c.type === 'obstacle' && !PAINTED_OBSTACLES.has(coordKey(c)));
+            const obstacles = board.cells.filter((c) => c.type === 'obstacle' && !PAINTED_OBSTACLES.has(coordKey(c)));
             if (!obstacles.length) return null;
             const kind = (k: string) => obstacles.filter((c) => c.obstacleKind === k);
             const FILL: Record<string, string> = { water: '#2a6f8c', lawn: '#3d6b3b', hedge: '#1e3d21', wall: '#4a4356' };
@@ -968,11 +986,11 @@ export function Board({
 
           {/* The Courtyard fountain, drawn as a stand-in only while the room it sits in has no board
               art of its own; once that art exists it paints its own basin. */}
-          {BOARD.fountain.length > 0 &&
-            !BOARD.fountain.some((f) => PAINTED_OBSTACLES.has(coordKey(f))) &&
+          {board.fountain.length > 0 &&
+            !board.fountain.some((f) => PAINTED_OBSTACLES.has(coordKey(f))) &&
             (() => {
-              const xs = BOARD.fountain.map((t) => t.x);
-              const ys = BOARD.fountain.map((t) => t.y);
+              const xs = board.fountain.map((t) => t.x);
+              const ys = board.fountain.map((t) => t.y);
               const x = Math.min(...xs) * TS;
               const y = Math.min(...ys) * TS;
               const w = (Math.max(...xs) - Math.min(...xs) + 1) * TS;
@@ -990,7 +1008,7 @@ export function Board({
             })()}
 
           {/* elevators — one per indoor floor */}
-          {BOARD.elevators.map((e) => {
+          {board.elevators.map((e) => {
             const xs = e.cells.map((c) => c.x);
             const ys = e.cells.map((c) => c.y);
             const x = Math.min(...xs) * TS;
@@ -1011,8 +1029,8 @@ export function Board({
           {/* staircases between sections: each landing tile is a free hop to its twin. Flights whose
               landings face each other across a gap are drawn as one continuous staircase bridging the
               floors (the Clock Tower's as a spiral); the rest get a marker at each end. */}
-          {BOARD.stairs.map((st) => {
-            const name = (id: string) => BOARD.sections.find((s) => s.id === id)?.title ?? id;
+          {board.stairs.map((st) => {
+            const name = (id: string) => board.sections.find((s) => s.id === id)?.title ?? id;
             const label = `${st.title} — ${name(st.from)} ↔ ${name(st.to)}`;
             if (spansGap(st)) {
               return st.id === 'stairs-spiral' ? (
@@ -1034,9 +1052,9 @@ export function Board({
           })}
 
           {/* rooms */}
-          {Object.values(BOARD.rooms).map((room) => {
+          {Object.values(board.rooms).map((room) => {
             const b = roomBounds(room);
-            const theme = BOARD.sections.find((s) => s.id === room.sectionId)?.theme ?? 'ground-floor';
+            const theme = board.sections.find((s) => s.id === room.sectionId)?.theme ?? 'ground-floor';
             const t = THEME[theme];
             const title = getCard(room.id)?.title ?? room.id;
             // Floor art: proper top-down board art if it has been painted (assets/board/rooms),
@@ -1145,15 +1163,15 @@ export function Board({
 
           {/* doors, drawn above every room outline so a connecting door between two rooms is never
               hidden under the neighbour's border */}
-          {Object.values(BOARD.rooms).flatMap((room) => {
-            const theme = BOARD.sections.find((s) => s.id === room.sectionId)?.theme ?? 'ground-floor';
+          {Object.values(board.rooms).flatMap((room) => {
+            const theme = board.sections.find((s) => s.id === room.sectionId)?.theme ?? 'ground-floor';
             const gate = theme === 'grounds';
             return room.entrances.map((e, i) => <Door key={`${room.id}-${i}`} rt={e.roomTile} dt={e.doorTile} gate={gate} />);
           })}
 
 
           {/* secret-passage staircases */}
-          {BOARD.shortcuts.flatMap((sc) => {
+          {board.shortcuts.flatMap((sc) => {
             const aLabel = `${sc.story} — secret passage to the ${getCard(sc.bRoomId)?.title ?? 'unknown'}`;
             const bLabel = `${sc.story} — secret passage to the ${getCard(sc.aRoomId)?.title ?? 'unknown'}`;
             return [
@@ -1165,9 +1183,13 @@ export function Board({
           {/* the case envelope: the title screen's sealed manila envelope, dropped at a slight tilt in
               the empty corner above the Upper Floor and beside the Grounds, about 12 tiles wide */}
           {(() => {
+            // The corner only exists when both the Grounds and the Upper Floor are in play.
+            const grounds = board.sections.find((s) => s.id === 'grounds');
+            const upper = board.sections.find((s) => s.id === 'upper-floor');
+            if (!grounds || !upper) return null;
             const w = 12 * TS;
             const h = (w * ENVELOPE_VIEWBOX.h) / ENVELOPE_VIEWBOX.w;
-            const blank = { x: BOARD.sections.find((s) => s.id === 'grounds')!.origin.x, y: BOARD.sections.find((s) => s.id === 'upper-floor')!.origin.y };
+            const blank = { x: grounds.origin.x, y: upper.origin.y };
             const ex = (blank.x * TS) / 2;
             const ey = (blank.y * TS) / 2;
             return (
@@ -1186,7 +1208,7 @@ export function Board({
 
           {/* start homes (faint), only until everyone has taken their first turn */}
           {round < 1 &&
-            BOARD.starts.map((s) => (
+            board.starts.map((s) => (
               <circle key={s.suspectId} cx={cx(s.tile)} cy={cy(s.tile)} r={TS / 2 - 3} fill="none" stroke={suspectColor(s.suspectId)} strokeWidth="1.5" opacity="0.25" />
             ))}
 

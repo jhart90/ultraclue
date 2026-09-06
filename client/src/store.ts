@@ -168,7 +168,7 @@ interface StoreState {
   createGame: (name: string, pin?: string) => void;
   joinGame: (code: string, name: string, pin?: string) => void;
   joinPublic: (name: string, observer?: boolean, pin?: string) => void;
-  setRoomSettings: (patch: { totalPlayers?: number; botDifficulty?: BotDifficulty; botSpeed?: BotSpeed }) => void;
+  setRoomSettings: (patch: { totalPlayers?: number; botDifficulty?: BotDifficulty; botSpeed?: BotSpeed; wingsOff?: string[]; weaponCount?: number }) => void;
   setBotDifficulty: (index: number, difficulty: BotDifficulty) => void;
   setDice: (color: string, pips: string) => void;
   takeSeat: (index: number) => void;

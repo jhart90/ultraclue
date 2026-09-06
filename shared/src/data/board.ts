@@ -116,6 +116,8 @@ export interface Board {
   fountain: Coord[];
   /** Room corners cut on the diagonal (the round Planetarium, the octagonal Gazebo). */
   chamfers: Chamfer[];
+  /** Wings the host switched off for this game (section ids); empty on the full board. */
+  wingsOff: string[];
 }
 
 export const coordKey = (c: Coord): string => `${c.x},${c.y}`;
@@ -255,7 +257,16 @@ const START_DEFS: [string, string][] = [
 
 const ARROWS: Record<string, Coord> = { '^': { x: 0, y: -1 }, v: { x: 0, y: 1 }, '<': { x: -1, y: 0 }, '>': { x: 1, y: 0 } };
 
-function buildBoard(): Board {
+/** The wings a host may switch off for a game. The Ground Floor is always in play. */
+export type WingId = 'grounds' | 'upper-floor' | 'basement';
+export const WINGS: readonly { id: WingId; title: string }[] = [
+  { id: 'upper-floor', title: 'Upper Floor' },
+  { id: 'grounds', title: 'Grounds' },
+  { id: 'basement', title: 'Basement' },
+];
+
+function buildBoard(wingsOff: readonly string[] = []): Board {
+  const off = new Set(wingsOff.filter((w) => WINGS.some((x) => x.id === w)));
   const cellAt = new Map<string, BoardCell>();
   const cells: BoardCell[] = [];
   const sections: BoardSection[] = [];
@@ -270,6 +281,7 @@ function buildBoard(): Board {
 
   // ---- tiles ----
   for (const map of SECTION_MAPS) {
+    if (off.has(map.id)) continue; // a wing the host switched off is not on this board at all
     const { w, h } = sizeOf(map);
     const origin = ORIGIN[map.id];
     sections.push({ id: map.id, theme: THEME_OF[map.id], title: map.title, origin, width: w, height: h });
@@ -344,13 +356,18 @@ function buildBoard(): Board {
       }
     }
   }
-  for (const r of ROOMS) if (!rooms[r.id]) errors.push(`room ${r.id} is missing from the board maps`);
+  // Every room card must have a footprint — on the full board every one of them, on a trimmed board
+  // every room drawn in a wing that is still in play.
+  const expectedRooms = off.size
+    ? new Set(SECTION_MAPS.filter((m) => !off.has(m.id)).flatMap((m) => m.tiles.flatMap((row) => [...row].map((ch) => ROOM_KEY[ch]).filter(Boolean))))
+    : new Set(ROOMS.map((r) => r.id));
+  for (const r of ROOMS) if (expectedRooms.has(r.id) && !rooms[r.id]) errors.push(`room ${r.id} is missing from the board maps`);
   for (const r of Object.values(rooms)) if (!r.entrances.length) errors.push(`room ${r.id} has no door`);
 
   // ---- chamfers: every '/' tile belongs to exactly one cut, and every cut touches its room ----
   const chamferTiles = new Set(cells.filter((c) => c.obstacleKind === 'chamfer').map((c) => coordKey(c)));
   const claimed = new Set<string>();
-  const chamfers: Chamfer[] = CHAMFER_DEFS.map((d) => {
+  const chamfers: Chamfer[] = CHAMFER_DEFS.filter((d) => !off.has(d.section)).map((d) => {
     const tiles = d.tiles.map(([x, y]) => local(d.section, x, y));
     for (const t of tiles) {
       const k = coordKey(t);
@@ -383,9 +400,22 @@ function buildBoard(): Board {
     }
     elevators.push({ floor: sec.id as FloorId, cells: ecells.map((c) => ({ x: c.x, y: c.y })), exit: exits[0], exits });
   }
+  // A lift with nowhere to go (every other floor switched off) is boarded up: its shaft becomes
+  // wall, so nothing steps in and the floor chooser never comes up.
+  if (elevators.length < 2) {
+    for (const e of elevators) {
+      for (const t of e.cells) {
+        const c = cellAt.get(coordKey(t))!;
+        c.type = 'obstacle';
+        c.obstacleKind = 'wall';
+        delete c.elevatorFloor;
+      }
+    }
+    elevators.length = 0;
+  }
 
-  // ---- staircases ----
-  const stairs: StairLink[] = STAIR_DEFS.map((d) => {
+  // ---- staircases (only between wings that are both in play) ----
+  const stairs: StairLink[] = STAIR_DEFS.filter((d) => !off.has(d.from) && !off.has(d.to)).map((d) => {
     const a = d.a.map(([x, y]) => local(d.from, x, y));
     const b = d.b.map(([x, y]) => local(d.to, x, y));
     for (const t of [...a, ...b]) {
@@ -397,7 +427,7 @@ function buildBoard(): Board {
   });
 
   // ---- secret passages: the passage sits on the room tile farthest from its doors ----
-  const shortcuts: Shortcut[] = PASSAGE_DEFS.map(([aId, bId, story], i) => {
+  const shortcuts: Shortcut[] = PASSAGE_DEFS.filter(([aId, bId]) => rooms[aId] && rooms[bId]).map(([aId, bId, story], i) => {
     const pick = (room: RoomLayout): Coord => {
       let best = room.tiles[0];
       let bestD = -1;
@@ -417,7 +447,9 @@ function buildBoard(): Board {
   // ---- envelope: the centre of the Courtyard fountain ----
   const fx = fountain.map((t) => t.x);
   const fy = fountain.map((t) => t.y);
-  const envelope = { x: Math.floor((Math.min(...fx) + Math.max(...fx)) / 2), y: Math.floor((Math.min(...fy) + Math.max(...fy)) / 2) };
+  const envelope = fountain.length
+    ? { x: Math.floor((Math.min(...fx) + Math.max(...fx)) / 2), y: Math.floor((Math.min(...fy) + Math.max(...fy)) / 2) }
+    : { x: 0, y: 0 };
 
   // ---- start tiles ----
   // Hall tiles are ranked by walking distance from the themed room's doors; a start is the tile
@@ -451,17 +483,28 @@ function buildBoard(): Board {
   const starts = orderedSuspects.map((s) => {
     const def = START_DEFS.find(([id]) => id === s.id);
     if (!def) throw new Error(`no start defined for ${s.id}`);
-    const room = rooms[def[1]];
-    const dist = hallDist(room.entrances.map((e) => e.doorTile));
+    // Rooms to try, home first. A suspect whose home room is in a wing that's switched off starts
+    // near a room still in play instead: the rooms are tried from a different one for each suspect
+    // so the starts stay spread about the house, and a room with no free hall tile in reach (or no
+    // hall door at all, like the Walk-in Closet) simply passes to the next.
+    const idx = START_DEFS.findIndex(([id]) => id === s.id);
+    const inPlay = ROOMS.filter((r) => rooms[r.id]).map((r) => rooms[r.id]);
+    const from = idx % inPlay.length;
+    const rotated = [...inPlay.slice(from), ...inPlay.slice(0, from)];
+    const candidates = rooms[def[1]] ? [rooms[def[1]], ...rotated] : rotated;
     let best: Coord | undefined;
-    let bestScore = -Infinity;
-    for (const want of [3, 4, 2, 5]) {
-      for (const [k, d] of dist) {
-        if (d !== want) continue;
-        const c = cellAt.get(k)!;
-        if (used.has(k) || c.landing || nearDoor(c) || c.sectionId !== room.sectionId) continue;
-        const spread = placed.length ? Math.min(...placed.map((p) => Math.abs(p.x - c.x) + Math.abs(p.y - c.y))) : 99;
-        if (spread > bestScore) (bestScore = spread), (best = { x: c.x, y: c.y });
+    for (const room of candidates) {
+      const dist = hallDist(room.entrances.map((e) => e.doorTile));
+      let bestScore = -Infinity;
+      for (const want of [3, 4, 2, 5, 6, 1, 7, 8]) {
+        for (const [k, d] of dist) {
+          if (d !== want) continue;
+          const c = cellAt.get(k)!;
+          if (used.has(k) || c.landing || nearDoor(c) || c.sectionId !== room.sectionId) continue;
+          const spread = placed.length ? Math.min(...placed.map((p) => Math.abs(p.x - c.x) + Math.abs(p.y - c.y))) : 99;
+          if (spread > bestScore) (bestScore = spread), (best = { x: c.x, y: c.y });
+        }
+        if (best) break;
       }
       if (best) break;
     }
@@ -473,10 +516,32 @@ function buildBoard(): Board {
 
   const width = Math.max(...cells.map((c) => c.x)) + 1;
   const height = Math.max(...cells.map((c) => c.y)) + 1;
-  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, elevators, stairs, fountain, chamfers };
+  return { width, height, cells, sections, rooms, starts, envelope, shortcuts, elevators, stairs, fountain, chamfers, wingsOff: [...off] };
 }
 
 export const BOARD: Board = buildBoard();
+
+/** Normalised key for a set of switched-off wings: canonical order, unknown ids dropped, "" for
+ *  the full board. */
+export function wingsKey(wingsOff: readonly string[] = []): string {
+  return WINGS.map((w) => w.id)
+    .filter((id) => wingsOff.includes(id))
+    .join('+');
+}
+
+const BOARDS = new Map<string, Board>([['', BOARD]]);
+
+/** The board with these wings switched off — the full BOARD when none are. Built once per
+ *  combination and shared, so caches keyed on the board object (the movement graph) hold. */
+export function boardFor(wingsOff: readonly string[] = []): Board {
+  const key = wingsKey(wingsOff);
+  let b = BOARDS.get(key);
+  if (!b) {
+    b = buildBoard(key.split('+'));
+    BOARDS.set(key, b);
+  }
+  return b;
+}
 
 // ---- movement graph (tile level; used by tests and tooling) ----------------------------------
 

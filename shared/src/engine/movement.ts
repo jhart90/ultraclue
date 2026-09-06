@@ -75,8 +75,19 @@ function buildMoveGraph(board: Board): {
   return { graph, freeLinks, cellMap };
 }
 
-// Cache for the static BOARD.
-const CACHE = buildMoveGraph(BOARD);
+// One graph per board object. The full BOARD and every trimmed variant from boardFor() are built
+// once and shared, so each is walked into a graph exactly once; an ad-hoc board (tests) is too,
+// for as long as it lives.
+const GRAPHS = new WeakMap<Board, ReturnType<typeof buildMoveGraph>>();
+function graphFor(board: Board): ReturnType<typeof buildMoveGraph> {
+  let g = GRAPHS.get(board);
+  if (!g) {
+    g = buildMoveGraph(board);
+    GRAPHS.set(board, g);
+  }
+  return g;
+}
+const CACHE = graphFor(BOARD);
 
 interface Bfs {
   dist: Map<string, number>;
@@ -84,7 +95,7 @@ interface Bfs {
 }
 
 function bfs(board: Board, start: Coord, steps: number, blocked: Set<string>): { graph: Map<string, string[]>; cellMap: Map<string, BoardCell>; startNode: string } & Bfs {
-  const { graph, freeLinks, cellMap } = board === BOARD ? CACHE : buildMoveGraph(board);
+  const { graph, freeLinks, cellMap } = graphFor(board);
   const startNode = nodeOf(cellMap, start);
   const dist = new Map<string, number>([[startNode, 0]]);
   const parent = new Map<string, string>();
@@ -124,7 +135,7 @@ function bfs(board: Board, start: Coord, steps: number, blocked: Set<string>): {
  *  third room either (the "direct" distance the 4-step rule is measured on). Infinity if unreachable
  *  without an elevator ride. For tests/tuning. */
 export function roomToRoomDistance(board: Board, aRoomId: string, bRoomId: string, passThroughRooms = true): number {
-  const { graph, freeLinks } = board === BOARD ? CACHE : buildMoveGraph(board);
+  const { graph, freeLinks } = graphFor(board);
   const start = roomNode(aRoomId);
   const target = roomNode(bRoomId);
   const dist = new Map<string, number>([[start, 0]]);
@@ -153,7 +164,7 @@ export function roomToRoomDistance(board: Board, aRoomId: string, bRoomId: strin
  *  estimate for bots). Staircases are free, the elevator is not walked through. Infinity if none. */
 export function stepsToRooms(board: Board, start: Coord, targets: Set<string>): number {
   if (!targets.size) return Infinity;
-  const { graph, freeLinks, cellMap } = board === BOARD ? CACHE : buildMoveGraph(board);
+  const { graph, freeLinks, cellMap } = graphFor(board);
   const startNode = nodeOf(cellMap, start);
   const dist = new Map<string, number>([[startNode, 0]]);
   const queue: string[] = [startNode];
@@ -180,21 +191,21 @@ export function stepsToRooms(board: Board, start: Coord, targets: Set<string>): 
 
 /** The room id at a tile, or undefined if it is a corridor / off-board. */
 export function roomIdAt(board: Board, tile: Coord): string | undefined {
-  const cellMap = board === BOARD ? CACHE.cellMap : buildCellMap(board);
+  const cellMap = graphFor(board).cellMap;
   const c = cellMap.get(coordKey(tile));
   return c && c.type === 'room' ? c.roomId : undefined;
 }
 
 /** The elevator's floor if this tile is an elevator cell, else undefined. */
 export function elevatorFloorAt(board: Board, tile: Coord): FloorId | undefined {
-  const cellMap = board === BOARD ? CACHE.cellMap : buildCellMap(board);
+  const cellMap = graphFor(board).cellMap;
   const c = cellMap.get(coordKey(tile));
   return c && c.type === 'elevator' ? c.elevatorFloor : undefined;
 }
 
 /** Path cells occupied by other pieces (rooms hold many pieces, so room cells never block). */
 export function blockedCells(board: Board, positions: Coord[]): Set<string> {
-  const cellMap = board === BOARD ? CACHE.cellMap : buildCellMap(board);
+  const cellMap = graphFor(board).cellMap;
   const set = new Set<string>();
   for (const p of positions) {
     const c = cellMap.get(coordKey(p));

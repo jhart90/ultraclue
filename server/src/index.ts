@@ -23,6 +23,9 @@ import {
   moveTo,
   chooseFloor,
   elevatorOptions,
+  boardOf,
+  poolOf,
+  WINGS,
   takeShortcut,
   skipMovement,
   makeSuggestion,
@@ -225,7 +228,7 @@ function eventsForPlayer(room: Room, playerId: string): SuggestionEvent[] {
 function mindFor(g: GameState, playerId: string, room: Room): BotMind {
   const p = getPlayer(g, playerId);
   const handCounts = new Map(g.players.map((pl) => [pl.id, pl.hand.length]));
-  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, eventsForPlayer(room, playerId), handCounts);
+  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, eventsForPlayer(room, playerId), handCounts, poolOf(g), boardOf(g));
 }
 /** The order in which the other players would be asked to disprove this player's suggestion. */
 function responderQueue(g: GameState, suggesterId: string): string[] {
@@ -541,7 +544,7 @@ function scheduleBots(room: Room): void {
             if (!dest) break;
             s = moveTo(s, cur.id, dest);
           } else if (s.turnPhase === 'awaitElevator' && s.elevatorRide) {
-            const opts = elevatorOptions(s.elevatorRide.fromFloor);
+            const opts = elevatorOptions(s.elevatorRide.fromFloor, boardOf(s));
             s = chooseFloor(s, cur.id, botDecideFloor(mind, opts, RNG), RNG);
           } else {
             break;
@@ -945,6 +948,8 @@ io.on('connection', (socket) => {
         totalPlayers: p?.totalPlayers == null ? undefined : Number(p.totalPlayers),
         botDifficulty: p?.botDifficulty,
         botSpeed: p?.botSpeed,
+        wingsOff: p?.wingsOff,
+        weaponCount: p?.weaponCount,
       });
       const who = nameOf(room, cid(socket));
       if (room.settings?.totalPlayers !== before.totalPlayers) {
@@ -955,6 +960,14 @@ io.on('connection', (socket) => {
       }
       if (room.settings?.botSpeed !== before.botSpeed) {
         addChat(room, 'System', `${who} set the computer speed to ${room.settings?.botSpeed}.`, true);
+      }
+      const wingsNow = (room.settings?.wingsOff ?? []).join('+');
+      if (wingsNow !== (before.wingsOff ?? []).join('+')) {
+        const off = WINGS.filter((w) => room.settings?.wingsOff?.includes(w.id)).map((w) => w.title);
+        addChat(room, 'System', off.length ? `${who} closed the ${off.join(', ')}: those rooms are out of the game.` : `${who} opened the whole house again.`, true);
+      }
+      if (room.settings?.weaponCount !== before.weaponCount) {
+        addChat(room, 'System', `${who} set the game to ${room.settings?.weaponCount ?? 40} weapons.`, true);
       }
       emitLobby(room);
       emitChat(room);

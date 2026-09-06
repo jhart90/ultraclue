@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getCard, PUBLIC_MIN_PLAYERS, PUBLIC_MAX_PLAYERS, DEFAULT_BOT_DIFFICULTY, DEFAULT_BOT_SPEED } from 'shared';
+import { getCard, PUBLIC_MIN_PLAYERS, PUBLIC_MAX_PLAYERS, DEFAULT_BOT_DIFFICULTY, DEFAULT_BOT_SPEED, MAX_WEAPONS } from 'shared';
 import { DifficultyPicker, SpeedPicker } from '../components/DifficultyPicker';
+import { WingsPicker, WeaponCountPicker } from '../components/HousePicker';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
@@ -60,6 +61,8 @@ export function PublicLobby() {
   const amObserver = !!mySlot?.occupant?.observer;
   const botDifficulty = lobby.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
   const botSpeed = lobby.settings?.botSpeed ?? DEFAULT_BOT_SPEED;
+  const wingsOff = lobby.settings?.wingsOff ?? [];
+  const weaponCount = lobby.settings?.weaponCount ?? MAX_WEAPONS;
   // The server's clock drives the start; correct for our own clock's skew so everyone agrees.
   const remaining = Math.max(0, (lobby.startsAt ?? now) - (now + serverOffset));
   const soon = remaining < 60_000;
@@ -118,11 +121,24 @@ export function PublicLobby() {
           Speed
           <SpeedPicker value={botSpeed} readOnly={!amHost} onChange={(s) => setRoomSettings({ botSpeed: s })} title="How quickly every computer acts" />
         </label>
+        <label>
+          House
+          <WingsPicker
+            wingsOff={wingsOff}
+            readOnly={!amHost}
+            onChange={(off) => setRoomSettings({ wingsOff: off })}
+            title="Which wings of the house are in play — a closed wing's rooms leave the board and the deck"
+          />
+        </label>
+        <label>
+          Weapons
+          <WeaponCountPicker value={weaponCount} readOnly={!amHost} onChange={(n) => setRoomSettings({ weaponCount: n })} title="How many of the 40 weapons are in the game" />
+        </label>
         <span className="plobby__hostnote">
           {amHost
-            ? 'You are the host — you set the table size and how well and how fast the computers play.'
+            ? 'You are the host — you set the table size, the computers, which wings of the house are open and how many weapons are in play.'
             : host
-              ? `${host.name} is the host and sets the table size, computer difficulty and speed.`
+              ? `${host.name} is the host and sets the table size, the computers, the wings in play and the weapon count.`
               : 'The first human to join becomes the host.'}
         </span>
       </div>
@@ -162,11 +178,26 @@ export function PublicLobby() {
                 </div>
               );
             }
+            // Your own seat is one big button: hover dims the whole tile under a SWAP CHARACTER?
+            // banner, and a click anywhere on it opens the character picker.
             return (
               <div
-                className={`pseat${occ.isBot ? '' : ' pseat--human'}${isMe ? ' pseat--me' : ''}`}
+                className={`pseat${occ.isBot ? '' : ' pseat--human'}${isMe ? ' pseat--me pseat--swap' : ''}`}
                 key={slot.index}
-                title={occ.isBot ? `Seat ${slot.index + 1}: computer` : `Seat ${slot.index + 1}: ${occ.name}`}
+                title={occ.isBot ? `Seat ${slot.index + 1}: computer` : isMe ? 'Click to swap your character' : `Seat ${slot.index + 1}: ${occ.name}`}
+                role={isMe ? 'button' : undefined}
+                tabIndex={isMe ? 0 : undefined}
+                onClick={isMe ? () => setPicking(true) : undefined}
+                onKeyDown={
+                  isMe
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setPicking(true);
+                        }
+                      }
+                    : undefined
+                }
               >
                 <div className="pseat__num">{slot.index + 1}</div>
                 <SuspectThumb suspectId={occ.suspectId} />
@@ -177,17 +208,25 @@ export function PublicLobby() {
                     {isMe && (
                       <>
                         {' · '}
-                        <button className="pseat__link" onClick={() => setPicking(true)} title="Change character">
-                          change
-                        </button>
-                        {' · '}
-                        <button className="pseat__link" onClick={() => setObserver(true)} title="Give the seat to a computer and just watch">
+                        <button
+                          className="pseat__link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setObserver(true);
+                          }}
+                          title="Give the seat to a computer and just watch"
+                        >
                           watch instead
                         </button>
                       </>
                     )}
                   </div>
                 </div>
+                {isMe && (
+                  <div className="pseat__swap" aria-hidden="true">
+                    SWAP CHARACTER?
+                  </div>
+                )}
                 <div className="pseat__tags">
                   {isHostSeat && <span className="tag tag--host">HOST</span>}
                   {isMe && <span className="tag tag--you">YOU</span>}

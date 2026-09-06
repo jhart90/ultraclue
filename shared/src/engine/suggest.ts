@@ -1,5 +1,6 @@
-import { getCard, BOARD } from '../data';
+import { getCard } from '../data';
 import type { RNG } from '../rng';
+import { boardOf, inPool, poolOf } from './pool';
 import type { GameState, Suggestion } from '../game';
 import { clone, currentPlayerId, log, requirePlayer } from './util';
 import { concludeTurn } from './turn';
@@ -34,12 +35,17 @@ export function makeSuggestion(
   if (currentPlayerId(s) !== suggesterId) throw new Error('Not your turn.');
   if (s.currentSuggestion && !s.currentSuggestion.resolved)
     throw new Error('A suggestion is already in progress.');
+  // Only cards in this game may be named: a wing the host switched off has no rooms in play, and
+  // a trimmed deck has no card for the weapons left out.
+  const pool = poolOf(s);
+  if (!inPool(pool, suspectId) || !inPool(pool, weaponId) || !inPool(pool, roomId)) throw new Error('That card is not in this game.');
 
   // Summon the named suspect's piece (if a player holds it) and the weapon token into the room.
   if (s.weaponLocations) s.weaponLocations[weaponId] = roomId;
   const summoned = s.players.find((p) => p.suspectId === suspectId);
-  if (summoned && BOARD.rooms[roomId]) {
-    const tile = BOARD.rooms[roomId].tiles[0];
+  const board = boardOf(s);
+  if (summoned && board.rooms[roomId]) {
+    const tile = board.rooms[roomId].tiles[0];
     summoned.position = { x: tile.x, y: tile.y };
     summoned.inRoomId = roomId;
   }

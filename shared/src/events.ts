@@ -110,6 +110,10 @@ export interface SetRoomSettingsPayload {
   totalPlayers?: number;
   botDifficulty?: BotDifficulty;
   botSpeed?: BotSpeed;
+  /** Wings switched off for the next game (board section ids). */
+  wingsOff?: string[];
+  /** Weapons in the next game's deck. */
+  weaponCount?: number;
 }
 export interface SetBotDifficultyPayload {
   index: number; // seat index of the computer

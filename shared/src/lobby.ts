@@ -54,6 +54,11 @@ export interface RoomSettings {
   botDifficulty: BotDifficulty;
   /** How quickly every computer at the table acts. */
   botSpeed?: BotSpeed;
+  /** Wings of the house switched off for the next game (board section ids: 'upper-floor',
+   *  'grounds', 'basement'). Their rooms leave the board and the deck. Empty/absent = whole house. */
+  wingsOff?: string[];
+  /** How many of the 40 weapons are in the next game's deck (MIN_WEAPONS..40; absent = all 40). */
+  weaponCount?: number;
 }
 
 export interface LobbyView {

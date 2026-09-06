@@ -1,7 +1,8 @@
-import { SUSPECTS, WEAPONS, ROOMS, BOARD, getCard } from '../data';
-import type { Coord } from '../data/board';
+import { BOARD, getCard } from '../data';
+import type { Board, Coord } from '../data/board';
 import { type RNG, pick } from '../rng';
 import { roomIdAt } from './movement';
+import { FULL_POOL, type CardPool } from './pool';
 
 // These helpers turn a bot's deduction into a decision. A card is "ruled out" of the solution once
 // the deduction (see botNotes.ts — own hand, passes, reveals, and cross-inferences) places it in
@@ -19,17 +20,18 @@ export interface BotAccusation {
   roomId: string;
 }
 
-export function botCandidates(ruledOut: Set<string>) {
+/** The cards in play (`pool`) that might still be in the envelope. */
+export function botCandidates(ruledOut: Set<string>, pool: CardPool = FULL_POOL) {
   return {
-    suspects: SUSPECTS.filter((c) => !ruledOut.has(c.id)),
-    weapons: WEAPONS.filter((c) => !ruledOut.has(c.id)),
-    rooms: ROOMS.filter((c) => !ruledOut.has(c.id)),
+    suspects: pool.suspects.filter((c) => !ruledOut.has(c.id)),
+    weapons: pool.weapons.filter((c) => !ruledOut.has(c.id)),
+    rooms: pool.rooms.filter((c) => !ruledOut.has(c.id)),
   };
 }
 
 /** The solution, if the bot has narrowed every category to a single candidate. */
-export function botAccusation(ruledOut: Set<string>): BotAccusation | null {
-  const c = botCandidates(ruledOut);
+export function botAccusation(ruledOut: Set<string>, pool: CardPool = FULL_POOL): BotAccusation | null {
+  const c = botCandidates(ruledOut, pool);
   if (c.suspects.length === 1 && c.weapons.length === 1 && c.rooms.length === 1) {
     return { suspectId: c.suspects[0].id, weaponId: c.weapons[0].id, roomId: c.rooms[0].id };
   }
@@ -49,8 +51,9 @@ export function botSuggestion(
   hand: string[],
   roomId: string | undefined,
   rng: RNG,
+  pool: CardPool = FULL_POOL,
 ): BotSuggestion {
-  const c = botCandidates(ruledOut);
+  const c = botCandidates(ruledOut, pool);
   const heldSuspects = hand.filter((id) => getCard(id)?.type === 'suspect');
   const heldWeapons = hand.filter((id) => getCard(id)?.type === 'weapon');
   const roomUnknown = !!roomId && !ruledOut.has(roomId);
@@ -65,8 +68,8 @@ export function botSuggestion(
     return { suspectId: pick(heldSuspects, rng), weaponId: pick(heldWeapons, rng) };
   }
 
-  const suspect = pick(c.suspects.length ? c.suspects : SUSPECTS, rng);
-  const weapon = pick(c.weapons.length ? c.weapons : WEAPONS, rng);
+  const suspect = pick(c.suspects.length ? c.suspects : pool.suspects, rng);
+  const weapon = pick(c.weapons.length ? c.weapons : pool.weapons, rng);
   return { suspectId: suspect.id, weaponId: weapon.id };
 }
 
@@ -91,11 +94,11 @@ export function botRevealCard(
 }
 
 /** Choose a destination: prefer entering a room (to suggest), favouring still-unknown rooms. */
-export function botMoveTarget(reachable: Coord[], ruledOut: Set<string>, rng: RNG): Coord | null {
+export function botMoveTarget(reachable: Coord[], ruledOut: Set<string>, rng: RNG, board: Board = BOARD): Coord | null {
   if (!reachable.length) return null;
-  const roomTiles = reachable.filter((t) => roomIdAt(BOARD, t));
+  const roomTiles = reachable.filter((t) => roomIdAt(board, t));
   if (roomTiles.length) {
-    const candidate = roomTiles.filter((t) => !ruledOut.has(roomIdAt(BOARD, t)!));
+    const candidate = roomTiles.filter((t) => !ruledOut.has(roomIdAt(board, t)!));
     return pick(candidate.length ? candidate : roomTiles, rng);
   }
   return pick(reachable, rng);

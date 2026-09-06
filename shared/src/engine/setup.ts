@@ -1,24 +1,33 @@
-import { ALL_CARDS, SUSPECTS, WEAPONS, ROOMS, getCard, BOARD } from '../data';
+import { SUSPECTS, getCard, wingsKey } from '../data';
 import type { Envelope, GameState, Player } from '../game';
 import { type RNG, shuffle, pick } from '../rng';
 import { log } from './util';
 import { beginTurn, startTileOf } from './turn';
 import { newStats, syncParticipants } from './stats';
+import { FULL_POOL, boardOf, chooseWeapons, poolIds, poolOf, type CardPool } from './pool';
 
-/** Pick the hidden solution: one random suspect, weapon, and room. */
-export function buildEnvelope(rng: RNG): Envelope {
+/** The host's choices for how much of the house, and how many weapons, a game is played with. */
+export interface GameOptions {
+  /** Wings switched off (board section ids). */
+  wingsOff?: string[];
+  /** Weapons in the deck (MIN_WEAPONS..40). */
+  weaponCount?: number;
+}
+
+/** Pick the hidden solution: one random suspect, weapon, and room from the cards in play. */
+export function buildEnvelope(rng: RNG, pool: CardPool = FULL_POOL): Envelope {
   return {
-    suspectId: pick(SUSPECTS, rng).id,
-    weaponId: pick(WEAPONS, rng).id,
-    roomId: pick(ROOMS, rng).id,
+    suspectId: pick(pool.suspects, rng).id,
+    weaponId: pick(pool.weapons, rng).id,
+    roomId: pick(pool.rooms, rng).id,
   };
 }
 
-/** Shuffle the 117 non-solution cards and deal them as evenly as possible, round-robin. */
-export function dealHands(players: Player[], envelope: Envelope, rng: RNG): void {
+/** Shuffle the non-solution cards in play and deal them as evenly as possible, round-robin. */
+export function dealHands(players: Player[], envelope: Envelope, rng: RNG, pool: CardPool = FULL_POOL): void {
   const inEnvelope = new Set([envelope.suspectId, envelope.weaponId, envelope.roomId]);
   const deck = shuffle(
-    ALL_CARDS.filter((c) => !inEnvelope.has(c.id)).map((c) => c.id),
+    poolIds(pool).filter((id) => !inEnvelope.has(id)),
     rng,
   );
   players.forEach((p) => (p.hand = []));
@@ -34,25 +43,37 @@ function turnOrderOf(players: Player[]): string[] {
 }
 
 /**
- * Create the initial in-play GameState from the lobby roster: pick the envelope, deal hands,
- * seat players in turn order. (Board placement is added in M5.)
+ * Create the initial in-play GameState from the lobby roster: settle which wings and weapons are
+ * in play, pick the envelope, deal hands, seat players in turn order and place their pieces.
  */
-export function startGame(code: string, lobbyPlayers: Player[], rng: RNG): GameState {
+export function startGame(code: string, lobbyPlayers: Player[], rng: RNG, options: GameOptions = {}): GameState {
   if (lobbyPlayers.length < 2) throw new Error('Need at least 2 players to start.');
+
+  const wingsOff = wingsKey(options.wingsOff ?? []) ? wingsKey(options.wingsOff ?? []).split('+') : undefined;
+  const board = boardOf({ wingsOff });
+  // Weapons: every one of the 40 unless the host asked for fewer, in which case the ones tied to
+  // rooms still on the board come first (the deck is stored only when it is not the full set).
+  const weaponIds = chooseWeapons(board, options.weaponCount, rng);
+  const trimmedDeck = weaponIds.length < FULL_POOL.weapons.length ? weaponIds : undefined;
+  const pool = poolOf({ wingsOff, weaponIds: trimmedDeck });
 
   const players: Player[] = lobbyPlayers.map((p) => ({
     ...p,
     hand: [],
     eliminated: false,
-    position: startTileOf(p.suspectId),
+    position: startTileOf(p.suspectId, board),
     inRoomId: undefined,
   }));
-  const envelope = buildEnvelope(rng);
-  dealHands(players, envelope, rng);
+  const envelope = buildEnvelope(rng, pool);
+  dealHands(players, envelope, rng, pool);
 
-  // Each room starts with one weapon token (board data assigns weaponId -> room).
+  // Each room starts with the weapon token the board ties to it, if that weapon is in the game;
+  // any weapon in the game whose room is not on the board is set down in a random room instead.
   const weaponLocations: Record<string, string> = {};
-  for (const room of Object.values(BOARD.rooms)) weaponLocations[room.weaponId] = room.id;
+  const inGame = new Set(weaponIds);
+  const roomIds = Object.keys(board.rooms);
+  for (const room of Object.values(board.rooms)) if (inGame.has(room.weaponId)) weaponLocations[room.weaponId] = room.id;
+  for (const wid of weaponIds) if (!weaponLocations[wid]) weaponLocations[wid] = pick(roomIds, rng);
 
   const state: GameState = {
     code,
@@ -61,6 +82,8 @@ export function startGame(code: string, lobbyPlayers: Player[], rng: RNG): GameS
     turnOrder: turnOrderOf(players),
     activeIdx: 0,
     round: 0,
+    ...(wingsOff ? { wingsOff } : {}),
+    ...(trimmedDeck ? { weaponIds: trimmedDeck } : {}),
     envelope,
     log: [],
     nextLogId: 1,

@@ -358,3 +358,21 @@
     min-height: 300px;
   }
 }
+
+/* The private lobby's weapon-count select, styled like the public table-size select. */
+.lobby__settings select {
+  font-family: var(--font-display, 'Georgia', serif);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
+  font-size: 1rem;
+  color: var(--ink, #ece8f5);
+  background: #1c1830;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-radius: 8px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.lobby__settings select:focus {
+  outline: none;
+  border-color: var(--accent, #c8a24a);
+}

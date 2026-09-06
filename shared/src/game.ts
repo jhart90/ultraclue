@@ -193,6 +193,11 @@ export interface GameState {
   activeIdx: number;
   /** Completed full rounds (bumps each time the turn wraps back to the first player). */
   round?: number;
+  /** Wings of the house the host switched off for this game (board section ids). Their rooms are
+   *  not on the board and their room cards are not in the deck. Absent = the whole house. */
+  wingsOff?: string[];
+  /** The weapon cards in this game's deck (the host may play with fewer than all 40). Absent = all. */
+  weaponIds?: string[];
   /** The solution. SERVER-ONLY — only revealed in views once the game has ended. */
   envelope: Envelope;
   currentSuggestion?: Suggestion;
@@ -257,6 +262,10 @@ export interface GameView {
   activeIdx: number;
   /** Completed full rounds so far. */
   round?: number;
+  /** Wings switched off for this game (see GameState.wingsOff) — the client draws the board without them. */
+  wingsOff?: string[];
+  /** The weapon cards in this game's deck (see GameState.weaponIds). */
+  weaponIds?: string[];
   yourId: string;
   /** Room host's id, so an observing host still gets host-only controls (set by the server). */
   hostId?: string;

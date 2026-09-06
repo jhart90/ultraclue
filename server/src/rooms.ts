@@ -14,6 +14,9 @@ import {
   DEFAULT_BOT_DIFFICULTY,
   BOT_SPEEDS,
   DEFAULT_BOT_SPEED,
+  WINGS,
+  clampWeaponCount,
+  wingsKey,
   type BotDifficulty,
   type BotSpeed,
   type RoomSettings,
@@ -161,6 +164,7 @@ export function createPublicRoom(
   totalPlayers = PUBLIC_DEFAULT_PLAYERS,
   botDifficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY,
   botSpeed: BotSpeed = DEFAULT_BOT_SPEED,
+  house: Pick<RoomSettings, 'wingsOff' | 'weaponCount'> = {},
 ): Room {
   const room: Room = {
     code: PUBLIC_ROOM_CODE,
@@ -173,7 +177,7 @@ export function createPublicRoom(
     suggestionLog: [],
     notes: {},
     isPublic: true,
-    settings: { totalPlayers: clampTotal(totalPlayers), botDifficulty, botSpeed },
+    settings: { totalPlayers: clampTotal(totalPlayers), botDifficulty, botSpeed, ...house },
     startsAt: publicStartTime(),
   };
   for (let i = 0; i < room.settings!.totalPlayers!; i++) {
@@ -245,7 +249,7 @@ export function joinPublicLobby(room: Room, id: string, name: string, observer =
 export function setRoomSettings(
   room: Room,
   requesterId: string,
-  patch: { totalPlayers?: number; botDifficulty?: unknown; botSpeed?: unknown },
+  patch: { totalPlayers?: number; botDifficulty?: unknown; botSpeed?: unknown; wingsOff?: unknown; weaponCount?: unknown },
 ): void {
   if (room.hostId !== requesterId) throw new Error('Only the host can change the settings.');
   if (room.phase !== 'lobby') throw new Error('The game has already started.');
@@ -256,6 +260,18 @@ export function setRoomSettings(
   }
   const sp = cleanSpeed(patch.botSpeed);
   if (sp) room.settings = { ...(room.settings ?? { botDifficulty: DEFAULT_BOT_DIFFICULTY }), botSpeed: sp };
+  // Wings of the house: an array of section ids to switch off. Unknown ids are dropped; the
+  // Ground Floor can never be switched off (it is not a wing). Stored in canonical order.
+  if (Array.isArray(patch.wingsOff)) {
+    const ids = patch.wingsOff.filter((w): w is string => typeof w === 'string' && WINGS.some((x) => x.id === w));
+    const key = wingsKey(ids);
+    room.settings = { ...(room.settings ?? { botDifficulty: DEFAULT_BOT_DIFFICULTY }), wingsOff: key ? key.split('+') : [] };
+  }
+  if (patch.weaponCount != null) {
+    const n = Number(patch.weaponCount);
+    if (!Number.isFinite(n)) throw new Error('Unknown weapon count.');
+    room.settings = { ...(room.settings ?? { botDifficulty: DEFAULT_BOT_DIFFICULTY }), weaponCount: clampWeaponCount(n) };
+  }
   if (patch.totalPlayers == null) return;
   if (!room.isPublic) throw new Error('Only the public table can be resized.');
   const n = clampTotal(patch.totalPlayers);
@@ -310,7 +326,8 @@ export function resetPublicRoom(): Room {
     ? old.slots.map((s) => s.occupant).filter((o): o is SlotOccupant => !!o && !o.isBot && o.connected)
     : [];
   rooms.delete(PUBLIC_ROOM_CODE);
-  const room = createPublicRoom(total, difficulty, speed);
+  // The house layout and weapon count carry over to the next game too, until the host changes them.
+  const room = createPublicRoom(total, difficulty, speed, { wingsOff: old?.settings?.wingsOff, weaponCount: old?.settings?.weaponCount });
   // The humans who stay on carry their profiles into the next game.
   for (const h of humans) setProfileId(room, h.id, old?.profileIds?.[h.id]);
   for (const h of humans) {
@@ -937,7 +954,7 @@ export function startGameInRoom(room: Room, requesterId: string, opts: { force?:
     };
   });
 
-  const game = startGame(room.code, players, rng);
+  const game = startGame(room.code, players, rng, { wingsOff: room.settings?.wingsOff, weaponCount: room.settings?.weaponCount });
   room.game = game;
   room.phase = 'play';
   return game;

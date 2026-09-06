@@ -1,4 +1,4 @@
-import { SUSPECTS, WEAPONS, ROOMS } from '../data';
+import { FULL_POOL, type CardPool } from './pool';
 
 // A bot's Clue deduction. From the suggestions it has witnessed it works out, for each player:
 //  - cards they definitely HOLD (a card was shown, or it's deducible),
@@ -23,15 +23,15 @@ export interface BotKnowledge {
   ruledOut: Set<string>; // cards held by some player — i.e. not in the envelope
 }
 
-const CATEGORIES = [SUSPECTS, WEAPONS, ROOMS];
-
 /** Run the deduction for one bot. `events` must already be filtered so `revealedCardId` is only set
- *  on suggestions this bot was entitled to see (the ones it made). */
+ *  on suggestions this bot was entitled to see (the ones it made). `pool` is the cards in this
+ *  game: the "one card left in a category" inference must count only cards that are in play. */
 export function deduceBotKnowledge(
   botId: string,
   hand: string[],
   playerIds: string[],
   events: SuggestionEvent[],
+  pool: CardPool = FULL_POOL,
 ): BotKnowledge {
   const has = new Map(playerIds.map((p) => [p, new Set<string>()]));
   const hasnt = new Map(playerIds.map((p) => [p, new Set<string>()]));
@@ -83,7 +83,7 @@ export function deduceBotKnowledge(
     }
     // If a category has exactly one card no one holds, that's the envelope — so nobody holds it.
     const ruled = heldByAnyone();
-    for (const cat of CATEGORIES) {
+    for (const cat of [pool.suspects, pool.weapons, pool.rooms]) {
       const unknown = cat.filter((c) => !ruled.has(c.id));
       if (unknown.length === 1) for (const p of playerIds) changed = setHasnt(p, unknown[0].id) || changed;
     }

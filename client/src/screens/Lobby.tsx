@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { getCard, MIN_PLAYERS, DEFAULT_BOT_DIFFICULTY, DEFAULT_BOT_SPEED, type Slot, type SlotStatus } from 'shared';
+import { getCard, MIN_PLAYERS, DEFAULT_BOT_DIFFICULTY, DEFAULT_BOT_SPEED, MAX_WEAPONS, type Slot, type SlotStatus } from 'shared';
 import { DifficultyPicker, SpeedPicker } from '../components/DifficultyPicker';
+import { WingsPicker, WeaponCountPicker } from '../components/HousePicker';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
@@ -72,6 +73,8 @@ export function Lobby() {
   const canStart = amHost && playerCount >= MIN_PLAYERS;
   const botDifficulty = lobby.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
   const botSpeed = lobby.settings?.botSpeed ?? DEFAULT_BOT_SPEED;
+  const wingsOff = lobby.settings?.wingsOff ?? [];
+  const weaponCount = lobby.settings?.weaponCount ?? MAX_WEAPONS;
   const botCount = lobby.slots.filter((s) => s.occupant?.isBot).length;
 
   // Only other humans' characters are off-limits; a computer's character can be swapped for yours.
@@ -133,12 +136,21 @@ export function Lobby() {
           onChange={(s) => setRoomSettings({ botSpeed: s })}
           title="How quickly every computer at the table acts"
         />
+        <span className="lobby__settingslabel lobby__settingslabel--gap">House</span>
+        <WingsPicker
+          wingsOff={wingsOff}
+          readOnly={!amHost}
+          onChange={(off) => setRoomSettings({ wingsOff: off })}
+          title="Which wings of the house are in play — a closed wing's rooms leave the board and the deck"
+        />
+        <span className="lobby__settingslabel lobby__settingslabel--gap">Weapons</span>
+        <WeaponCountPicker value={weaponCount} readOnly={!amHost} onChange={(n) => setRoomSettings({ weaponCount: n })} title="How many of the 40 weapons are in the game" />
         <span className="lobby__settingsnote">
           {amHost
             ? botCount
-              ? 'Difficulty applies to every computer (change one on its seat below); speed is for the whole table.'
-              : 'Set a seat to Bot to add a computer player.'
-            : 'The host chooses how well, and how quickly, the computers play.'}
+              ? 'Difficulty applies to every computer (change one on its seat below); speed, the open wings and the weapon count are for the whole game.'
+              : 'Set a seat to Bot to add a computer player. Close a wing to play a smaller house.'
+            : 'The host chooses the computers, which wings of the house are open, and how many weapons are in play.'}
         </span>
       </div>
 

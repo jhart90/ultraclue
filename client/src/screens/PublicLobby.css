@@ -195,3 +195,48 @@
     min-width: 8rem;
   }
 }
+
+/* Your own seat is one big "swap character" button. Hovering (or focusing) it dims everything on
+   the tile well under a bold SWAP CHARACTER? banner; a click anywhere opens the character picker. */
+.pseat--swap {
+  cursor: pointer;
+}
+.pseat--swap > :not(.pseat__swap) {
+  transition: opacity 0.12s ease, filter 0.12s ease;
+}
+.pseat__swap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  font-family: var(--font-display, 'Georgia', serif);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
+  font-weight: 900;
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+  color: #f4e6b8;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  background: rgba(10, 7, 18, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.pseat--swap:hover > :not(.pseat__swap),
+.pseat--swap:focus-visible > :not(.pseat__swap) {
+  opacity: 0.22;
+  filter: saturate(0.4);
+}
+.pseat--swap:hover .pseat__swap,
+.pseat--swap:focus-visible .pseat__swap {
+  opacity: 1;
+}
+.pseat--swap:focus-visible {
+  outline: 2px solid var(--accent, #c8a24a);
+  outline-offset: 2px;
+}
+/* The "watch instead" link must stay clickable under the banner. */
+.pseat--swap:hover .pseat__link {
+  pointer-events: auto;
+}

@@ -14,6 +14,7 @@ import {
   botDecideAccusation,
   botThreatened,
   type BotMind,
+  FULL_POOL,
 } from '../src';
 
 /** Rule out everything except the given solution triple. */
@@ -101,6 +102,8 @@ describe('bot gambles when a rival is about to win', () => {
       k: { has: new Map(), hasnt: new Map(), groups: [], ruledOut },
       envelope: new Set(envelope),
       playerIds: [bot, rival, ...others],
+      pool: FULL_POOL,
+      board: BOARD,
       events,
     };
   }

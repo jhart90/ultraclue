@@ -4,6 +4,7 @@ import { type RNG, shuffle } from '../rng';
 import { activePlayers, clone, currentPlayerId, log, requirePlayer } from './util';
 import { concludeTurn } from './turn';
 import { noteAccusation, noteGameEnd } from './stats';
+import { inPool, poolOf } from './pool';
 
 export interface AccusationOutcome {
   state: GameState;
@@ -30,6 +31,8 @@ export function makeAccusation(
   if (currentPlayerId(s) !== accuserId) throw new Error('Not your turn.');
 
   const accuser = requirePlayer(s, accuserId);
+  const pool = poolOf(s);
+  if (!inPool(pool, suspectId) || !inPool(pool, weaponId) || !inPool(pool, roomId)) throw new Error('That card is not in this game.');
   const correct =
     s.envelope.suspectId === suspectId &&
     s.envelope.weaponId === weaponId &&

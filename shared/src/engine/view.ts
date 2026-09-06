@@ -1,6 +1,7 @@
 import type { GameState, GameView, PlayerView, SuggestionView } from '../game';
 import { getPlayer, currentPlayerId } from './util';
 import { activeReachable, elevatorOptions } from './turn';
+import { boardOf } from './pool';
 
 /**
  * Project the authoritative state down to what a single viewer is allowed to see. This is the
@@ -53,6 +54,8 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     turnOrder: state.turnOrder,
     activeIdx: state.activeIdx,
     round: state.round,
+    wingsOff: state.wingsOff,
+    weaponIds: state.weaponIds,
     yourId: viewerId,
     // A viewer who isn't one of the dealt players is watching in observer mode.
     observer: !state.players.some((p) => p.id === viewerId),
@@ -76,7 +79,7 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     reachable: activeReachable(state),
     elevatorFloors:
       state.turnPhase === 'awaitElevator' && state.elevatorRide && currentPlayerId(state) === viewerId
-        ? elevatorOptions(state.elevatorRide.fromFloor)
+        ? elevatorOptions(state.elevatorRide.fromFloor, boardOf(state))
         : undefined,
   };
 }

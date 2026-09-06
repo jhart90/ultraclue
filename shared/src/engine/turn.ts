@@ -1,8 +1,9 @@
 import { getCard } from '../data';
-import { BOARD, coordKey, type Coord, type FloorId } from '../data/board';
+import { BOARD, coordKey, type Board, type Coord, type FloorId } from '../data/board';
 import type { GameState } from '../game';
 import { type RNG } from '../rng';
 import { blockedCells, elevatorFloorAt, pathTo, reachableTiles, roomIdAt } from './movement';
+import { boardOf } from './pool';
 import { advanceTurn, clone, currentPlayerId, getPlayer, log, requirePlayer } from './util';
 import { noteRoomVisit, noteTurn, noteWalk, playerStats, statsOf } from './stats';
 
@@ -12,9 +13,10 @@ const FLOOR_NAMES: Record<FloorId, string> = {
   basement: 'Basement',
 };
 
-/** The indoor floors a rider can choose from an elevator (every indoor floor but the one they're on). */
-export function elevatorOptions(fromFloor: FloorId): FloorId[] {
-  return (['ground-floor', 'upper-floor', 'basement'] as FloorId[]).filter((f) => f !== fromFloor);
+/** The floors a rider can choose from an elevator: every floor with a lift on this board but the
+ *  one they're on (a floor the host switched off has no lift to ride to). */
+export function elevatorOptions(fromFloor: FloorId, board: Board = BOARD): FloorId[] {
+  return board.elevators.map((e) => e.floor).filter((f) => f !== fromFloor);
 }
 
 const die = (rng: RNG) => 1 + Math.floor(rng() * 6);
@@ -66,9 +68,9 @@ export function rollAndMove(state: GameState, playerId: string, rng: RNG): GameS
 }
 
 /** The room a secret passage leads to from `roomId`, if this room has one. */
-export function shortcutDestForRoom(roomId: string | undefined): string | undefined {
+export function shortcutDestForRoom(roomId: string | undefined, board: Board = BOARD): string | undefined {
   if (!roomId) return undefined;
-  const sc = BOARD.shortcuts.find((x) => x.kind === 'room' && (x.aRoomId === roomId || x.bRoomId === roomId));
+  const sc = board.shortcuts.find((x) => x.kind === 'room' && (x.aRoomId === roomId || x.bRoomId === roomId));
   if (!sc) return undefined;
   return sc.aRoomId === roomId ? sc.bRoomId : sc.aRoomId;
 }
@@ -79,9 +81,9 @@ export function takeShortcut(state: GameState, playerId: string): GameState {
   if (currentPlayerId(s) !== playerId) throw new Error('Not your turn.');
   if (s.turnPhase !== 'awaitRoll') throw new Error('You can only take a shortcut at the start of your turn.');
   const player = requirePlayer(s, playerId);
-  const destRoomId = shortcutDestForRoom(player.inRoomId);
+  const destRoomId = shortcutDestForRoom(player.inRoomId, boardOf(s));
   if (!destRoomId) throw new Error('There is no secret passage from this room.');
-  const destRoom = BOARD.rooms[destRoomId];
+  const destRoom = boardOf(s).rooms[destRoomId];
   const landing = destRoom.shortcutTile ?? destRoom.tiles[0];
   const before = player.position;
   player.position = { x: landing.x, y: landing.y };
@@ -110,18 +112,19 @@ export function moveTo(state: GameState, playerId: string, dest: Coord): GameSta
   if (s.turnPhase !== 'awaitMove' || !s.lastRoll) throw new Error('You cannot move right now.');
 
   const player = requirePlayer(s, playerId);
+  const board = boardOf(s);
   const steps = s.lastRoll[0] + s.lastRoll[1];
-  const blocked = blockedCells(BOARD, otherPositions(s, playerId));
-  const reach = new Set(reachableTiles(BOARD, player.position, steps, blocked).map(coordKey));
+  const blocked = blockedCells(board, otherPositions(s, playerId));
+  const reach = new Set(reachableTiles(board, player.position, steps, blocked).map(coordKey));
   if (!reach.has(coordKey(dest))) throw new Error('That square is out of range.');
 
-  const path = pathTo(BOARD, player.position, dest, steps, blocked);
+  const path = pathTo(board, player.position, dest, steps, blocked);
   player.position = { x: dest.x, y: dest.y };
   s.lastMove = { playerId, path };
   noteWalk(s, playerId, Math.max(0, path.length - 1));
 
   // Stepped into an elevator? Stop, and let them choose a floor to ride to (then continue moving).
-  const elevFloor = elevatorFloorAt(BOARD, dest);
+  const elevFloor = elevatorFloorAt(board, dest);
   if (elevFloor) {
     player.inRoomId = undefined;
     const used = Math.max(0, path.length - 1);
@@ -131,7 +134,7 @@ export function moveTo(state: GameState, playerId: string, dest: Coord): GameSta
     return s;
   }
 
-  player.inRoomId = roomIdAt(BOARD, dest);
+  player.inRoomId = roomIdAt(board, dest);
   noteRoomVisit(s, playerId, player.inRoomId);
   s.turnPhase = 'postMove';
   const where = player.inRoomId ? `enters the ${getCard(player.inRoomId)?.title}` : 'moves';
@@ -144,9 +147,9 @@ export function chooseFloor(state: GameState, playerId: string, floor: FloorId, 
   const s = clone(state);
   if (currentPlayerId(s) !== playerId) throw new Error('Not your turn.');
   if (s.turnPhase !== 'awaitElevator' || !s.elevatorRide) throw new Error('You are not in the elevator.');
-  if (!elevatorOptions(s.elevatorRide.fromFloor).includes(floor)) throw new Error('You cannot ride to that floor.');
+  if (!elevatorOptions(s.elevatorRide.fromFloor, boardOf(s)).includes(floor)) throw new Error('You cannot ride to that floor.');
 
-  const elev = BOARD.elevators.find((e) => e.floor === floor);
+  const elev = boardOf(s).elevators.find((e) => e.floor === floor);
   if (!elev) throw new Error('No elevator there.');
   const player = requirePlayer(s, playerId);
   const before = player.position;
@@ -177,8 +180,9 @@ export function activeReachable(state: GameState): Coord[] {
   const player = getPlayer(state, currentPlayerId(state));
   if (!player) return [];
   const steps = state.lastRoll[0] + state.lastRoll[1];
-  const blocked = blockedCells(BOARD, otherPositions(state, player.id));
-  return reachableTiles(BOARD, player.position, steps, blocked);
+  const board = boardOf(state);
+  const blocked = blockedCells(board, otherPositions(state, player.id));
+  return reachableTiles(board, player.position, steps, blocked);
 }
 
 /** Advance to the next active player and set up their movement phase. Used after a turn's actions
@@ -207,8 +211,8 @@ export function passTurn(state: GameState, playerId: string, rng: RNG): GameStat
   return s;
 }
 
-/** Start tile for a suspect. */
-export function startTileOf(suspectId: string): Coord {
-  const s = BOARD.starts.find((st) => st.suspectId === suspectId);
+/** Start tile for a suspect on this board. */
+export function startTileOf(suspectId: string, board: Board = BOARD): Coord {
+  const s = board.starts.find((st) => st.suspectId === suspectId);
   return s ? { x: s.tile.x, y: s.tile.y } : { x: 0, y: 0 };
 }

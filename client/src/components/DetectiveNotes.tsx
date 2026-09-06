@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SUSPECTS, WEAPONS, ROOMS, getCard, type AnyCard, type PlayerView } from 'shared';
+import { SUSPECTS, WEAPONS, ROOMS, getCard, type AnyCard, type PlayerView, type RoomCard, type WeaponCard } from 'shared';
 import { useStore } from '../store';
 import { NoteBox, NOTE_STATES } from './NoteBox';
 import './DetectiveNotes.css';
@@ -11,8 +11,6 @@ const EMPTY_ROW = new Array(COLS).fill(0);
 // Columns are sorted alphabetically; suspects by their colour-based surname (the last word).
 const surname = (title: string) => title.trim().split(/\s+/).pop() ?? title;
 const SORTED_SUSPECTS = [...SUSPECTS].sort((a, b) => surname(a.title).localeCompare(surname(b.title)));
-const SORTED_WEAPONS = [...WEAPONS].sort((a, b) => a.title.localeCompare(b.title));
-const SORTED_ROOMS = [...ROOMS].sort((a, b) => a.title.localeCompare(b.title));
 
 type NotesState = Record<string, number[]>; // cardId -> 8 mark states
 
@@ -38,14 +36,21 @@ export function DetectiveNotes({
   players,
   selfId,
   hand,
+  weapons = WEAPONS,
+  rooms = ROOMS,
   onClose,
 }: {
   roomCode: string;
   players: PlayerView[];
   selfId?: string;
   hand?: string[];
+  /** The weapon and room cards in this game (the host may have trimmed either); all 40 by default. */
+  weapons?: WeaponCard[];
+  rooms?: RoomCard[];
   onClose?: () => void;
 }) {
+  const sortedWeapons = [...weapons].sort((a, b) => a.title.localeCompare(b.title));
+  const sortedRooms = [...rooms].sort((a, b) => a.title.localeCompare(b.title));
   const storageKey = `ultraclue-notes-${roomCode}`;
   const syncNotes = useStore((s) => s.syncNotes);
   const notesEpoch = useStore((s) => s.notesEpoch); // bumps when the server restores our notes
@@ -144,8 +149,8 @@ export function DetectiveNotes({
       </button>
       <div className="notes__body">
         {renderColumn('Suspects', SORTED_SUSPECTS)}
-        {renderColumn('Weapons', SORTED_WEAPONS)}
-        {renderColumn('Rooms', SORTED_ROOMS)}
+        {renderColumn('Weapons', sortedWeapons)}
+        {renderColumn('Rooms', sortedRooms)}
       </div>
     </>
   );

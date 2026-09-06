@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getCard, shortcutDestForRoom, PUBLIC_ROOM_CODE, DICE_ANIM_MS, TURN_FLASH_MS, TURN_GAP_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
+import { getCard, shortcutDestForRoom, boardFor, poolOf, PUBLIC_ROOM_CODE, DICE_ANIM_MS, TURN_FLASH_MS, TURN_GAP_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
 import { useStore, savedDice } from '../store';
 import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
 import { DiceOverlay, DICE_FADE_MS, type DiceRollShow } from '../components/DiceOverlay';
@@ -366,8 +366,13 @@ export function Game() {
   /** Everyone at the table with their character's colour, so names can be tinted in chat and pills. */
   const chatPlayers = game.players.map((p) => ({ id: p.id, name: p.name, color: suspectColor(p.suspectId), suspectId: p.suspectId, dice: p.dice }));
 
+  // The board this game is played on (the house minus any wings the host closed) and the cards in
+  // it. boardFor() hands back one shared object per wing combination, so this is cheap to redo.
+  const board = boardFor(game.wingsOff ?? []);
+  const pool = poolOf(game);
+
   const myRoom = me?.inRoomId ? getCard(me.inRoomId)?.title : null;
-  const myShortcutDest = me?.inRoomId ? shortcutDestForRoom(me.inRoomId) : undefined;
+  const myShortcutDest = me?.inRoomId ? shortcutDestForRoom(me.inRoomId, board) : undefined;
   const myShortcutName = myShortcutDest ? getCard(myShortcutDest)?.title : undefined;
 
   const observer = !!game.observer; // watching only — no piece, hand, notes, or private reveals
@@ -544,6 +549,7 @@ export function Game() {
             myId={myId}
             activeId={activeId}
             round={game.round ?? 0}
+            board={board}
           />
         </div>
 
@@ -578,6 +584,7 @@ export function Game() {
               canMove={false}
               keyboardZoom={false}
               round={game.round ?? 0}
+              board={board}
             />
           )}
         </div>
@@ -585,7 +592,7 @@ export function Game() {
       {!observer && (
         <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
           <div className="dock__folder dock__folder--notes">
-            <DetectiveNotes roomCode={game.code} players={orderedPlayers} selfId={myId} hand={game.yourHand} onClose={() => setDock(null)} />
+            <DetectiveNotes roomCode={game.code} players={orderedPlayers} selfId={myId} hand={game.yourHand} weapons={pool.weapons} rooms={pool.rooms} onClose={() => setDock(null)} />
           </div>
         </div>
       )}
@@ -613,6 +620,8 @@ export function Game() {
         <SelectModal
           mode={modal}
           fixedRoomId={modal === 'suggest' ? me.inRoomId : undefined}
+          weapons={pool.weapons}
+          rooms={pool.rooms}
           onCancel={() => {
             if (modal === 'accuse') setAccusing(false); // withdrew — clear the table's warning
             setModal(null);

@@ -1,0 +1,45 @@
+/* Upper Floor / Grounds / Basement as one row of connected toggles. Lit (gold) = in play; a wing
+   the host has closed goes dark with its name struck through. */
+.wings {
+  display: inline-flex;
+  border: 1px solid rgba(200, 162, 74, 0.45);
+  border-radius: 999px;
+  overflow: hidden;
+  background: #14111f;
+  vertical-align: middle;
+}
+.wings__opt {
+  background: none;
+  border: none;
+  color: var(--muted, #9a93b3);
+  font-family: 'Georgia', serif;
+  font-size: 0.78rem;
+  padding: 0.22rem 0.7rem;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  text-decoration: line-through;
+  text-decoration-color: rgba(154, 147, 179, 0.7);
+  white-space: nowrap;
+}
+.wings__opt + .wings__opt {
+  border-left: 1px solid rgba(200, 162, 74, 0.25);
+}
+.wings__opt:hover:not(:disabled) {
+  color: var(--ink, #ece8f5);
+}
+.wings__opt--on {
+  font-weight: 700;
+  color: #1a1622;
+  background: #d9a441;
+  text-decoration: none;
+}
+.wings__opt--on:hover:not(:disabled) {
+  color: #1a1622;
+  background: #e6b654;
+}
+.wings__opt:disabled {
+  cursor: default;
+}
+.wings--ro .wings__opt--on {
+  background: #b58a34;
+}

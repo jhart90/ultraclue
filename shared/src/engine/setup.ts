@@ -4,14 +4,17 @@ import { type RNG, shuffle, pick } from '../rng';
 import { log } from './util';
 import { beginTurn, startTileOf } from './turn';
 import { newStats, syncParticipants } from './stats';
-import { FULL_POOL, boardOf, chooseWeapons, poolIds, poolOf, type CardPool } from './pool';
+import { FULL_POOL, boardOf, chooseSuspects, chooseWeapons, poolIds, poolOf, type CardPool } from './pool';
 
-/** The host's choices for how much of the house, and how many weapons, a game is played with. */
+/** The host's choices for how much of the house, and how many cards, a game is played with. */
 export interface GameOptions {
   /** Wings switched off (board section ids). */
   wingsOff?: string[];
   /** Weapons in the deck (MIN_WEAPONS..40). */
   weaponCount?: number;
+  /** Suspects in the deck (MIN_SUSPECTS..40; never fewer than the players, whose characters are
+   *  always in). */
+  suspectCount?: number;
 }
 
 /** Pick the hidden solution: one random suspect, weapon, and room from the cards in play. */
@@ -43,19 +46,25 @@ function turnOrderOf(players: Player[]): string[] {
 }
 
 /**
- * Create the initial in-play GameState from the lobby roster: settle which wings and weapons are
- * in play, pick the envelope, deal hands, seat players in turn order and place their pieces.
+ * Create the initial in-play GameState from the lobby roster: settle which wings and cards are in
+ * play, pick the envelope, deal hands, seat players in turn order and place their pieces.
  */
 export function startGame(code: string, lobbyPlayers: Player[], rng: RNG, options: GameOptions = {}): GameState {
   if (lobbyPlayers.length < 2) throw new Error('Need at least 2 players to start.');
 
   const wingsOff = wingsKey(options.wingsOff ?? []) ? wingsKey(options.wingsOff ?? []).split('+') : undefined;
   const board = boardOf({ wingsOff });
-  // Weapons: every one of the 40 unless the host asked for fewer, in which case the ones tied to
-  // rooms still on the board come first (the deck is stored only when it is not the full set).
+  // The deck is stored only where it is not the full set. Suspects: every seated character plus
+  // random others up to the host's count. Weapons: the ones tied to rooms on the board first.
+  const suspectIds = chooseSuspects(
+    lobbyPlayers.map((p) => p.suspectId),
+    options.suspectCount,
+    rng,
+  );
+  const trimmedSuspects = suspectIds.length < FULL_POOL.suspects.length ? suspectIds : undefined;
   const weaponIds = chooseWeapons(board, options.weaponCount, rng);
-  const trimmedDeck = weaponIds.length < FULL_POOL.weapons.length ? weaponIds : undefined;
-  const pool = poolOf({ wingsOff, weaponIds: trimmedDeck });
+  const trimmedWeapons = weaponIds.length < FULL_POOL.weapons.length ? weaponIds : undefined;
+  const pool = poolOf({ wingsOff, weaponIds: trimmedWeapons, suspectIds: trimmedSuspects });
 
   const players: Player[] = lobbyPlayers.map((p) => ({
     ...p,
@@ -83,7 +92,8 @@ export function startGame(code: string, lobbyPlayers: Player[], rng: RNG, option
     activeIdx: 0,
     round: 0,
     ...(wingsOff ? { wingsOff } : {}),
-    ...(trimmedDeck ? { weaponIds: trimmedDeck } : {}),
+    ...(trimmedWeapons ? { weaponIds: trimmedWeapons } : {}),
+    ...(trimmedSuspects ? { suspectIds: trimmedSuspects } : {}),
     envelope,
     log: [],
     nextLogId: 1,

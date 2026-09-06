@@ -1,10 +1,10 @@
-import { WINGS, MIN_WEAPONS, MAX_WEAPONS, WEAPONS, type WingId } from 'shared';
+import { WINGS, type WingId } from 'shared';
 import './HousePicker.css';
 
-// Host controls for how much of the house, and how many weapons, the next game is played with.
+// Host controls for how much of the house, and how many cards and seats, the next game has.
 //  - WingsPicker: the three optional wings as one row of connected toggle buttons, every one lit
 //    by default; switching a wing off takes its rooms off the board and out of the deck.
-//  - WeaponCountPicker: a plain select, like the table size.
+//  - CountPicker: a plain select over a range — seats at the table, suspects and weapons in play.
 
 const WING_BLURB: Record<WingId, string> = {
   'upper-floor': 'The Upper Floor: Library, Study, Gallery, Master Suite, Planetarium and the rest of upstairs.',
@@ -55,25 +55,29 @@ export function WingsPicker({
   );
 }
 
-const WEAPON_COUNTS = Array.from({ length: MAX_WEAPONS - MIN_WEAPONS + 1 }, (_, i) => MAX_WEAPONS - i);
-
-/** How many of the 40 weapons are in the game. */
-export function WeaponCountPicker({
+/** A number in `min`..`max` as a select (host) or plain text (everyone else). Listed high to low
+ *  so the usual full-size choice is at the top. */
+export function CountPicker({
   value,
+  min,
+  max,
   onChange,
   readOnly = false,
   title,
 }: {
   value: number;
+  min: number;
+  max: number;
   onChange?: (n: number) => void;
   readOnly?: boolean;
   title?: string;
 }) {
-  const n = Math.max(MIN_WEAPONS, Math.min(MAX_WEAPONS, value || WEAPONS.length));
+  const n = Math.max(min, Math.min(max, value || max));
   if (readOnly) return <strong title={title}>{n}</strong>;
+  const options = Array.from({ length: Math.max(0, max - min + 1) }, (_, i) => max - i);
   return (
     <select value={n} onChange={(e) => onChange?.(Number(e.target.value))} title={title}>
-      {WEAPON_COUNTS.map((k) => (
+      {options.map((k) => (
         <option key={k} value={k}>
           {k}
         </option>

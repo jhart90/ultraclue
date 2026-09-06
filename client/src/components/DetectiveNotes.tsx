@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SUSPECTS, WEAPONS, ROOMS, getCard, type AnyCard, type PlayerView, type RoomCard, type WeaponCard } from 'shared';
+import { SUSPECTS, WEAPONS, ROOMS, getCard, type AnyCard, type PlayerView, type RoomCard, type SuspectCard, type WeaponCard } from 'shared';
 import { useStore } from '../store';
 import { NoteBox, NOTE_STATES } from './NoteBox';
 import './DetectiveNotes.css';
@@ -36,6 +36,7 @@ export function DetectiveNotes({
   players,
   selfId,
   hand,
+  suspects = SUSPECTS,
   weapons = WEAPONS,
   rooms = ROOMS,
   onClose,
@@ -44,11 +45,13 @@ export function DetectiveNotes({
   players: PlayerView[];
   selfId?: string;
   hand?: string[];
-  /** The weapon and room cards in this game (the host may have trimmed either); all 40 by default. */
+  /** The suspect, weapon and room cards in this game (the host may have trimmed any); all 40 by default. */
+  suspects?: SuspectCard[];
   weapons?: WeaponCard[];
   rooms?: RoomCard[];
   onClose?: () => void;
 }) {
+  const sortedSuspects = suspects === SUSPECTS ? SORTED_SUSPECTS : [...suspects].sort((a, b) => surname(a.title).localeCompare(surname(b.title)));
   const sortedWeapons = [...weapons].sort((a, b) => a.title.localeCompare(b.title));
   const sortedRooms = [...rooms].sort((a, b) => a.title.localeCompare(b.title));
   const storageKey = `ultraclue-notes-${roomCode}`;
@@ -148,7 +151,7 @@ export function DetectiveNotes({
         Detective Notes <span className="dnotes__barclose">▾ click to close</span>
       </button>
       <div className="notes__body">
-        {renderColumn('Suspects', SORTED_SUSPECTS)}
+        {renderColumn('Suspects', sortedSuspects)}
         {renderColumn('Weapons', sortedWeapons)}
         {renderColumn('Rooms', sortedRooms)}
       </div>

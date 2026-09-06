@@ -2,29 +2,31 @@ import { useEffect, useState } from 'react';
 import {
   getCard,
   MIN_PLAYERS,
+  PRIVATE_MIN_PLAYERS,
+  PRIVATE_MAX_PLAYERS,
   PUBLIC_MIN_PLAYERS,
   PUBLIC_MAX_PLAYERS,
   DEFAULT_BOT_DIFFICULTY,
   DEFAULT_BOT_SPEED,
+  MIN_SUSPECTS,
+  MAX_SUSPECTS,
+  MIN_WEAPONS,
   MAX_WEAPONS,
-  type Slot,
-  type SlotStatus,
 } from 'shared';
 import { DifficultyPicker, SpeedPicker } from '../components/DifficultyPicker';
-import { WingsPicker, WeaponCountPicker } from '../components/HousePicker';
+import { WingsPicker, CountPicker } from '../components/HousePicker';
 import { useStore } from '../store';
 import { Chat } from '../components/Chat';
 import { SuspectPicker } from '../components/SuspectPicker';
 import { SuspectThumb } from '../components/SuspectThumb';
 import './Lobby.css';
 
-// One lobby for both kinds of table. The frame is the same either way — header, settings strip, a
-// dense grid of slim seat rows (thumbnail, name, character), chat column, footer — and only the
-// bits that genuinely differ change:
-//   public   a countdown clock (the game starts itself), a table-size setting, every seat filled by
-//            a computer until a human takes it;
-//   private  the room code and share link, eight seats the host opens, closes or gives to a
-//            computer, and a Start button.
+// One lobby for both kinds of table. Every seat is a computer until a human takes it, the host
+// picks how many seats there are (8..40 public, 2..40 private) and how many suspects and weapons
+// are in the deck, and the frame is the same either way — header, settings strip, a dense grid of
+// slim seat rows (thumbnail, name, character), chat column, footer. Only the bits that genuinely
+// differ change: the public table shows a countdown clock and starts itself; a private room shows
+// its code and share link, and the host presses Start.
 
 function suspectColor(suspectId?: string): string {
   if (!suspectId) return '#555';
@@ -55,20 +57,12 @@ async function sendInvite(code: string): Promise<void> {
   window.location.href = `sms:?&body=${encodeURIComponent(`${msg} ${url}`)}`;
 }
 
-const TABLE_SIZES = Array.from({ length: PUBLIC_MAX_PLAYERS - PUBLIC_MIN_PLAYERS + 1 }, (_, i) => PUBLIC_MIN_PLAYERS + i);
-const SEAT_STATES: { status: SlotStatus; label: string }[] = [
-  { status: 'open', label: 'Open' },
-  { status: 'closed', label: 'Closed' },
-  { status: 'bot', label: 'Bot' },
-];
-
 export function Lobby() {
   const lobby = useStore((s) => s.lobby);
   const myId = useStore((s) => s.myId);
   const chat = useStore((s) => s.chat);
   const error = useStore((s) => s.error);
   const serverOffset = useStore((s) => s.serverOffset);
-  const setSlot = useStore((s) => s.setSlot);
   const pickSuspect = useStore((s) => s.pickSuspect);
   const setObserver = useStore((s) => s.setObserver);
   const sendChat = useStore((s) => s.sendChat);
@@ -97,13 +91,13 @@ export function Lobby() {
   const humans = lobby.slots.filter((s) => s.occupant && !s.occupant.isBot && !s.occupant.observer).length;
   const watchers = lobby.slots.filter((s) => s.occupant?.observer).length;
   const cpus = lobby.slots.filter((s) => s.occupant?.isBot).length;
-  // Observers watch but aren't dealt in, so only the rest count toward the minimum to start.
-  const playerCount = humans + cpus;
-  const canStart = amHost && playerCount >= MIN_PLAYERS;
+  const canStart = amHost && humans + cpus >= MIN_PLAYERS;
   const botDifficulty = lobby.settings?.botDifficulty ?? DEFAULT_BOT_DIFFICULTY;
   const botSpeed = lobby.settings?.botSpeed ?? DEFAULT_BOT_SPEED;
   const wingsOff = lobby.settings?.wingsOff ?? [];
   const weaponCount = lobby.settings?.weaponCount ?? MAX_WEAPONS;
+  // Every seated character is in the deck, so the suspect count can't go below the seats.
+  const suspectCount = Math.max(lobby.settings?.suspectCount ?? MAX_SUSPECTS, total);
   // The server's clock drives a public start; correct for our own clock's skew so everyone agrees.
   const remaining = Math.max(0, (lobby.startsAt ?? now) - (now + serverOffset));
   const soon = remaining < 60_000;
@@ -121,44 +115,13 @@ export function Lobby() {
   const hint = isPublic
     ? 'Every seat is a computer until a human takes it. When the clock runs out the game begins with whoever is here.'
     : amHost
-      ? 'You are the host. Open seats for friends, give the rest to computers, and press Start when ready.'
+      ? 'Every seat is a computer until a friend takes it. Send them the code, set up the game, and press Start when ready.'
       : 'Waiting for the host to start the game.';
   const hostNote = amHost
-    ? isPublic
-      ? 'You are the host — you set the table size, the computers, which wings of the house are open and how many weapons are in play.'
-      : 'You are the host — you set the computers, which wings of the house are open and how many weapons are in play.'
+    ? 'You are the host — you set the seats, the computers, which wings of the house are open, and how many characters and weapons are in play.'
     : host
-      ? `${host.name} is the host and sets ${isPublic ? 'the table size, ' : ''}the computers, the wings in play and the weapon count.`
+      ? `${host.name} is the host and sets the seats, the computers, the wings in play and the character and weapon counts.`
       : 'The first human to join becomes the host.';
-
-  /** An unfilled private seat: what it is (open / closed), and the host's controls to change it. */
-  const emptySeat = (slot: Slot) => {
-    const hostCtrls = amHost && slot.index !== 0;
-    return (
-      <div className={`pseat pseat--empty pseat--${slot.status}`} key={slot.index} title={`Seat ${slot.index + 1}: ${slot.status}`}>
-        <div className="pseat__num">{slot.index + 1}</div>
-        <div className="pseat__text">
-          <div className="pseat__name pseat__name--empty">{slot.status === 'closed' ? 'Closed' : 'Open'}</div>
-        </div>
-        {hostCtrls && (
-          <span className="pseat__ctrls" role="radiogroup" title="Open the seat, close it, or give it to a computer">
-            {SEAT_STATES.map(({ status, label }) => (
-              <button
-                key={status}
-                type="button"
-                role="radio"
-                aria-checked={slot.status === status}
-                className={`pseat__ctrl pseat__ctrl--${status}${slot.status === status ? ' pseat__ctrl--on' : ''}`}
-                onClick={() => setSlot(slot.index, status)}
-              >
-                {label}
-              </button>
-            ))}
-          </span>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className={`lobby${isPublic ? ' plobby' : ''}`}>
@@ -186,22 +149,48 @@ export function Lobby() {
       </header>
 
       <div className="plobby__settings">
-        {isPublic && (
-          <label>
-            Total players
-            {amHost ? (
-              <select value={total} onChange={(e) => setRoomSettings({ totalPlayers: Number(e.target.value) })}>
-                {TABLE_SIZES.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <strong>{total}</strong>
-            )}
-          </label>
-        )}
+        <label>
+          Player slots
+          <CountPicker
+            value={total}
+            min={isPublic ? PUBLIC_MIN_PLAYERS : PRIVATE_MIN_PLAYERS}
+            max={isPublic ? PUBLIC_MAX_PLAYERS : PRIVATE_MAX_PLAYERS}
+            readOnly={!amHost}
+            onChange={(n) => setRoomSettings({ totalPlayers: n })}
+            title="Seats at the table — each one a computer until a human takes it"
+          />
+        </label>
+        <label>
+          Characters
+          <CountPicker
+            value={suspectCount}
+            min={Math.max(MIN_SUSPECTS, total)}
+            max={MAX_SUSPECTS}
+            readOnly={!amHost}
+            onChange={(n) => setRoomSettings({ suspectCount: n })}
+            title="How many of the 40 suspect cards are in the game (every seated character is always in)"
+          />
+        </label>
+        <label>
+          Weapons
+          <CountPicker
+            value={weaponCount}
+            min={MIN_WEAPONS}
+            max={MAX_WEAPONS}
+            readOnly={!amHost}
+            onChange={(n) => setRoomSettings({ weaponCount: n })}
+            title="How many of the 40 weapon cards are in the game"
+          />
+        </label>
+        <label>
+          House
+          <WingsPicker
+            wingsOff={wingsOff}
+            readOnly={!amHost}
+            onChange={(off) => setRoomSettings({ wingsOff: off })}
+            title="Which wings of the house are in play — a closed wing's rooms leave the board and the deck"
+          />
+        </label>
         <label>
           Computers
           <DifficultyPicker
@@ -215,19 +204,6 @@ export function Lobby() {
           Speed
           <SpeedPicker value={botSpeed} readOnly={!amHost} onChange={(s) => setRoomSettings({ botSpeed: s })} title="How quickly every computer acts" />
         </label>
-        <label>
-          House
-          <WingsPicker
-            wingsOff={wingsOff}
-            readOnly={!amHost}
-            onChange={(off) => setRoomSettings({ wingsOff: off })}
-            title="Which wings of the house are in play — a closed wing's rooms leave the board and the deck"
-          />
-        </label>
-        <label>
-          Weapons
-          <WeaponCountPicker value={weaponCount} readOnly={!amHost} onChange={(n) => setRoomSettings({ weaponCount: n })} title="How many of the 40 weapons are in the game" />
-        </label>
         <span className="plobby__hostnote">{hostNote}</span>
       </div>
 
@@ -235,7 +211,7 @@ export function Lobby() {
         <div className="plobby__seats">
           {lobby.slots.map((slot) => {
             const occ = slot.occupant;
-            if (!occ) return isPublic ? null : emptySeat(slot);
+            if (!occ) return null;
             const isMe = occ.id === myId;
             const isHostSeat = occ.id === lobby.hostId;
             const character = occ.suspectId ? getCard(occ.suspectId)?.title : undefined;
@@ -308,14 +284,6 @@ export function Lobby() {
                         </button>
                       </>
                     )}
-                    {!isPublic && amHost && occ.isBot && (
-                      <>
-                        {' · '}
-                        <button className="pseat__link" onClick={() => setSlot(slot.index, 'open')} title="Remove this computer and open the seat">
-                          boot
-                        </button>
-                      </>
-                    )}
                   </div>
                 </div>
                 <div className="pseat__tags">
@@ -360,10 +328,8 @@ export function Lobby() {
           Exit
         </button>
         <div className="lobby__footinfo">
-          {humans} {humans === 1 ? 'human' : 'humans'} · {cpus} {cpus === 1 ? 'computer' : 'computers'}
-          {isPublic ? ` · ${total} seats` : ''}
+          {humans} {humans === 1 ? 'human' : 'humans'} · {cpus} {cpus === 1 ? 'computer' : 'computers'} · {total} seats
           {watchers > 0 && ` · ${watchers} watching`}
-          {!isPublic && amHost && playerCount < MIN_PLAYERS && ` · need ${MIN_PLAYERS - playerCount} more to start`}
         </div>
         {isPublic ? (
           <div className="plobby__footclock">Starts in {fmtCountdown(remaining)}</div>

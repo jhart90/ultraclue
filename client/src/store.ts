@@ -8,7 +8,6 @@ import {
   type GameView,
   type LobbyView,
   type Slot,
-  type SlotStatus,
   type YouArePayload,
   type LobbyPayload,
   type ChatBroadcastPayload,
@@ -168,12 +167,18 @@ interface StoreState {
   createGame: (name: string, pin?: string) => void;
   joinGame: (code: string, name: string, pin?: string) => void;
   joinPublic: (name: string, observer?: boolean, pin?: string) => void;
-  setRoomSettings: (patch: { totalPlayers?: number; botDifficulty?: BotDifficulty; botSpeed?: BotSpeed; wingsOff?: string[]; weaponCount?: number }) => void;
+  setRoomSettings: (patch: {
+    totalPlayers?: number;
+    botDifficulty?: BotDifficulty;
+    botSpeed?: BotSpeed;
+    wingsOff?: string[];
+    weaponCount?: number;
+    suspectCount?: number;
+  }) => void;
   setBotDifficulty: (index: number, difficulty: BotDifficulty) => void;
   setDice: (color: string, pips: string) => void;
   takeSeat: (index: number) => void;
   joinAsObserver: () => void;
-  setSlot: (index: number, status: SlotStatus) => void;
   setObserver: (observer: boolean) => void;
   pickSuspect: (suspectId: string) => void;
   sendChat: (text: string) => void;
@@ -256,7 +261,6 @@ export const useStore = create<StoreState>((set) => ({
     const { seatPick } = useStore.getState();
     if (seatPick) socket.emit(SOCKET_EVENTS.JOIN_OBSERVER, { code: seatPick.code, name: pendingName });
   },
-  setSlot: (index, status) => socket.emit(SOCKET_EVENTS.SET_SLOT, { index, status }),
   setObserver: (observer) => socket.emit(SOCKET_EVENTS.SET_OBSERVER, { observer }),
   pickSuspect: (suspectId) => socket.emit(SOCKET_EVENTS.PICK_SUSPECT, { suspectId }),
   sendChat: (text) => socket.emit(SOCKET_EVENTS.LOBBY_CHAT, { text }),

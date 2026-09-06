@@ -592,7 +592,7 @@ export function Game() {
       {!observer && (
         <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
           <div className="dock__folder dock__folder--notes">
-            <DetectiveNotes roomCode={game.code} players={orderedPlayers} selfId={myId} hand={game.yourHand} weapons={pool.weapons} rooms={pool.rooms} onClose={() => setDock(null)} />
+            <DetectiveNotes roomCode={game.code} players={orderedPlayers} selfId={myId} hand={game.yourHand} suspects={pool.suspects} weapons={pool.weapons} rooms={pool.rooms} onClose={() => setDock(null)} />
           </div>
         </div>
       )}
@@ -620,6 +620,7 @@ export function Game() {
         <SelectModal
           mode={modal}
           fixedRoomId={modal === 'suggest' ? me.inRoomId : undefined}
+          suspects={pool.suspects}
           weapons={pool.weapons}
           rooms={pool.rooms}
           onCancel={() => {

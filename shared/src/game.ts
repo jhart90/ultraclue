@@ -198,6 +198,9 @@ export interface GameState {
   wingsOff?: string[];
   /** The weapon cards in this game's deck (the host may play with fewer than all 40). Absent = all. */
   weaponIds?: string[];
+  /** The suspect cards in this game's deck: every seated character plus random others up to the
+   *  host's count. Absent = all 40. */
+  suspectIds?: string[];
   /** The solution. SERVER-ONLY — only revealed in views once the game has ended. */
   envelope: Envelope;
   currentSuggestion?: Suggestion;
@@ -266,6 +269,8 @@ export interface GameView {
   wingsOff?: string[];
   /** The weapon cards in this game's deck (see GameState.weaponIds). */
   weaponIds?: string[];
+  /** The suspect cards in this game's deck (see GameState.suspectIds). */
+  suspectIds?: string[];
   yourId: string;
   /** Room host's id, so an observing host still gets host-only controls (set by the server). */
   hostId?: string;

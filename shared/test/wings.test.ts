@@ -10,6 +10,8 @@ import {
   makeRng,
   startGame,
   chooseWeapons,
+  chooseSuspects,
+  SUSPECTS,
   poolOf,
   reachableTiles,
   blockedCells,
@@ -159,6 +161,35 @@ describe('the deck follows the wings and the weapon count', () => {
     const m = botMind('hard', bot.id, bot.hand, s.turnOrder, events, undefined, pool, boardFor(s.wingsOff));
     const acc = botDecideAccusation(m, makeRng(1));
     expect(acc).toEqual(s.envelope);
+  });
+});
+
+describe('a trimmed suspect deck', () => {
+  it('always holds every seated character, then random others up to the count', () => {
+    const seated = ['suspect-scarlet', 'suspect-plum', 'suspect-green'];
+    const some = chooseSuspects(seated, 10, makeRng(4));
+    expect(some).toHaveLength(10);
+    for (const s of seated) expect(some).toContain(s);
+    // Never fewer than the seats, however low the count; the full set stays untouched.
+    expect(chooseSuspects(seated, 1, makeRng(4)).length).toBeGreaterThanOrEqual(seated.length);
+    expect(chooseSuspects(seated, 40, makeRng(1))).toEqual(SUSPECTS.map((s) => s.id));
+  });
+
+  it('deals only its suspects and refuses one that is not in play', () => {
+    const s = startGame('W', TWO, makeRng(21), { suspectCount: 6 });
+    expect(s.suspectIds).toHaveLength(6);
+    const inDeck = new Set(s.suspectIds);
+    for (const p of s.players) expect(inDeck.has(p.suspectId)).toBe(true);
+    expect(inDeck.has(s.envelope.suspectId)).toBe(true);
+    for (const p of s.players) for (const c of p.hand) if (c.startsWith('suspect-')) expect(inDeck.has(c)).toBe(true);
+    expect(poolOf(s).suspects).toHaveLength(6);
+    const active = s.players.find((p) => p.id === s.turnOrder[s.activeIdx])!;
+    const room = Object.values(BOARD.rooms)[0];
+    active.position = { ...room.tiles[0] };
+    active.inRoomId = room.id;
+    s.turnPhase = 'postMove';
+    const outSuspect = SUSPECTS.find((x) => !inDeck.has(x.id))!.id;
+    expect(() => makeSuggestion(s, active.id, outSuspect, 'weapon-rope', room.id, makeRng(1))).toThrow(/not in this game/);
   });
 });
 

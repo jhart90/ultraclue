@@ -1,4 +1,4 @@
-import type { SlotStatus, GameView, BotDifficulty, BotSpeed } from './game';
+import type { GameView, BotDifficulty, BotSpeed } from './game';
 import type { LobbyView, ChatMsg } from './lobby';
 import type { PublicStats } from './publicStats';
 import type { PlayerProfile } from './profile';
@@ -19,7 +19,6 @@ export const SOCKET_EVENTS = {
   SET_ROOM_SETTINGS: 'setRoomSettings', // host adjusts the room's settings (table size, computer difficulty)
   SET_BOT_DIFFICULTY: 'setBotDifficulty', // host changes one computer seat's difficulty
   REJOIN: 'rejoin', // reconnect to an existing seat after a refresh/drop
-  SET_SLOT: 'setSlot',
   SET_OBSERVER: 'setObserver', // a human toggles watch-only mode for their own seat
   PICK_SUSPECT: 'pickSuspect',
   LOBBY_CHAT: 'lobbyChat',
@@ -114,14 +113,12 @@ export interface SetRoomSettingsPayload {
   wingsOff?: string[];
   /** Weapons in the next game's deck. */
   weaponCount?: number;
+  /** Suspects in the next game's deck (never fewer than the seats). */
+  suspectCount?: number;
 }
 export interface SetBotDifficultyPayload {
   index: number; // seat index of the computer
   difficulty: BotDifficulty;
-}
-export interface SetSlotPayload {
-  index: number;
-  status: SlotStatus;
 }
 export interface SetObserverPayload {
   observer: boolean;

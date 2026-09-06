@@ -48,7 +48,7 @@ export type RoomPhase = 'lobby' | 'play' | 'ended';
 
 /** Host-adjustable room settings. */
 export interface RoomSettings {
-  /** Public room only: seats at the table (humans + computers always sum to this), 8..40. */
+  /** Seats at the table (humans + computers always sum to this): 8..40 public, 2..40 private. */
   totalPlayers?: number;
   /** Difficulty given to computer seats (the host can still override any one seat). */
   botDifficulty: BotDifficulty;
@@ -59,13 +59,15 @@ export interface RoomSettings {
   wingsOff?: string[];
   /** How many of the 40 weapons are in the next game's deck (MIN_WEAPONS..40; absent = all 40). */
   weaponCount?: number;
+  /** How many of the 40 suspects are in the next game's deck — never fewer than the seats, since
+   *  every seated character is in play (absent = all 40). */
+  suspectCount?: number;
 }
 
 export interface LobbyView {
   code: string;
   hostId: string;
-  /** MAX_PLAYERS long for a private room; `settings.totalPlayers` long for the public room (plus
-   *  any extra observer seats appended mid-game). */
+  /** `settings.totalPlayers` long (plus any extra observer seats appended past the table). */
   slots: Slot[];
   phase: RoomPhase;
   /** The single always-on public room: every seat is a computer until a human takes it over, and
@@ -79,8 +81,12 @@ export interface LobbyView {
   settings?: RoomSettings;
 }
 
-/** Private rooms: a fixed 8-seat table. */
-export const MAX_PLAYERS = 8;
+/** Private rooms: the host picks a table size in this range (8 seats to begin with); every seat
+ *  is a computer until a human takes it, the same as the public table. */
+export const PRIVATE_MIN_PLAYERS = 2;
+export const PRIVATE_MAX_PLAYERS = 40;
+export const PRIVATE_DEFAULT_PLAYERS = 8;
+/** The fewest dealt players any game can start with. */
 export const MIN_PLAYERS = 2;
 
 /** The public room: the host picks a table size in this range; every seat is filled (by a

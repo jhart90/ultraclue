@@ -56,7 +56,6 @@ import {
   type RevealCardPayload,
   type MakeAccusationPayload,
   type PickSuspectPayload,
-  type SetSlotPayload,
   type RejoinPayload,
   type BootPlayerPayload,
   type TakeSeatPayload,
@@ -96,7 +95,6 @@ import {
   reconnectOccupant,
   hasConnectedHuman,
   deleteRoom,
-  setSlot,
   setObserver,
   bootPlayer,
   leaveGameAsBot,
@@ -950,6 +948,7 @@ io.on('connection', (socket) => {
         botSpeed: p?.botSpeed,
         wingsOff: p?.wingsOff,
         weaponCount: p?.weaponCount,
+        suspectCount: p?.suspectCount,
       });
       const who = nameOf(room, cid(socket));
       if (room.settings?.totalPlayers !== before.totalPlayers) {
@@ -968,6 +967,9 @@ io.on('connection', (socket) => {
       }
       if (room.settings?.weaponCount !== before.weaponCount) {
         addChat(room, 'System', `${who} set the game to ${room.settings?.weaponCount ?? 40} weapons.`, true);
+      }
+      if (room.settings?.suspectCount !== before.suspectCount) {
+        addChat(room, 'System', `${who} set the game to ${room.settings?.suspectCount ?? 40} characters.`, true);
       }
       emitLobby(room);
       emitChat(room);
@@ -1097,17 +1099,6 @@ io.on('connection', (socket) => {
     emitChat(room);
     if (room.game) socket.emit(SOCKET_EVENTS.GAME_STARTED, { view: gameView(room, clientId) });
     sendNotes(socket, room, clientId); // hand back their notes on reconnect
-  });
-
-  socket.on(SOCKET_EVENTS.SET_SLOT, (p: SetSlotPayload) => {
-    const room = findRoomByOccupant(cid(socket));
-    if (!room) return;
-    try {
-      setSlot(room, cid(socket), p.index, p.status);
-      emitLobby(room);
-    } catch (err) {
-      emitError(socket, (err as Error).message);
-    }
   });
 
   socket.on(SOCKET_EVENTS.SET_OBSERVER, (p: SetObserverPayload) => {

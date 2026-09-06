@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { getCard, type RoomCard, type WeaponCard } from 'shared';
-import { SORTED_SUSPECTS, SORTED_WEAPONS, SORTED_ROOMS } from '../util/cardSort';
+import { getCard, type RoomCard, type SuspectCard, type WeaponCard } from 'shared';
+import { SORTED_SUSPECTS, SORTED_WEAPONS, SORTED_ROOMS, surname } from '../util/cardSort';
 import { highlightChat } from '../util/highlightChat';
 import { Card } from './Card';
 import { openCardZoom } from './CardZoom';
@@ -13,6 +13,7 @@ export function SelectModal({
   fixedRoomId,
   onCancel,
   onSubmit,
+  suspects,
   weapons,
   rooms,
 }: {
@@ -20,10 +21,12 @@ export function SelectModal({
   fixedRoomId?: string;
   onCancel: () => void;
   onSubmit: (suspectId: string, weaponId: string, roomId: string) => void;
-  /** The weapon and room cards in this game (the host may have trimmed either); all 40 by default. */
+  /** The suspect, weapon and room cards in this game (the host may have trimmed any); all 40 by default. */
+  suspects?: SuspectCard[];
   weapons?: WeaponCard[];
   rooms?: RoomCard[];
 }) {
+  const suspectList = suspects ? [...suspects].sort((a, b) => surname(a.title).localeCompare(surname(b.title))) : SORTED_SUSPECTS;
   const weaponList = weapons ? [...weapons].sort((a, b) => a.title.localeCompare(b.title)) : SORTED_WEAPONS;
   const roomList = rooms ? [...rooms].sort((a, b) => a.title.localeCompare(b.title)) : SORTED_ROOMS;
   const [suspectId, setSuspectId] = useState('');
@@ -44,7 +47,7 @@ export function SelectModal({
           <div className="sp__col">
             <h4>Suspect</h4>
             <div className="sp__list">
-              {SORTED_SUSPECTS.map((s) => (
+              {suspectList.map((s) => (
                 <button
                   key={s.id}
                   className={`sp__chip${suspectId === s.id ? ' sp__chip--on' : ''}`}

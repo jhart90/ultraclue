@@ -16,17 +16,33 @@ export interface CardPool {
 /** Every card: the pool of a game played with the whole house and all 40 weapons. */
 export const FULL_POOL: CardPool = { suspects: SUSPECTS, weapons: WEAPONS, rooms: ROOMS };
 
-/** How few weapons a host may play with. Fewer than this and the weapon is barely a mystery. */
-export const MIN_WEAPONS = 6;
+/** How few weapons or suspects a host may play with: two keeps each a mystery. */
+export const MIN_WEAPONS = 2;
 export const MAX_WEAPONS = WEAPONS.length;
 export const DEFAULT_WEAPONS = WEAPONS.length;
+export const MIN_SUSPECTS = 2;
+export const MAX_SUSPECTS = SUSPECTS.length;
+export const DEFAULT_SUSPECTS = SUSPECTS.length;
 
 export function clampWeaponCount(n: number | undefined): number {
   if (n == null || !Number.isFinite(n)) return DEFAULT_WEAPONS;
   return Math.max(MIN_WEAPONS, Math.min(MAX_WEAPONS, Math.round(n)));
 }
 
-type PoolState = Pick<GameState, 'wingsOff' | 'weaponIds'>;
+export function clampSuspectCount(n: number | undefined): number {
+  if (n == null || !Number.isFinite(n)) return DEFAULT_SUSPECTS;
+  return Math.max(MIN_SUSPECTS, Math.min(MAX_SUSPECTS, Math.round(n)));
+}
+
+type PoolState = Pick<GameState, 'wingsOff' | 'weaponIds' | 'suspectIds'>;
+
+/** The suspect cards in this game's deck, in the canonical card order. */
+export function suspectsInPlay(state: PoolState | undefined): SuspectCard[] {
+  const ids = state?.suspectIds;
+  if (!ids) return SUSPECTS;
+  const set = new Set(ids);
+  return SUSPECTS.filter((s) => set.has(s.id));
+}
 
 /** The board this game is played on: the whole house, or the house minus the wings switched off. */
 export function boardOf(state: PoolState | undefined): Board {
@@ -48,8 +64,21 @@ export function weaponsInPlay(state: PoolState | undefined): WeaponCard[] {
 
 /** The suspects, weapons and rooms in this game. */
 export function poolOf(state: PoolState | undefined): CardPool {
-  if (!state || (!state.wingsOff?.length && !state.weaponIds)) return FULL_POOL;
-  return { suspects: SUSPECTS, weapons: weaponsInPlay(state), rooms: roomsInPlay(boardOf(state)) };
+  if (!state || (!state.wingsOff?.length && !state.weaponIds && !state.suspectIds)) return FULL_POOL;
+  return { suspects: suspectsInPlay(state), weapons: weaponsInPlay(state), rooms: roomsInPlay(boardOf(state)) };
+}
+
+/**
+ * Pick which suspects are in a game: every character somebody is playing (`seated`) is in, and the
+ * rest of the host's `count` is filled at random from the others. Returned in canonical card order.
+ */
+export function chooseSuspects(seated: readonly string[], count: number | undefined, rng: RNG): string[] {
+  const must = new Set(seated.filter((id) => SUSPECTS.some((s) => s.id === id)));
+  const n = Math.max(clampSuspectCount(count), must.size);
+  if (n >= MAX_SUSPECTS) return SUSPECTS.map((s) => s.id);
+  const rest = shuffle(SUSPECTS.filter((s) => !must.has(s.id)).map((s) => s.id), rng);
+  const chosen = new Set([...must, ...rest.slice(0, n - must.size)]);
+  return SUSPECTS.filter((s) => chosen.has(s.id)).map((s) => s.id);
 }
 
 /** Every card id in the pool, suspects then weapons then rooms. */

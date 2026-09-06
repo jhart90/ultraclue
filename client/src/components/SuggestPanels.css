@@ -35,10 +35,10 @@
 .statpop {
   animation: uc-pop 0.18s ease;
 }
-/* Pop-ups the player only reads (status, announcements, reveals, verdicts, the end screen) render
-   at half size so the board stays visible. The ones the player acts in — choosing what to suggest
-   or accuse, choosing which card to reveal — keep their full size. */
-.statpop,
+/* Announcements, reveals, verdicts and the end screen — pop-ups the player only reads — render at
+   half size so the board stays visible. The ones the player acts in (the turn-status pop-up with
+   its Suggest / Accuse / End Turn buttons, the suggest and accuse pickers, the reveal choice) keep
+   their full size. */
 .sp--end {
   zoom: 0.5;
 }

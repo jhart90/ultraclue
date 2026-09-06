@@ -156,13 +156,23 @@ const WAVE_STAGGER_MS = 110;
 /** Model size of one die at the default scale; `buildSims` multiplies it by the viewer's setting. */
 export const DIE_SIZE = 41;
 
-/** Scatter landing spots around the middle of the play area, no two dice touching. */
-function scatterTargets(n: number, b: PlayBounds): Array<{ x: number; y: number }> {
+/** How far apart two dice centres must be so the dice never touch once at rest. A resting die's
+ *  widest projected reach is its top-face corner, about 0.89 x `dieSize` from centre (the cube is
+ *  drawn inside a unit sphere with a little perspective), and the landing pop swells it by 14%
+ *  more, so two dice need a bit over twice that between their centres. */
+export function diceMinGap(dieSize: number): number {
+  return dieSize * 2.1 + 8;
+}
+
+/** Scatter landing spots around the middle of the play area, no two dice touching. The gap between
+ *  dice follows the viewer's die size, so bigger dice spread out further; if the play area is too
+ *  cramped for the throw, the spots are eased apart afterwards rather than left overlapping. */
+function scatterTargets(n: number, b: PlayBounds, dieSize: number): Array<{ x: number; y: number }> {
   const w = b.right - b.left;
   const h = b.bottom - b.top;
   const cx = b.left + w / 2;
   const cy = b.top + h / 2;
-  const minGap = 92;
+  const minGap = diceMinGap(dieSize);
   const needed = Math.sqrt(n) * minGap * 1.6;
   const spreadX = Math.min(Math.max(needed, minGap), w * 0.8) / 2;
   const spreadY = Math.min(Math.max(needed, minGap), h * 0.62) / 2;
@@ -186,6 +196,41 @@ function scatterTargets(n: number, b: PlayBounds): Array<{ x: number; y: number 
       }
     }
     placed.push(best);
+  }
+  // Ease any pair still closer than the gap apart, keeping every spot inside the play area with the
+  // die's own reach to spare. A few passes settle even a crowded throw of big dice.
+  const reach = dieSize * 0.95;
+  const clamp = (p: { x: number; y: number }) => {
+    p.x = Math.min(Math.max(p.x, b.left + reach), b.right - reach);
+    p.y = Math.min(Math.max(p.y, b.top + reach), b.bottom - reach);
+  };
+  for (let pass = 0; pass < 24; pass++) {
+    let moved = false;
+    for (let i = 0; i < placed.length; i++) {
+      for (let j = i + 1; j < placed.length; j++) {
+        const a = placed[i];
+        const c = placed[j];
+        let dx = c.x - a.x;
+        let dy = c.y - a.y;
+        let d = Math.hypot(dx, dy);
+        if (d >= minGap) continue;
+        if (d < 1e-3) {
+          const ang = Math.random() * Math.PI * 2;
+          dx = Math.cos(ang);
+          dy = Math.sin(ang);
+          d = 1;
+        }
+        const push = (minGap - d) / 2 + 0.5;
+        a.x -= (dx / d) * push;
+        a.y -= (dy / d) * push;
+        c.x += (dx / d) * push;
+        c.y += (dy / d) * push;
+        clamp(a);
+        clamp(c);
+        moved = true;
+      }
+    }
+    if (!moved) break;
   }
   return placed;
 }
@@ -219,7 +264,7 @@ export function buildSims(values: number[], w: number, h: number, color: string,
   const b = bounds ?? { left: 0, right: w, top: 0, bottom: h };
   const bounceChance = Math.max(0, Math.min(100, bouncePct)) / 100;
   const dieSize = DIE_SIZE * scale;
-  const targets = scatterTargets(values.length, b);
+  const targets = scatterTargets(values.length, b, dieSize);
   const cx = b.left + (b.right - b.left) / 2;
   const rgb = hexToRgb(color);
   let waveDelay = 0;

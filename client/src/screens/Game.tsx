@@ -543,6 +543,7 @@ export function Game() {
             onMoveTo={moveTo}
             myId={myId}
             activeId={activeId}
+            round={game.round ?? 0}
           />
         </div>
 
@@ -576,6 +577,7 @@ export function Game() {
               cameraLock={cameraLock}
               canMove={false}
               keyboardZoom={false}
+              round={game.round ?? 0}
             />
           )}
         </div>

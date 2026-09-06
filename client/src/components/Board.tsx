@@ -6,6 +6,7 @@ import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
 import { highlightChat } from '../util/highlightChat';
 import { packRoom, type Packing, type Rect } from '../render/roomPacking';
 import { BOARD_TEXTURES, textureUrl, texturePatternId, type BoardTexture } from '../render/boardTextures';
+import { EnvelopeArt, ENVELOPE_VIEWBOX } from './EnvelopeArt';
 import './Board.css';
 
 interface LastMove {
@@ -602,8 +603,12 @@ export function Board({
   myId,
   cameraLock = true,
   activeId,
+  round = 0,
 }: {
   players: PlayerView[];
+  /** Completed rounds so far. The faint start-position rings are shown only while the first round
+   *  is still being played (round 0); once everyone has had a turn they are gone for good. */
+  round?: number;
   reachable?: Coord[];
   lastMove?: LastMove;
   weaponLocations?: Record<string, string>;
@@ -891,13 +896,6 @@ export function Board({
             );
           })}
 
-          {/* shortcut link lines */}
-          <g stroke="#e7c66a" strokeWidth="1.5" strokeDasharray="3 5" opacity="0.22">
-            {BOARD.shortcuts.map((sc) => (
-              <line key={sc.id} x1={cx(sc.a)} y1={cy(sc.a)} x2={cx(sc.b)} y2={cy(sc.b)} />
-            ))}
-          </g>
-
           {/* path cells */}
           {BOARD.cells.filter((c) => c.type === 'path').map((c) => {
             const t = THEME[(BOARD.sections.find((s) => s.id === c.sectionId)?.theme) ?? 'ground-floor'];
@@ -1025,7 +1023,6 @@ export function Board({
             }
             return (
               <g key={st.id}>
-                <line x1={cx(st.a[0])} y1={cy(st.a[0])} x2={cx(st.b[0])} y2={cy(st.b[0])} stroke="#9aa0a6" strokeWidth="1.5" strokeDasharray="2 4" opacity="0.3" />
                 {st.a.map((t, i) => (
                   <Staircase key={`a${i}`} at={t} label={`${st.title} — to the ${name(st.to)}`} onTip={setTip} />
                 ))}
@@ -1165,14 +1162,33 @@ export function Board({
             ];
           })}
 
-          {/* envelope */}
-          <rect x={BOARD.envelope.x * TS + 1} y={BOARD.envelope.y * TS + 1} width={TS - 2} height={TS - 2} rx="2" fill="#7a1f2b" stroke="#e7c66a" />
-          <text x={cx(BOARD.envelope)} y={cy(BOARD.envelope) + 4} textAnchor="middle" fontSize="12">✉</text>
+          {/* the case envelope: the title screen's sealed manila envelope, dropped at a slight tilt in
+              the empty corner above the Upper Floor and beside the Grounds, about 12 tiles wide */}
+          {(() => {
+            const w = 12 * TS;
+            const h = (w * ENVELOPE_VIEWBOX.h) / ENVELOPE_VIEWBOX.w;
+            const blank = { x: BOARD.sections.find((s) => s.id === 'grounds')!.origin.x, y: BOARD.sections.find((s) => s.id === 'upper-floor')!.origin.y };
+            const ex = (blank.x * TS) / 2;
+            const ey = (blank.y * TS) / 2;
+            return (
+              <g transform={`translate(${ex} ${ey}) rotate(-12)`} filter="url(#board-env-shadow)" style={{ pointerEvents: 'none' }}>
+                <svg x={-w / 2} y={-h / 2} width={w} height={h} viewBox={`0 0 ${ENVELOPE_VIEWBOX.w} ${ENVELOPE_VIEWBOX.h}`} overflow="visible">
+                  <defs>
+                    <filter id="board-env-shadow" x="-20%" y="-20%" width="140%" height="150%">
+                      <feDropShadow dx="0" dy="10" stdDeviation="9" floodColor="#000" floodOpacity="0.6" />
+                    </filter>
+                  </defs>
+                  <EnvelopeArt idPrefix="board-env" />
+                </svg>
+              </g>
+            );
+          })()}
 
-          {/* start homes (faint) */}
-          {BOARD.starts.map((s) => (
-            <circle key={s.suspectId} cx={cx(s.tile)} cy={cy(s.tile)} r={TS / 2 - 3} fill="none" stroke={suspectColor(s.suspectId)} strokeWidth="1.5" opacity="0.25" />
-          ))}
+          {/* start homes (faint), only until everyone has taken their first turn */}
+          {round < 1 &&
+            BOARD.starts.map((s) => (
+              <circle key={s.suspectId} cx={cx(s.tile)} cy={cy(s.tile)} r={TS / 2 - 3} fill="none" stroke={suspectColor(s.suspectId)} strokeWidth="1.5" opacity="0.25" />
+            ))}
 
           {/* darken out-of-range squares; highlight reachable path cells individually and each
               reachable room as ONE large clickable space */}

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { getCard, BOT_DIFFICULTY_LABEL, type PlayerView } from 'shared';
 import { SuspectThumb } from './SuspectThumb';
-import '../screens/PublicLobby.css';
+import '../screens/Lobby.css';
 import './TurnOrder.css';
 
 function suspectColor(suspectId?: string): string {

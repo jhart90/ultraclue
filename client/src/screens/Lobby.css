@@ -1,3 +1,7 @@
+/* The lobby — public table and private room alike: header (clock or room code), a settings strip,
+   a dense grid of slim seat rows that fits 40 seats on one screen, the chat column, and a footer.
+   The seat-row styles (.pseat) are shared with the in-game roster (TurnOrder.tsx). */
+
 .lobby {
   max-width: 1180px;
   margin: 0 auto;
@@ -24,6 +28,7 @@
   font-style: italic;
 }
 
+/* Private rooms: the room code, with the share button stacked beneath it on mobile. */
 .lobby__code {
   text-align: center;
   background: #1c1830;
@@ -43,8 +48,6 @@
   letter-spacing: 0.35em;
   color: var(--accent);
 }
-
-/* Room code + (mobile) the share button stacked beneath it, matching the code tag's width. */
 .lobby__codecol {
   display: flex;
   flex-direction: column;
@@ -76,35 +79,77 @@
   }
 }
 
-/* Room-wide computer difficulty, between the header and the seats. */
-.lobby__settings {
+/* Public table: the countdown clock in the header. */
+.plobby__clock {
+  text-align: center;
+  background: #1c1830;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-radius: 10px;
+  padding: 0.4rem 1rem;
+  min-width: 11rem;
+}
+.plobby__clock span {
+  display: block;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted, #9a93b3);
+}
+.plobby__clock strong {
+  font-size: 1.8rem;
+  letter-spacing: 0.08em;
+  color: var(--accent, #c8a24a);
+  font-variant-numeric: tabular-nums;
+}
+.plobby__clock--soon strong {
+  color: #ef6d82;
+}
+
+/* Settings strip: table size (public), computers, speed, the wings in play, weapons. */
+.plobby__settings {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 1rem;
   flex-wrap: wrap;
   margin-top: 0.9rem;
-  padding: 0.5rem 0.8rem;
+  padding: 0.55rem 0.8rem;
   background: #1a1630;
   border: 1px solid rgba(200, 162, 74, 0.18);
   border-radius: 10px;
 }
-.lobby__settingslabel {
+.plobby__settings label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   font-size: 0.72rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted, #9a93b3);
 }
-.lobby__settingslabel--gap {
-  margin-left: 0.6rem;
+.plobby__settings select,
+.plobby__settings strong {
+  font-family: var(--font-display, 'Georgia', serif);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
+  font-size: 1.1rem;
+  color: var(--ink, #ece8f5);
+  background: #1c1830;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-radius: 8px;
+  padding: 0.25rem 0.55rem;
+  letter-spacing: 0.04em;
 }
-.lobby__settingsnote {
+.plobby__settings select {
+  cursor: pointer;
+}
+.plobby__settings select:focus {
+  outline: none;
+  border-color: var(--accent, #c8a24a);
+}
+.plobby__hostnote {
   color: var(--muted, #9a93b3);
   font-style: italic;
   font-size: 0.85rem;
-}
-.seat__diff {
-  display: flex;
-  justify-content: center;
 }
 
 .lobby__body {
@@ -115,64 +160,219 @@
   flex: 1;
   min-height: 0;
 }
-
-.lobby__seats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  grid-auto-rows: 1fr;
-  gap: 0.7rem;
-  min-width: 0;
-}
-
 .lobby__chat {
   min-height: 420px;
 }
 
-.seat {
-  background: #1a1630;
-  border: 1px solid rgba(200, 162, 74, 0.18);
-  border-radius: 10px;
-  padding: 0.7rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  min-height: 150px;
-}
-.seat--filled {
-  background: #211a38;
-  border-color: rgba(200, 162, 74, 0.4);
+/* Seat rows. */
+.plobby__seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.45rem;
+  align-content: start;
+  min-width: 0;
 }
 
-.seat__num {
-  font-size: 0.65rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted, #9a93b3);
-}
-
-.seat__who {
+.pseat {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: #1a1630;
+  border: 1px solid rgba(200, 162, 74, 0.18);
+  border-radius: 8px;
+  min-height: 54px;
 }
-.seat__swatch {
-  width: 1.3rem;
-  height: 1.3rem;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.55);
+.pseat--human {
+  background: #211a38;
+  border-color: rgba(200, 162, 74, 0.45);
+}
+.pseat--me {
+  box-shadow: inset 0 0 0 2px #2e8b57;
+}
+.pseat__num {
+  width: 1.4rem;
+  text-align: right;
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  color: var(--muted, #9a93b3);
   flex-shrink: 0;
 }
-.seat__name {
+.pseat__thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #14111f;
+  border: 2px solid #555;
+  flex-shrink: 0;
+}
+.pseat__thumb img,
+.pseat__thumb svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.pseat__text {
+  flex: 1;
+  min-width: 0;
+}
+.pseat__name {
   font-weight: 700;
-  font-size: 1.02rem;
-  word-break: break-word;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pseat__sub {
+  font-size: 0.72rem;
+  color: var(--muted, #9a93b3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pseat__tags {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+/* Inline links in a seat's sub-line ("watch instead", "boot") keep the row one line tall. */
+.pseat__link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent, #c8a24a);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.pseat__link:hover {
+  color: #e6c46a;
 }
 
-.seat__tags {
-  display: flex;
-  gap: 0.3rem;
-  flex-wrap: wrap;
+/* Watchers: a dimmed row past the playing seats, with an eye instead of a portrait. */
+.pseat--watcher {
+  opacity: 0.85;
+  border-style: dashed;
 }
+.pseat__thumb--eye {
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  border-color: #5a4a86;
+}
+.plobby__watchnote {
+  text-align: center;
+  color: var(--muted, #9a93b3);
+  font-style: italic;
+  margin: 0.4rem 0 0;
+}
+
+/* Private rooms: an unfilled seat — open (waiting for a player) or closed — with the host's
+   Open / Closed / Bot control on the right where a computer's difficulty would sit. */
+.pseat--empty {
+  border-style: dashed;
+}
+.pseat--closed {
+  opacity: 0.6;
+}
+.pseat__name--empty {
+  color: var(--muted, #9a93b3);
+  font-weight: 400;
+  font-style: italic;
+}
+.pseat__ctrls {
+  display: inline-flex;
+  border: 1px solid rgba(200, 162, 74, 0.4);
+  border-radius: 999px;
+  overflow: hidden;
+  background: #14111f;
+  flex-shrink: 0;
+}
+.pseat__ctrl {
+  background: none;
+  border: none;
+  color: var(--muted, #9a93b3);
+  font-family: 'Georgia', serif;
+  font-size: 0.66rem;
+  padding: 0.12rem 0.45rem;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.pseat__ctrl + .pseat__ctrl {
+  border-left: 1px solid rgba(200, 162, 74, 0.2);
+}
+.pseat__ctrl:hover {
+  color: var(--ink, #ece8f5);
+}
+.pseat__ctrl--on {
+  font-weight: 700;
+}
+/* Selected-state themes: open = green, closed = red, bot = light blue. */
+.pseat__ctrl--open.pseat__ctrl--on {
+  background: #2f9e54;
+  color: #08210f;
+}
+.pseat__ctrl--closed.pseat__ctrl--on {
+  background: #c2435a;
+  color: #fff;
+}
+.pseat__ctrl--bot.pseat__ctrl--on {
+  background: #5bb8e6;
+  color: #06243a;
+}
+
+/* Your own seat is one big "swap character" button. Hovering (or focusing) it dims everything on
+   the tile well under a bold SWAP CHARACTER? banner; a click anywhere opens the character picker. */
+.pseat--swap {
+  cursor: pointer;
+}
+.pseat--swap > :not(.pseat__swap) {
+  transition: opacity 0.12s ease, filter 0.12s ease;
+}
+.pseat__swap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  font-family: var(--font-display, 'Georgia', serif);
+  -webkit-text-stroke: var(--display-stroke);
+  paint-order: stroke fill;
+  font-weight: 900;
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+  color: #f4e6b8;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  background: rgba(10, 7, 18, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.pseat--swap:hover > :not(.pseat__swap),
+.pseat--swap:focus-visible > :not(.pseat__swap) {
+  opacity: 0.22;
+  filter: saturate(0.4);
+}
+.pseat--swap:hover .pseat__swap,
+.pseat--swap:focus-visible .pseat__swap {
+  opacity: 1;
+}
+.pseat--swap:focus-visible {
+  outline: 2px solid var(--accent, #c8a24a);
+  outline-offset: 2px;
+}
+/* The "watch instead" link must stay clickable under the banner. */
+.pseat--swap:hover .pseat__link {
+  pointer-events: auto;
+}
+
+/* Tags on a seat: HOST / YOU / OFFLINE (and BOT / OBSERVER in the in-game roster). */
 .tag {
   font-size: 0.6rem;
   letter-spacing: 0.1em;
@@ -201,136 +401,6 @@
   color: #fff;
 }
 
-/* Watch-only seats: a short note in place of the character art, plus the toggle on your own seat. */
-.seat__observing {
-  font-size: 0.82rem;
-  color: #b9b2d4;
-  font-style: italic;
-  text-align: center;
-  margin-top: auto;
-  padding: 0.3rem 0.2rem;
-}
-.seat__observe {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  font-size: 0.82rem;
-  color: #d9d3e6;
-  cursor: pointer;
-  margin-top: 0.4rem;
-  user-select: none;
-}
-.seat__observe input {
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--accent, #c8a24a);
-  cursor: pointer;
-}
-
-.seat__char {
-  font-size: 0.85rem;
-  color: #d9d3e6;
-  margin-top: auto;
-  text-align: center;
-}
-
-.seat__pick {
-  background: #2c2447;
-  border: 1px solid rgba(200, 162, 74, 0.5);
-  color: var(--ink, #ece8f5);
-  border-radius: 6px;
-  /* roughly twice the previous height */
-  min-height: 3.4rem;
-  padding: 0.35rem;
-  cursor: pointer;
-  font-family: 'Georgia', serif;
-  font-size: 0.85rem;
-}
-.seat__pick:hover {
-  border-color: var(--accent);
-}
-
-/* Chosen-character art shown above the "Change character" button on your own seat. */
-.seat__portrait {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 8px;
-  background: #14111f;
-  border: 1px solid rgba(200, 162, 74, 0.2);
-}
-.seat__portrait img,
-.seat__portrait svg {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  border-radius: 6px;
-}
-
-.seat__empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  letter-spacing: 0.2em;
-  color: var(--muted, #9a93b3);
-  font-weight: 700;
-}
-.seat__empty--closed {
-  color: #5a4750;
-}
-
-/* Stacked Open / Closed / Bot controls that fill nearly all of an unfilled seat's height. */
-.seat__ctrls {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  flex: 1;
-  min-height: 0;
-}
-.seat__ctrl {
-  flex: 1;
-  background: #14111f;
-  border: 1px solid rgba(200, 162, 74, 0.25);
-  color: var(--muted, #9a93b3);
-  border-radius: 6px;
-  padding: 0.25rem;
-  font-size: 0.92rem;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  font-family: 'Georgia', serif;
-}
-.seat__ctrl:hover {
-  border-color: var(--accent);
-  color: var(--ink);
-}
-.seat__ctrl--on {
-  font-weight: 700;
-}
-/* Selected-state themes: open = green, closed = red, bot = light blue. */
-.seat__ctrl--open.seat__ctrl--on {
-  background: #2f9e54;
-  border-color: #43c172;
-  color: #08210f;
-}
-.seat__ctrl--closed.seat__ctrl--on {
-  background: #c2435a;
-  border-color: #e0556b;
-  color: #fff;
-}
-.seat__ctrl--bot.seat__ctrl--on {
-  background: #5bb8e6;
-  border-color: #84cff0;
-  color: #06243a;
-}
-
 .lobby__error {
   color: #ef6d82;
   text-align: center;
@@ -349,6 +419,12 @@
   color: var(--muted, #9a93b3);
   font-size: 0.9rem;
 }
+.plobby__footclock {
+  color: var(--accent, #c8a24a);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 @media (max-width: 760px) {
   .lobby__body {
@@ -357,22 +433,10 @@
   .lobby__chat {
     min-height: 300px;
   }
-}
-
-/* The private lobby's weapon-count select, styled like the public table-size select. */
-.lobby__settings select {
-  font-family: var(--font-display, 'Georgia', serif);
-  -webkit-text-stroke: var(--display-stroke);
-  paint-order: stroke fill;
-  font-size: 1rem;
-  color: var(--ink, #ece8f5);
-  background: #1c1830;
-  border: 1px solid rgba(200, 162, 74, 0.4);
-  border-radius: 8px;
-  padding: 0.2rem 0.5rem;
-  cursor: pointer;
-}
-.lobby__settings select:focus {
-  outline: none;
-  border-color: var(--accent, #c8a24a);
+  .plobby__seats {
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  }
+  .plobby__clock {
+    min-width: 8rem;
+  }
 }

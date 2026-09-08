@@ -853,6 +853,7 @@ export function takeSeat(room: Room, joinerId: string, name: string, index: numb
     gp.connected = true;
     gp.isHost = joinerId === room.hostId;
     gp.difficulty = undefined;
+    gp.persona = undefined;
     if (name.trim()) gp.name = name.trim();
     // A seat inherits its character's dice; a returning human's own choice comes via SET_DICE.
   }

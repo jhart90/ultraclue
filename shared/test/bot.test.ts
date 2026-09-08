@@ -15,6 +15,7 @@ import {
   botThreatened,
   type BotMind,
   FULL_POOL,
+  NEUTRAL_PERSONA,
 } from '../src';
 
 /** Rule out everything except the given solution triple. */
@@ -79,6 +80,19 @@ describe('bot deduction', () => {
     expect(coordKey(target!)).toBe(coordKey(roomTile));
   });
 
+  it('weights its room pick per room, not per tile', () => {
+    // One Lounge tile against every Ballroom tile: a per-tile pick would land in the Ballroom almost
+    // every time; a per-room pick splits the visits evenly.
+    const lounge = BOARD.rooms['room-lounge'].tiles.slice(0, 1);
+    const ballroom = BOARD.rooms['room-ballroom'].tiles;
+    const rng = makeRng(7);
+    let loungeHits = 0;
+    const N = 2000;
+    for (let i = 0; i < N; i++) if (coordKey(botMoveTarget([...ballroom, ...lounge], new Set(), rng)!) === coordKey(lounge[0])) loungeHits++;
+    expect(loungeHits / N).toBeGreaterThan(0.4);
+    expect(loungeHits / N).toBeLessThan(0.6);
+  });
+
   it('stays only in an untested, still-unknown room', () => {
     expect(botShouldStay('room-study', new Set(), new Set())).toBe(true);
     expect(botShouldStay('room-study', new Set(['room-study']), new Set())).toBe(false); // ruled out
@@ -97,6 +111,7 @@ describe('bot gambles when a rival is about to win', () => {
     ruledOut.delete('suspect-mustard'); // second suspect still possible
     return {
       difficulty: 'hard',
+      persona: NEUTRAL_PERSONA,
       botId: bot,
       hand: [],
       k: { has: new Map(), hasnt: new Map(), groups: [], ruledOut },

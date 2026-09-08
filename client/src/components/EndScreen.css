@@ -236,6 +236,44 @@
   text-transform: uppercase;
 }
 
+/* The computers' personalities, revealed at the end. */
+.end__personasub {
+  font-size: 0.78rem;
+  color: var(--muted, #9a93b3);
+  margin: -0.2rem 0 0.5rem;
+  font-style: italic;
+}
+.end__personas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 0.7rem;
+}
+.end__persona {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+.end__personawho {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.end__personatitle {
+  font-weight: 700;
+  color: var(--accent, #c8a24a);
+  letter-spacing: 0.02em;
+}
+.end__personablurb {
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--muted, #9a93b3);
+}
+
 .end__about {
   padding: 0.5rem 1.2rem 0.55rem;
   border-top: 1px solid rgba(200, 162, 74, 0.18);
@@ -375,6 +413,9 @@
   .end__numbers,
   .end__tops,
   .end__honours {
+    grid-template-columns: 1fr;
+  }
+  .end__personas {
     grid-template-columns: 1fr;
   }
   .end__numbers {

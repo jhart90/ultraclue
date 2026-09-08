@@ -4,6 +4,7 @@ import { type RNG, shuffle, pick } from '../rng';
 import { log } from './util';
 import { beginTurn, startTileOf } from './turn';
 import { newStats, syncParticipants } from './stats';
+import { randomPersona } from './persona';
 import { FULL_POOL, boardOf, chooseSuspects, chooseWeapons, poolIds, poolOf, type CardPool } from './pool';
 
 /** The host's choices for how much of the house, and how many cards, a game is played with. */
@@ -72,6 +73,8 @@ export function startGame(code: string, lobbyPlayers: Player[], rng: RNG, option
     eliminated: false,
     position: startTileOf(p.suspectId, board),
     inRoomId: undefined,
+    // Every computer is dealt a personality; nobody learns it until the game ends.
+    persona: p.isBot ? randomPersona(rng) : undefined,
   }));
   const envelope = buildEnvelope(rng, pool);
   dealHands(players, envelope, rng, pool);

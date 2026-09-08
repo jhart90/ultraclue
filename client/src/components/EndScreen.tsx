@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getCard, summarizeStats, PUBLIC_ROOM_CODE, type GameView, type Ranked } from 'shared';
+import { getCard, summarizeStats, BOT_PERSONAS, PUBLIC_ROOM_CODE, type GameView, type Ranked } from 'shared';
 import { Card } from './Card';
 import { contrastInk } from '../render/colorUtils';
 import './EndScreen.css';
@@ -122,6 +122,9 @@ export function EndScreen({
   const solved = game.announcement?.kind === 'accusation' && game.announcement.correct && game.announcement.byId === game.winnerId;
   const summary = summarizeStats(game);
   const winColor = winner ? suspectColor(game, winner.id) : '#c8a24a';
+  // The computers' personalities: secret all game, revealed here (the view only carries them
+  // once the game has ended).
+  const unmasked = game.players.filter((p) => p.isBot && p.persona && BOT_PERSONAS[p.persona]);
 
   // Public games: live countdown to the next lobby (server clock, skew-corrected).
   const [now, setNow] = useState(Date.now());
@@ -285,6 +288,27 @@ export function EndScreen({
                 </div>
               </section>
             </>
+          )}
+
+          {unmasked.length > 0 && (
+            <section className="end__section">
+              <div className="end__sectiontitle">The computers, unmasked</div>
+              <div className="end__personasub">Every computer played the whole game with a secret personality.</div>
+              <ul className="end__personas">
+                {unmasked.map((p) => {
+                  const persona = BOT_PERSONAS[p.persona!];
+                  return (
+                    <li key={p.id} className="end__persona">
+                      <div className="end__personawho">
+                        <Name view={game} id={p.id} />
+                        <span className="end__personatitle">{persona.title}</span>
+                      </div>
+                      <div className="end__personablurb">{persona.blurb}</div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           )}
         </div>
 

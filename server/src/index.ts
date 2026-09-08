@@ -43,6 +43,7 @@ import {
   botDecideShortcut,
   botDecideMove,
   botDecideFloor,
+  randomPersona,
   botNotesGrid,
   type BotMind,
   type SuggestionEvent,
@@ -225,8 +226,11 @@ function eventsForPlayer(room: Room, playerId: string): SuggestionEvent[] {
 /** A bot's current understanding of the game, as good as its difficulty allows. */
 function mindFor(g: GameState, playerId: string, room: Room): BotMind {
   const p = getPlayer(g, playerId);
+  // A seat that became a computer mid-game (a dropped or booted human) is dealt its personality
+  // the first time it has to think; seats that started as computers got theirs in startGame().
+  if (p?.isBot && !p.persona) p.persona = randomPersona(RNG);
   const handCounts = new Map(g.players.map((pl) => [pl.id, pl.hand.length]));
-  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, eventsForPlayer(room, playerId), handCounts, poolOf(g), boardOf(g));
+  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, eventsForPlayer(room, playerId), handCounts, poolOf(g), boardOf(g), p?.persona);
 }
 /** The order in which the other players would be asked to disprove this player's suggestion. */
 function responderQueue(g: GameState, suggesterId: string): string[] {
@@ -521,7 +525,7 @@ function scheduleBots(room: Room): void {
             const visited = mem.visited.get(cur.id) ?? new Set<string>();
             const st = mem.stays.get(cur.id);
             const staysHere = st && st.room === me?.inRoomId ? st.n : 0;
-            if (botDecideShortcut(mind, me?.inRoomId)) {
+            if (botDecideShortcut(mind, me?.inRoomId, RNG)) {
               s = takeShortcut(s, cur.id);
               mem.stays.delete(cur.id);
             } else if (botDecideStay(mind, me?.inRoomId, staysHere, visited)) {
@@ -538,7 +542,7 @@ function scheduleBots(room: Room): void {
               return;
             }
           } else if (s.turnPhase === 'awaitMove') {
-            const dest = botDecideMove(mind, activeReachable(s), RNG, responderQueue(s, cur.id));
+            const dest = botDecideMove(mind, activeReachable(s), RNG, responderQueue(s, cur.id), mem.visited.get(cur.id));
             if (!dest) break;
             s = moveTo(s, cur.id, dest);
           } else if (s.turnPhase === 'awaitElevator' && s.elevatorRide) {

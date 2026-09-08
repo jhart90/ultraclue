@@ -93,13 +93,30 @@ export function botRevealCard(
   return pick(mostExposed, rng);
 }
 
+/** Pick one of these room tiles, weighting every room equally: first a room among those the tiles
+ *  belong to, then a tile inside it. Picking a tile uniformly would let a big room next to a small
+ *  one (the Ballroom beside the Lounge) soak up nearly every visit, since it shows far more tiles
+ *  within one roll of its doors. `tiles` must all lie in rooms. */
+export function pickRoomTile(tiles: readonly Coord[], rng: RNG, board: Board = BOARD): Coord {
+  const byRoom = new Map<string, Coord[]>();
+  for (const t of tiles) {
+    const r = roomIdAt(board, t);
+    if (!r) continue;
+    const list = byRoom.get(r);
+    if (list) list.push(t);
+    else byRoom.set(r, [t]);
+  }
+  if (!byRoom.size) return pick(tiles, rng);
+  return pick(pick([...byRoom.values()], rng), rng);
+}
+
 /** Choose a destination: prefer entering a room (to suggest), favouring still-unknown rooms. */
 export function botMoveTarget(reachable: Coord[], ruledOut: Set<string>, rng: RNG, board: Board = BOARD): Coord | null {
   if (!reachable.length) return null;
   const roomTiles = reachable.filter((t) => roomIdAt(board, t));
   if (roomTiles.length) {
     const candidate = roomTiles.filter((t) => !ruledOut.has(roomIdAt(board, t)!));
-    return pick(candidate.length ? candidate : roomTiles, rng);
+    return pickRoomTile(candidate.length ? candidate : roomTiles, rng, board);
   }
   return pick(reachable, rng);
 }

@@ -43,6 +43,37 @@ describe('public game history', () => {
     expect(stats.recent[0].id).toBe('g1');
   });
 
+  it('tallies the computers by personality, using the personality the finished view reveals', () => {
+    const stats = emptyPublicStats();
+    const view = finishedGame(7, true); // the human solves it; the computer b1 just played
+    const bot = view.players.find((p) => p.isBot)!;
+    expect(bot.persona).toBeTruthy(); // revealed because the game has ended
+    foldPublicGame(stats, view, 'g1');
+    expect(stats.personaGames).toEqual({ [bot.persona!]: 1 });
+    expect(stats.personaWins).toEqual({});
+    expect(stats.personaTiles[bot.persona!] ?? 0).toBe(0);
+    // A human's wrong accusation hands the computer the game by default: a win, not a solve.
+    const lost = finishedGame(8, false);
+    const bot2 = lost.players.find((p) => p.isBot)!;
+    foldPublicGame(stats, lost, 'g2');
+    expect(stats.personaWins).toEqual({ [bot2.persona!]: 1 });
+    expect(stats.personaCorrect).toEqual({});
+    expect(Object.values(stats.personaGames).reduce((a, b) => a + b, 0)).toBe(2);
+  });
+
+  it('backfills the personality tallies from the archive when an older stats file lacks them', () => {
+    const stats = emptyPublicStats();
+    const view = finishedGame(8, false);
+    foldPublicGame(stats, view, 'g1');
+    const bot = view.players.find((p) => p.isBot)!;
+    const raw = JSON.parse(JSON.stringify(stats)) as Record<string, unknown>;
+    for (const k of Object.keys(raw)) if (k.startsWith('persona')) delete raw[k];
+    const loaded = { ...emptyPublicStats(), ...(raw as object), recent: stats.recent } as typeof stats;
+    expect(backfillPublicStats(loaded, raw as never)).toBe(true);
+    expect(loaded.personaGames).toEqual({ [bot.persona!]: 1 });
+    expect(loaded.personaWins).toEqual({ [bot.persona!]: 1 });
+  });
+
   it('credits a computer win to the character but not to the human table', () => {
     const stats = emptyPublicStats();
     const view = finishedGame(8, false); // the human accuses wrongly; the computer wins by default

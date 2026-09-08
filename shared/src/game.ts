@@ -3,6 +3,7 @@
 // to what that player is allowed to see.
 
 import type { Coord, FloorId } from './data/board';
+import type { BotPersonaId } from './engine/persona';
 
 export type SlotStatus = 'open' | 'closed' | 'bot';
 
@@ -73,6 +74,9 @@ export interface Player {
   dice?: DiceStyle;
   /** Computer players only: how well this seat plays. */
   difficulty?: BotDifficulty;
+  /** Computer players only: the personality it was dealt at the start. SERVER-ONLY until the game
+   *  ends — the end-of-game screen is the first anyone hears of it. */
+  persona?: BotPersonaId;
   /** Current board tile. */
   position: Coord;
   /** Room id if the piece is currently inside a room. */
@@ -236,6 +240,8 @@ export interface PlayerView {
   eliminated: boolean;
   dice?: DiceStyle;
   difficulty?: BotDifficulty;
+  /** A computer's personality, revealed only once the game has ended. */
+  persona?: BotPersonaId;
   /** How many cards this player holds — never the cards themselves. */
   handCount: number;
   position: Coord;

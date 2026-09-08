@@ -64,6 +64,14 @@ export interface PublicStats {
   roomsSuggested: Record<string, number>;
   characterAccusations: Record<string, number>;
   characterCorrect: Record<string, number>;
+  /** Per computer personality (BotPersonaId), summed over every computer seat dealt one. The
+   *  personality is secret during a game, so these only ever come from finished games. */
+  personaGames: Record<string, number>;
+  personaWins: Record<string, number>;
+  personaTiles: Record<string, number>;
+  personaSuggestions: Record<string, number>;
+  personaAccusations: Record<string, number>;
+  personaCorrect: Record<string, number>;
   /** Newest first, capped at PUBLIC_STATS_RECENT. */
   recent: ArchivedPublicGame[];
 }
@@ -104,6 +112,12 @@ export function emptyPublicStats(): PublicStats {
     roomsSuggested: {},
     characterAccusations: {},
     characterCorrect: {},
+    personaGames: {},
+    personaWins: {},
+    personaTiles: {},
+    personaSuggestions: {},
+    personaAccusations: {},
+    personaCorrect: {},
     recent: [],
   };
 }
@@ -197,10 +211,28 @@ export function foldPublicGame(stats: PublicStats, view: GameView, id: string, w
   for (const [wid, n] of Object.entries(view.stats?.weapons ?? {})) bump(stats.weaponsSuggested, wid, n);
   for (const [rid, n] of Object.entries(view.stats?.rooms ?? {})) bump(stats.roomsSuggested, rid, n);
   if (summary.solved) bump(stats.characterCorrect, summary.winnerSuspectId);
+  foldPersonas(stats, view, summary);
   const archived: ArchivedPublicGame = { ...summary, view: archiveView(view) };
   stats.recent.unshift(archived);
   if (stats.recent.length > PUBLIC_STATS_RECENT) stats.recent.length = PUBLIC_STATS_RECENT;
   return archived;
+}
+
+/** The computers' personalities are revealed in a finished game's view; tally them the way the
+ *  characters are tallied. Mutates `stats`. */
+function foldPersonas(stats: PublicStats, view: GameView, summary: PublicGameSummary): void {
+  for (const p of view.players) {
+    if (!p.isBot || !p.persona) continue;
+    const ps = view.stats?.players[p.id];
+    bump(stats.personaGames, p.persona);
+    bump(stats.personaTiles, p.persona, ps?.tiles ?? 0);
+    bump(stats.personaSuggestions, p.persona, ps?.suggestions ?? 0);
+    bump(stats.personaAccusations, p.persona, ps?.accusations ?? 0);
+    if (p.id === summary.winnerId) {
+      bump(stats.personaWins, p.persona);
+      if (summary.solved) bump(stats.personaCorrect, p.persona);
+    }
+  }
 }
 
 /** Fill in tallies that a stats file saved by an older build never recorded, from whatever the
@@ -217,6 +249,13 @@ export function backfillPublicStats(stats: PublicStats, raw: Partial<PublicStats
   };
   rebuild('weaponsSuggested', (g) => g.view.stats?.weapons);
   rebuild('roomsSuggested', (g) => g.view.stats?.rooms);
+  // Personality tallies arrived with the personalities themselves; rebuild them from the archived
+  // games that already carry one (older archived games have no personalities and add nothing).
+  if (!raw.personaGames) {
+    for (const key of ['personaGames', 'personaWins', 'personaTiles', 'personaSuggestions', 'personaAccusations', 'personaCorrect'] as const) stats[key] = {};
+    for (const g of stats.recent) foldPersonas(stats, g.view, g);
+    changed = true;
+  }
   // Wins recorded by name before profiles existed become PIN-less profiles of the same name.
   if (!raw.humanWinners) {
     stats.humanWinners = {};

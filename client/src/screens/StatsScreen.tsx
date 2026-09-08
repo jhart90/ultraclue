@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { getCard, SUSPECTS, WEAPONS, ROOMS, type ArchivedPublicGame, type PublicStats } from 'shared';
+import { getCard, SUSPECTS, WEAPONS, ROOMS, BOT_PERSONAS, BOT_PERSONA_IDS, type ArchivedPublicGame, type PublicStats } from 'shared';
 import { useStore } from '../store';
 import { Wordmark } from '../components/Wordmark';
 import { EndScreen } from '../components/EndScreen';
@@ -23,6 +23,8 @@ function fmtDuration(a?: number, b?: number): string {
   return `${mins} min`;
 }
 const n = (v: number) => v.toLocaleString();
+/** The computer personalities as Ranking rows ("The Tourist", "The Gambler", ...). */
+const PERSONAS = BOT_PERSONA_IDS.map((id) => ({ id, title: BOT_PERSONAS[id].title }));
 const avg = (num: number, den: number, digits = 1) => (den ? (num / den).toFixed(digits) : '–');
 
 /** One finished game in the history list. */
@@ -99,6 +101,12 @@ export function StatsScreen() {
   const characterIncorrect = useMemo(
     () => Object.fromEntries(SUSPECTS.map((c) => [c.id, Math.max(0, (stats?.characterAccusations[c.id] ?? 0) - (stats?.characterCorrect[c.id] ?? 0))])),
     [stats?.characterAccusations, stats?.characterCorrect],
+  );
+  // The computers' personalities, tallied like the characters. A personality is only ever known once
+  // a game has ended, so every number here comes from finished games.
+  const personaIncorrect = useMemo(
+    () => Object.fromEntries(BOT_PERSONA_IDS.map((id) => [id, Math.max(0, (stats?.personaAccusations?.[id] ?? 0) - (stats?.personaCorrect?.[id] ?? 0))])),
+    [stats?.personaAccusations, stats?.personaCorrect],
   );
   // Human winners are profiles (name + optional PIN), so two players called "Jack" get their own rows.
   const winners = useMemo(() => humanWinnerRows(stats?.humanWinners ?? {}, stats?.humanWins ?? {}), [stats?.humanWinners, stats?.humanWins]);
@@ -206,6 +214,21 @@ export function StatsScreen() {
             <Ranking title="Accusations per game" tally={stats.characterAccusations} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
             <Ranking title="Incorrect accusations per game" tally={characterIncorrect} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
             <Ranking title="Correct accusations per game" tally={stats.characterCorrect} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
+          </div>
+
+          <h2 className="stats__h2">Personality Statistics</h2>
+          <div className="stats__note stats__note--h2">Every computer plays with a secret personality, revealed only when the game ends.</div>
+          <div className="stats__grid stats__grid--4">
+            <Ranking title="Personalities by wins" tally={stats.personaWins ?? {}} all={PERSONAS} />
+            <Ranking title="Win rate" tally={stats.personaWins ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="wins per game the personality was dealt into" />
+            <Ranking title="Total games played" tally={stats.personaGames ?? {}} all={PERSONAS} note="computer seats dealt this personality" />
+            <Ranking title="Total tiles moved" tally={stats.personaTiles ?? {}} all={PERSONAS} />
+            <Ranking title="Tiles moved per game" tally={stats.personaTiles ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />
+            <Ranking title="Suggestions per game" tally={stats.personaSuggestions ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />
+            <Ranking title="Total accusations" tally={stats.personaAccusations ?? {}} all={PERSONAS} />
+            <Ranking title="Accusations per game" tally={stats.personaAccusations ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />
+            <Ranking title="Incorrect accusations per game" tally={personaIncorrect} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />
+            <Ranking title="Correct accusations per game" tally={stats.personaCorrect ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />
           </div>
         </>
       )}

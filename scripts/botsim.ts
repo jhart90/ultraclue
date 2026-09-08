@@ -53,6 +53,13 @@ const TIERS: Record<string, BotDifficulty[]> = {
 const tiers = TIERS[MODE] ?? TIERS.mixed;
 
 const z = () => ({ easy: 0, medium: 0, hard: 0 });
+type PersonaRow = { seats: number; wins: number; wrong: number; turns: number; stays: number; shortcuts: number; lifts: number; unknown: number; known: number; corridor: number; bluffs: number };
+const PS = new Map<string, PersonaRow>();
+const prow = (id: string): PersonaRow => {
+  let r = PS.get(id);
+  if (!r) { r = { seats: 0, wins: 0, wrong: 0, turns: 0, stays: 0, shortcuts: 0, lifts: 0, unknown: 0, known: 0, corridor: 0, bluffs: 0 }; PS.set(id, r); }
+  return r;
+};
 const S = {
   games: 0, finished: 0, turnsToEnd: [] as number[], wins: z(), wrong: z(), eliminated: z(), turns: z(), seats: z(),
   moves: z(), intoUnknownRoom: z(), intoKnownRoom: z(), corridor: z(), stays: z(), shortcuts: z(), noSuggestion: z(),
@@ -74,6 +81,7 @@ function runGame(seed: number): void {
     const d = tiers[i % tiers.length];
     diff.set(id, d);
     S.seats[d]++;
+    prow(getPlayer(g, id)!.persona ?? 'none').seats++;
     getPlayer(g, id)!.difficulty = d;
   });
   const log: SuggestionEvent[] = [];
@@ -84,7 +92,8 @@ function runGame(seed: number): void {
   const handCounts = () => new Map(g.players.map((p) => [p.id, p.hand.length]));
   const mindOf = (pid: string) =>
     botMind(diff.get(pid), pid, getPlayer(g, pid)?.hand ?? [], g.turnOrder,
-      log.map((e) => ({ ...e, revealedCardId: e.suggesterId === pid ? e.revealedCardId : undefined })), handCounts());
+      log.map((e) => ({ ...e, revealedCardId: e.suggesterId === pid ? e.revealedCardId : undefined })), handCounts(), undefined, undefined,
+      getPlayer(g, pid)?.persona);
   const queueFor = (pid: string) => {
     const o = g.turnOrder; const st = o.indexOf(pid); const q: string[] = [];
     for (let k = 1; k < o.length; k++) { const id = o[(st + k) % o.length]; if (!getPlayer(g, id)!.eliminated) q.push(id); }
@@ -123,6 +132,8 @@ function runGame(seed: number): void {
     const cur = getPlayer(g, currentPlayerId(g))!;
     const d = diff.get(cur.id)!;
     S.turns[d]++;
+    const pr = prow(cur.persona ?? 'none');
+    pr.turns++;
     const mind = mindOf(cur.id);
     const unknownRooms = new Set(Object.keys(BOARD.rooms).filter((r) => !mind.k.ruledOut.has(r) && !mind.envelope.has(r)));
     for (let step = 0; step < 4; step++) {
@@ -131,17 +142,18 @@ function runGame(seed: number): void {
         const v = visited.get(cur.id) ?? new Set<string>();
         const st = stays.get(cur.id);
         const n = st && st.room === me.inRoomId ? st.n : 0;
-        if (botDecideShortcut(mind, me.inRoomId)) { g = takeShortcut(g, cur.id); stays.delete(cur.id); S.shortcuts[d]++; }
-        else if (botDecideStay(mind, me.inRoomId, n, v)) { g = skipMovement(g, cur.id); stays.set(cur.id, { room: me.inRoomId!, n: n + 1 }); S.stays[d]++; }
+        if (botDecideShortcut(mind, me.inRoomId, rng)) { g = takeShortcut(g, cur.id); stays.delete(cur.id); S.shortcuts[d]++; pr.shortcuts++; }
+        else if (botDecideStay(mind, me.inRoomId, n, v)) { g = skipMovement(g, cur.id); stays.set(cur.id, { room: me.inRoomId!, n: n + 1 }); S.stays[d]++; pr.stays++; }
         else { g = rollAndMove(g, cur.id, rng); stays.delete(cur.id); }
       } else if (g.turnPhase === 'awaitMove') {
-        const dest = botDecideMove(mind, activeReachable(g), rng, queueFor(cur.id));
+        const dest = botDecideMove(mind, activeReachable(g), rng, queueFor(cur.id), visited.get(cur.id));
         if (!dest) break;
         g = moveTo(g, cur.id, dest);
         S.moves[d]++;
         const r = roomIdAt(BOARD, dest);
-        if (r) (unknownRooms.has(r) ? S.intoUnknownRoom : S.intoKnownRoom)[d]++;
-        else if (g.turnPhase !== 'awaitElevator') S.corridor[d]++;
+        if (r) { (unknownRooms.has(r) ? S.intoUnknownRoom : S.intoKnownRoom)[d]++; if (unknownRooms.has(r)) pr.unknown++; else pr.known++; }
+        else if (g.turnPhase !== 'awaitElevator') { S.corridor[d]++; pr.corridor++; }
+        else pr.lifts++;
       } else if (g.turnPhase === 'awaitElevator' && g.elevatorRide) {
         g = chooseFloor(g, cur.id, botDecideFloor(mind, elevatorOptions(g.elevatorRide.fromFloor), rng), rng);
       } else break;
@@ -152,11 +164,12 @@ function runGame(seed: number): void {
     if (acc) {
       const out = makeAccusation(g, cur.id, acc.suspectId, acc.weaponId, acc.roomId, rng);
       g = out.state;
-      if (!out.correct) { S.wrong[d]++; S.eliminated[d]++; }
+      if (!out.correct) { S.wrong[d]++; S.eliminated[d]++; pr.wrong++; }
       continue;
     }
     if (g.turnPhase === 'postMove' && me.inRoomId) {
       const sugg = botDecideSuggestion(m2, me.inRoomId, queueFor(cur.id), rng);
+      if (me.hand.includes(sugg.suspectId) && me.hand.includes(sugg.weaponId)) pr.bluffs++;
       const v = visited.get(cur.id) ?? new Set<string>(); v.add(me.inRoomId); visited.set(cur.id, v);
       S.suggestions[d]++;
       g = makeSuggestion(g, cur.id, sugg.suspectId, sugg.weaponId, me.inRoomId, rng);
@@ -177,6 +190,8 @@ function runGame(seed: number): void {
     S.turnsToEnd.push(turns);
     const w = diff.get(g.winnerId ?? '');
     if (w) S.wins[w]++;
+    const wp = getPlayer(g, g.winnerId ?? '');
+    if (wp) prow(wp.persona ?? 'none').wins++;
   }
 }
 
@@ -191,4 +206,9 @@ for (const d of ['easy', 'medium', 'hard'] as BotDifficulty[]) {
   console.log(`--- ${d}: ${S.seats[d]} seats, ${S.wins[d]} wins (${pct(S.wins[d], S.seats[d])} per seat), ${S.wrong[d]} wrong accusations`);
   console.log(`  moves into unknown room ${pct(S.intoUnknownRoom[d], S.moves[d])}, known room ${pct(S.intoKnownRoom[d], S.moves[d])}, corridor ${pct(S.corridor[d], S.moves[d])}; stays ${pct(S.stays[d], S.turns[d])} of turns; shortcuts ${S.shortcuts[d]}`);
   console.log(`  turns with no suggestion ${pct(S.noSuggestion[d], S.turns[d])}; reveals ${S.reveals[d]}, already-known shown ${pct(S.revealsKnown[d], S.reveals[d])}, nobody disproved ${S.nobody[d]}`);
+}
+console.log('--- by personality (per seat): wins, wrong accusations; per turn: stays, passages, lift rides, moves into unknown/known rooms, corridor stops, own-hand suggestions');
+for (const [id, r] of [...PS.entries()].sort()) {
+  const pt = (n: number) => pct(n, r.turns);
+  console.log(`  ${id.padEnd(9)} seats ${String(r.seats).padStart(3)}  wins ${pct(r.wins, r.seats).padStart(6)}  wrong ${pct(r.wrong, r.seats).padStart(6)} | stays ${pt(r.stays).padStart(5)} passages ${pt(r.shortcuts).padStart(5)} lifts ${pt(r.lifts).padStart(5)} unknown ${pt(r.unknown).padStart(5)} known ${pt(r.known).padStart(5)} corridor ${pt(r.corridor).padStart(5)} bluffs ${pt(r.bluffs).padStart(5)}`);
 }

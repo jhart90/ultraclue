@@ -7,6 +7,7 @@ import {
   makeAccusation,
   viewFor,
   makeRng,
+  BOT_PERSONA_IDS,
 } from '../src';
 import type { GameState, Player } from '../src';
 
@@ -209,6 +210,34 @@ describe('accusations', () => {
     const { state } = makeAccusation(st, 'p1', 'suspect-scarlet', 'weapon-rope', 'room-study', makeRng(1));
     expect(state.phase).toBe('ended');
     expect(state.winnerId).toBe('p2');
+  });
+});
+
+describe('computer personalities', () => {
+  const lobby: Player[] = [
+    player('p1', 'suspect-mustard', true),
+    { ...player('bot-1', 'suspect-scarlet'), isBot: true, difficulty: 'hard' },
+    { ...player('bot-2', 'suspect-plum'), isBot: true, difficulty: 'easy' },
+  ];
+
+  it('deals every computer a personality at the start, and no human', () => {
+    const s = startGame('ROOM', lobby, makeRng(3));
+    for (const p of s.players) {
+      if (p.isBot) expect(BOT_PERSONA_IDS).toContain(p.persona);
+      else expect(p.persona).toBeUndefined();
+    }
+  });
+
+  it('keeps the personalities secret until the game has ended', () => {
+    const s = startGame('ROOM', lobby, makeRng(3));
+    const during = viewFor(s, 'p1');
+    for (const p of during.players) expect(p.persona).toBeUndefined();
+    const ended = { ...s, phase: 'ended' as const, winnerId: 'p1' };
+    const after = viewFor(ended, 'p1');
+    for (const p of after.players) {
+      const real = s.players.find((x) => x.id === p.id)!;
+      expect(p.persona).toBe(real.isBot ? real.persona : undefined);
+    }
   });
 });
 

@@ -7,6 +7,7 @@ export * from './suggest';
 export * from './accuse';
 export * from './bot';
 export * from './botNotes';
+export * from './persona';
 export * from './botMind';
 export * from './view';
 export * from './stats';

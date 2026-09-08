@@ -154,6 +154,10 @@
 .stats__grid--4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.stats__note--h2 {
+  margin: -0.4rem 0 0.7rem;
+  font-style: italic;
+}
 .stats__note {
   color: var(--muted, #9a93b3);
   font-size: 0.72rem;

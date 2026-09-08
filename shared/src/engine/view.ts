@@ -22,6 +22,8 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     eliminated: p.eliminated,
     dice: p.dice,
     difficulty: p.difficulty,
+    // A computer's personality stays secret until the case is closed.
+    persona: state.phase === 'ended' && p.isBot ? p.persona : undefined,
     handCount: p.hand.length,
     position: p.position,
     inRoomId: p.inRoomId,

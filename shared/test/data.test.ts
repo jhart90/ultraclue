@@ -29,8 +29,8 @@ describe('card data integrity', () => {
     }
   });
 
-  it('Miss Scarlet leads the turn order', () => {
-    expect(suspectsByTurnOrder()[0].id).toBe('suspect-scarlet');
+  it('Ruby Valentine leads the turn order', () => {
+    expect(suspectsByTurnOrder()[0].id).toBe('suspect-valentine');
   });
 
   it('getCard resolves by id', () => {

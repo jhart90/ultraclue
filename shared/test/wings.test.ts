@@ -26,7 +26,7 @@ import {
 function lobbyPlayer(id: string, suspectId: string, isBot = false): Player {
   return { id, name: id, suspectId, isBot, isHost: id === 'p1', connected: true, hand: [], eliminated: false, position: { x: 0, y: 0 } };
 }
-const TWO = [lobbyPlayer('p1', 'suspect-scarlet'), lobbyPlayer('p2', 'suspect-plum')];
+const TWO = [lobbyPlayer('p1', 'suspect-valentine'), lobbyPlayer('p2', 'suspect-mulberry')];
 
 describe('boards with wings switched off', () => {
   it('the full board is the default and is shared', () => {
@@ -146,9 +146,9 @@ describe('the deck follows the wings and the weapon count', () => {
     active.inRoomId = room.id;
     s.turnPhase = 'postMove';
     const outWeapon = WEAPONS.find((w) => !inDeck.has(w.id))!.id;
-    expect(() => makeSuggestion(s, active.id, 'suspect-scarlet', outWeapon, room.id, makeRng(1))).toThrow(/not in this game/);
-    expect(() => makeSuggestion(s, active.id, 'suspect-scarlet', s.weaponIds![0], 'room-courtyard', makeRng(1))).toThrow(/not in this game/);
-    expect(() => makeSuggestion(s, active.id, 'suspect-scarlet', s.weaponIds![0], room.id, makeRng(1))).not.toThrow();
+    expect(() => makeSuggestion(s, active.id, 'suspect-valentine', outWeapon, room.id, makeRng(1))).toThrow(/not in this game/);
+    expect(() => makeSuggestion(s, active.id, 'suspect-valentine', s.weaponIds![0], 'room-courtyard', makeRng(1))).toThrow(/not in this game/);
+    expect(() => makeSuggestion(s, active.id, 'suspect-valentine', s.weaponIds![0], room.id, makeRng(1))).not.toThrow();
   });
 
   it('a bot reasons over the cards in play, not the full set', () => {
@@ -166,7 +166,7 @@ describe('the deck follows the wings and the weapon count', () => {
 
 describe('a trimmed suspect deck', () => {
   it('always holds every seated character, then random others up to the count', () => {
-    const seated = ['suspect-scarlet', 'suspect-plum', 'suspect-green'];
+    const seated = ['suspect-valentine', 'suspect-mulberry', 'suspect-verdant'];
     const some = chooseSuspects(seated, 10, makeRng(4));
     expect(some).toHaveLength(10);
     for (const s of seated) expect(some).toContain(s);

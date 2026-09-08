@@ -38,7 +38,7 @@ export function dealHands(players: Player[], envelope: Envelope, rng: RNG, pool:
   deck.forEach((cardId, i) => players[i % players.length].hand.push(cardId));
 }
 
-/** Sort players into seats by their suspect's fixed turn order (Miss Scarlet first). */
+/** Sort players into seats by their suspect's fixed turn order (Ruby Valentine first). */
 function turnOrderOf(players: Player[]): string[] {
   const rank = new Map(SUSPECTS.map((s) => [s.id, s.turnOrder]));
   return [...players]

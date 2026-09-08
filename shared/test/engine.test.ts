@@ -31,13 +31,13 @@ function baseState(): GameState {
     code: 'T',
     phase: 'play',
     players: [
-      player('p1', 'suspect-scarlet', true),
-      player('p2', 'suspect-plum'),
-      player('p3', 'suspect-green'),
+      player('p1', 'suspect-valentine', true),
+      player('p2', 'suspect-mulberry'),
+      player('p3', 'suspect-verdant'),
     ],
     turnOrder: ['p1', 'p2', 'p3'],
     activeIdx: 0,
-    envelope: { suspectId: 'suspect-mustard', weaponId: 'weapon-rope', roomId: 'room-study' },
+    envelope: { suspectId: 'suspect-dijon', weaponId: 'weapon-rope', roomId: 'room-study' },
     log: [],
     nextLogId: 1,
     weaponLocations: {},
@@ -47,12 +47,12 @@ function baseState(): GameState {
 
 describe('setup / dealing', () => {
   const lobby = [
-    player('p1', 'suspect-green', true), // turnOrder 5
-    player('p2', 'suspect-scarlet'), //     turnOrder 1
-    player('p3', 'suspect-plum'), //        turnOrder 4
+    player('p1', 'suspect-verdant', true), // turnOrder 5
+    player('p2', 'suspect-valentine'), //     turnOrder 1
+    player('p3', 'suspect-mulberry'), //        turnOrder 4
   ];
 
-  it('seats players by their suspect turn order (Scarlet first)', () => {
+  it('seats players by their suspect turn order (Ruby Valentine first)', () => {
     const s = startGame('ROOM', lobby, makeRng(42));
     expect(s.turnOrder).toEqual(['p2', 'p3', 'p1']);
   });
@@ -85,7 +85,7 @@ describe('suggestions', () => {
     st.players[1].hand = ['weapon-dagger']; // p2: no match
     st.players[2].hand = ['weapon-candlestick']; // p3: holds the suggested weapon
 
-    let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    let s = makeSuggestion(st, 'p1', 'suspect-valentine', 'weapon-candlestick', 'room-library', makeRng(1));
     expect(s.currentSuggestion?.pendingResponderId).toBe('p2'); // pauses on p2 even with no match
     expect(s.currentSuggestion?.passes).toEqual([]);
     expect(s.currentSuggestion?.resolved).toBe(false);
@@ -105,7 +105,7 @@ describe('suggestions', () => {
     const st = baseState();
     st.players.forEach((p) => (p.hand = ['weapon-dagger'])); // none in the suggested trio
     st.players[1].isBot = st.players[2].isBot = true;
-    let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    let s = makeSuggestion(st, 'p1', 'suspect-valentine', 'weapon-candlestick', 'room-library', makeRng(1));
     expect(s.currentSuggestion?.pendingResponderId).toBe('p2');
     s = passSuggestion(s, 'p2', makeRng(1));
     s = passSuggestion(s, 'p3', makeRng(1));
@@ -119,7 +119,7 @@ describe('suggestions', () => {
     const st = baseState();
     st.players[1].hand = ['weapon-dagger']; // p2: human, no match -> must acknowledge
     st.players[2].hand = ['weapon-candlestick']; // p3: can disprove
-    let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    let s = makeSuggestion(st, 'p1', 'suspect-valentine', 'weapon-candlestick', 'room-library', makeRng(1));
     expect(s.currentSuggestion?.pendingResponderId).toBe('p2'); // stops on p2 even with no match
     expect(s.currentSuggestion?.passes).toEqual([]);
     expect(() => respondToSuggestion(s, 'p2', 'weapon-candlestick', makeRng(1))).toThrow(); // can't reveal a card they lack
@@ -131,7 +131,7 @@ describe('suggestions', () => {
   it('forbids passing when you do hold a matching card', () => {
     const st = baseState();
     st.players[1].hand = ['weapon-candlestick']; // p2 can disprove -> may not "reveal nothing"
-    const s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    const s = makeSuggestion(st, 'p1', 'suspect-valentine', 'weapon-candlestick', 'room-library', makeRng(1));
     expect(() => passSuggestion(s, 'p2', makeRng(1))).toThrow();
   });
 
@@ -140,7 +140,7 @@ describe('suggestions', () => {
     st.players[1].isBot = true;
     st.players[1].hand = [];
     st.players[2].hand = ['weapon-candlestick', 'weapon-dagger'];
-    let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    let s = makeSuggestion(st, 'p1', 'suspect-valentine', 'weapon-candlestick', 'room-library', makeRng(1));
     s = passSuggestion(s, 'p2', makeRng(1)); // advance past the card-less p2 to p3
     expect(() => respondToSuggestion(s, 'p3', 'weapon-dagger', makeRng(1))).toThrow();
   });
@@ -150,7 +150,7 @@ describe('suggestions', () => {
     st.players[1].hand = [];
     st.players[2].hand = ['weapon-candlestick'];
     const snapshot = structuredClone(st);
-    makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    makeSuggestion(st, 'p1', 'suspect-valentine', 'weapon-candlestick', 'room-library', makeRng(1));
     expect(st).toEqual(snapshot);
   });
 });
@@ -160,7 +160,7 @@ describe('accusations', () => {
     const { state, correct } = makeAccusation(
       baseState(),
       'p1',
-      'suspect-mustard',
+      'suspect-dijon',
       'weapon-rope',
       'room-study',
       makeRng(1),
@@ -180,7 +180,7 @@ describe('accusations', () => {
     const { state, correct } = makeAccusation(
       st,
       'p1',
-      'suspect-scarlet',
+      'suspect-valentine',
       'weapon-rope',
       'room-study',
       makeRng(3),
@@ -197,17 +197,17 @@ describe('accusations', () => {
     const st: GameState = {
       code: 'T',
       phase: 'play',
-      players: [player('p1', 'suspect-scarlet', true), player('p2', 'suspect-plum')],
+      players: [player('p1', 'suspect-valentine', true), player('p2', 'suspect-mulberry')],
       turnOrder: ['p1', 'p2'],
       activeIdx: 0,
-      envelope: { suspectId: 'suspect-mustard', weaponId: 'weapon-rope', roomId: 'room-study' },
+      envelope: { suspectId: 'suspect-dijon', weaponId: 'weapon-rope', roomId: 'room-study' },
       log: [],
       nextLogId: 1,
       weaponLocations: {},
       turnPhase: 'postMove',
     };
     st.players[0].hand = ['weapon-dagger'];
-    const { state } = makeAccusation(st, 'p1', 'suspect-scarlet', 'weapon-rope', 'room-study', makeRng(1));
+    const { state } = makeAccusation(st, 'p1', 'suspect-valentine', 'weapon-rope', 'room-study', makeRng(1));
     expect(state.phase).toBe('ended');
     expect(state.winnerId).toBe('p2');
   });
@@ -215,9 +215,9 @@ describe('accusations', () => {
 
 describe('computer personalities', () => {
   const lobby: Player[] = [
-    player('p1', 'suspect-mustard', true),
-    { ...player('bot-1', 'suspect-scarlet'), isBot: true, difficulty: 'hard' },
-    { ...player('bot-2', 'suspect-plum'), isBot: true, difficulty: 'easy' },
+    player('p1', 'suspect-dijon', true),
+    { ...player('bot-1', 'suspect-valentine'), isBot: true, difficulty: 'hard' },
+    { ...player('bot-2', 'suspect-mulberry'), isBot: true, difficulty: 'easy' },
   ];
 
   it('deals every computer a personality at the start, and no human', () => {
@@ -261,7 +261,7 @@ describe('per-player view (hidden-information boundary)', () => {
     st.players[1].isBot = true;
     st.players[1].hand = [];
     st.players[2].hand = ['weapon-candlestick'];
-    let s = makeSuggestion(st, 'p1', 'suspect-scarlet', 'weapon-candlestick', 'room-library', makeRng(1));
+    let s = makeSuggestion(st, 'p1', 'suspect-valentine', 'weapon-candlestick', 'room-library', makeRng(1));
     s = passSuggestion(s, 'p2', makeRng(1)); // card-less p2 passes; play moves to p3
     s = respondToSuggestion(s, 'p3', 'weapon-candlestick', makeRng(1));
 
@@ -274,7 +274,7 @@ describe('per-player view (hidden-information boundary)', () => {
     const { state } = makeAccusation(
       baseState(),
       'p1',
-      'suspect-mustard',
+      'suspect-dijon',
       'weapon-rope',
       'room-study',
       makeRng(1),

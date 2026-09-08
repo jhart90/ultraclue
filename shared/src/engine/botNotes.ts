@@ -101,12 +101,12 @@ export function deduceBotKnowledge(
 // to tag a possibility group (each group gets a distinct symbol, in matching sets across its cards).
 const GROUP_SYMBOLS = [11, 12, 13, 14, 3, 4, 5, 6, 7, 8, 9, 10];
 
-/** Render a deduction into the Detective Notes grid (cardId -> 8 column states, one per seat in
- *  turn order) — the same shape the human notes sheet persists. */
+/** Render a deduction into the Detective Notes grid (cardId -> one column state per seat in turn
+ *  order, up to 40) — the same shape the human notes sheet persists. */
 export function botNotesGrid(k: BotKnowledge, turnOrder: string[]): Record<string, number[]> {
   const col = new Map(turnOrder.map((id, i) => [id, i]));
   const grid: Record<string, number[]> = {};
-  const row = (c: string): number[] => (grid[c] ??= new Array(8).fill(0));
+  const row = (c: string): number[] => (grid[c] ??= new Array(turnOrder.length).fill(0));
 
   for (const [p, cards] of k.hasnt) {
     const i = col.get(p);

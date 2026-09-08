@@ -29,7 +29,7 @@ function lobbyPlayer(id: string, suspectId: string): Player {
 }
 
 function newGame(seed = 5) {
-  return startGame('M', [lobbyPlayer('p1', 'suspect-scarlet'), lobbyPlayer('p2', 'suspect-plum')], makeRng(seed));
+  return startGame('M', [lobbyPlayer('p1', 'suspect-valentine'), lobbyPlayer('p2', 'suspect-mulberry')], makeRng(seed));
 }
 
 describe('movement', () => {
@@ -37,7 +37,7 @@ describe('movement', () => {
     const s = newGame();
     expect(s.turnPhase).toBe('awaitMove');
     expect(s.lastRoll).toBeDefined();
-    expect(s.players[0].position).toEqual(BOARD.starts.find((st) => st.suspectId === 'suspect-scarlet')!.tile);
+    expect(s.players[0].position).toEqual(BOARD.starts.find((st) => st.suspectId === 'suspect-valentine')!.tile);
     expect(activeReachable(s).length).toBeGreaterThan(0);
   });
 

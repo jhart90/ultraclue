@@ -55,15 +55,15 @@ try {
   await until(() => A.state.lobby.slots[2].occupant?.isBot, 'bot added to seat 3');
 
   // Suspect picks.
-  A.s.emit('pickSuspect', { suspectId: 'suspect-scarlet' });
-  B.s.emit('pickSuspect', { suspectId: 'suspect-plum' });
+  A.s.emit('pickSuspect', { suspectId: 'suspect-valentine' });
+  B.s.emit('pickSuspect', { suspectId: 'suspect-mulberry' });
   await until(
-    () => A.state.lobby.slots.find((s) => s.occupant?.id === A.state.id)?.occupant?.suspectId === 'suspect-scarlet',
-    'Alice picked Scarlet',
+    () => A.state.lobby.slots.find((s) => s.occupant?.id === A.state.id)?.occupant?.suspectId === 'suspect-valentine',
+    'Alice picked Ruby Valentine',
   );
 
   // Duplicate pick should be rejected.
-  B.s.emit('pickSuspect', { suspectId: 'suspect-scarlet' });
+  B.s.emit('pickSuspect', { suspectId: 'suspect-valentine' });
   await until(() => B.state.errors.some((e) => /taken/i.test(e)), 'duplicate suspect rejected');
 
   // Chat broadcast.
@@ -84,9 +84,9 @@ try {
   ok(ah.filter((c) => bh.includes(c)).length === 0, 'hands are disjoint (no shared cards)');
   ok(A.state.game.envelope == null, 'envelope hidden from Alice mid-game');
   ok(A.state.game.players.length === 3, '3 players in game (Alice, Bob, bot)');
-  ok(A.state.game.turnOrder[0] === A.state.id, 'Scarlet (Alice) leads the turn order');
+  ok(A.state.game.turnOrder[0] === A.state.id, 'Ruby Valentine (Alice) leads the turn order');
   const botP = A.state.game.players.find((p) => p.isBot);
-  ok(!!botP?.suspectId && !['suspect-scarlet', 'suspect-plum'].includes(botP.suspectId), 'bot auto-assigned a free suspect');
+  ok(!!botP?.suspectId && !['suspect-valentine', 'suspect-mulberry'].includes(botP.suspectId), 'bot auto-assigned a free suspect');
   // Other players' hands must not leak into the view.
   const aliceInB = B.state.game.players.find((p) => p.id === A.state.id);
   ok(aliceInB && aliceInB.hand === undefined && typeof aliceInB.handCount === 'number', "Bob sees Alice's hand as a count only");

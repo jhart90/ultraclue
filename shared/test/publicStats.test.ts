@@ -6,10 +6,10 @@ function lobbyPlayer(id: string, suspectId: string, isBot = false): Player {
 }
 
 function finishedGame(seed: number, correct: boolean) {
-  let s = startGame('PUBLIC', [lobbyPlayer('p1', 'suspect-scarlet'), lobbyPlayer('b1', 'suspect-plum', true)], makeRng(seed));
+  let s = startGame('PUBLIC', [lobbyPlayer('p1', 'suspect-valentine'), lobbyPlayer('b1', 'suspect-mulberry', true)], makeRng(seed));
   s.turnPhase = 'postMove';
   const env = s.envelope;
-  const trio = correct ? env : { suspectId: 'suspect-plum', weaponId: env.weaponId, roomId: env.roomId };
+  const trio = correct ? env : { suspectId: 'suspect-mulberry', weaponId: env.weaponId, roomId: env.roomId };
   s = makeAccusation(s, 'p1', trio.suspectId, trio.weaponId, trio.roomId, makeRng(1)).state;
   expect(s.phase).toBe('ended');
   return viewFor(s, '');
@@ -24,15 +24,15 @@ describe('public game history', () => {
     expect(stats.solvedGames).toBe(1);
     expect(stats.turnsInSolvedGames).toBe(stats.totalTurns);
     expect(stats.humanWins).toEqual({ P1: 1 });
-    expect(stats.characterWins).toEqual({ 'suspect-scarlet': 1 });
+    expect(stats.characterWins).toEqual({ 'suspect-valentine': 1 });
     expect(stats.murderers[view.envelope!.suspectId]).toBe(1);
     expect(stats.weapons[view.envelope!.weaponId]).toBe(1);
     expect(stats.rooms[view.envelope!.roomId]).toBe(1);
     expect(archived.solved).toBe(true);
-    expect(stats.characterGames).toEqual({ 'suspect-scarlet': 1, 'suspect-plum': 1 });
-    expect(stats.characterAccusations).toEqual({ 'suspect-scarlet': 1 });
-    expect(stats.characterCorrect).toEqual({ 'suspect-scarlet': 1 });
-    expect(stats.characterTiles['suspect-scarlet'] ?? 0).toBe(0);
+    expect(stats.characterGames).toEqual({ 'suspect-valentine': 1, 'suspect-mulberry': 1 });
+    expect(stats.characterAccusations).toEqual({ 'suspect-valentine': 1 });
+    expect(stats.characterCorrect).toEqual({ 'suspect-valentine': 1 });
+    expect(stats.characterTiles['suspect-valentine'] ?? 0).toBe(0);
     expect(archived.humans).toBe(1);
     expect(archived.computers).toBe(1);
     // the archived view carries what the details screen needs and nothing private
@@ -82,7 +82,7 @@ describe('public game history', () => {
     expect(archived.winnerIsBot).toBe(true);
     expect(stats.solvedGames).toBe(0);
     expect(stats.humanWins).toEqual({});
-    expect(stats.characterWins).toEqual({ 'suspect-plum': 1 });
+    expect(stats.characterWins).toEqual({ 'suspect-mulberry': 1 });
   });
 
   it('keeps only the newest games in the archive, newest first', () => {

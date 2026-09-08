@@ -11,7 +11,7 @@ import { CardName, RoomName } from '../components/CardName';
 import { Board, WALK_STEP_MS } from '../components/Board';
 import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
-import { DetectiveNotes } from '../components/DetectiveNotes';
+import { DetectiveNotes, readNotesTheme, saveNotesTheme, type NotesTheme } from '../components/DetectiveNotes';
 import { SelectModal, RevealPanel, NoEvidencePanel } from '../components/SuggestPanels';
 import { EndScreen } from '../components/EndScreen';
 import { StatusModal, AccusationFlow, AccusingModal, type StatusButton } from '../components/GamePopups';
@@ -110,6 +110,8 @@ export function Game() {
   const setDice = useStore((s) => s.setDice);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [handShelf, setHandShelf] = useState(readHandShelf);
+  // Detective Notes look: the printed sepia sheet, or columns tinted in each player's colour.
+  const [notesTheme, setNotesTheme] = useState<NotesTheme>(readNotesTheme);
   // "Lock camera on player to move": off means the map never follows a move or recentres on a turn.
   const [cameraLock, setCameraLock] = useState(readCameraLock);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -592,7 +594,17 @@ export function Game() {
       {!observer && (
         <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
           <div className="dock__folder dock__folder--notes">
-            <DetectiveNotes roomCode={game.code} players={orderedPlayers} selfId={myId} hand={game.yourHand} suspects={pool.suspects} weapons={pool.weapons} rooms={pool.rooms} onClose={() => setDock(null)} />
+            <DetectiveNotes
+              roomCode={game.code}
+              players={orderedPlayers}
+              selfId={myId}
+              hand={game.yourHand}
+              suspects={pool.suspects}
+              weapons={pool.weapons}
+              rooms={pool.rooms}
+              theme={notesTheme}
+              onClose={() => setDock(null)}
+            />
           </div>
         </div>
       )}
@@ -798,6 +810,27 @@ export function Game() {
               />
               Classic shelf (a row of small thumbnails instead of the fan)
             </label>
+
+            <div className="game__settinghead2">Detective Notes</div>
+            {(
+              [
+                ['sepia', 'Sepia sheet (monotone, like the printed notes)'],
+                ['colour', 'Colour-coded columns (each in that player’s colour)'],
+              ] as [NotesTheme, string][]
+            ).map(([t, label]) => (
+              <label className="game__settoggle" key={t}>
+                <input
+                  type="radio"
+                  name="notes-theme"
+                  checked={notesTheme === t}
+                  onChange={() => {
+                    setNotesTheme(t);
+                    saveNotesTheme(t);
+                  }}
+                />
+                {label}
+              </label>
+            ))}
 
             <div className="game__settinghead2">Sound</div>
             <label className="game__settoggle">

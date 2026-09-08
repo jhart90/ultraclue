@@ -27,8 +27,11 @@ proportions are even slightly off, the blank area lands inside the room and show
 
 Art has to survive these overlays, so keep the middle of the room calm:
 
-- **Pawns** cluster in the centre of the room, up to 40 of them.
-- **Weapon tokens** sit as small pewter circles along the top edge.
+- **Pawns** cluster just below the room name, up to 40 of them, spreading outward as the room fills.
+- **Weapon tokens** (small pewter circles) gather on the calmest patch of the painting that clears the
+  name and the pawns — normally just above the name. The board measures each painting for this
+  (`client/scripts/boardBusyness.py`, see *Processing new files*), so calm floor near the middle is
+  where they will land.
 - **The room name** renders as a white bubble at the room's centre, so the art must **not** letter the
   room name onto the floor. No name plaques, no signage, no text of any kind.
 - **Doors** are drawn as small wooden doors or iron gates straddling the wall line, and
@@ -76,12 +79,17 @@ furniture, and name the palette from its card art.
 
 ## Processing new files
 
-Same two passes as card art, minus the frame alignment (board art has no drawn frame):
+Same two passes as card art, minus the frame alignment (board art has no drawn frame), then a third
+that measures the finished painting so the board knows where its calm floor is:
 
 ```bash
 python .claude/skills/optimize-image-assets/scripts/optimize_overrides.py assets/board/rooms
 python .claude/skills/optimize-image-assets/scripts/trim_board_art.py
+python client/scripts/boardBusyness.py
 ```
+
+The last one rewrites `client/src/render/boardBusyness.json` (a coarse busyness grid per room, which
+decides where the weapon tokens gather); commit it alongside the new art.
 
 Generate as large as the tool allows at the right ratio; the optimiser downscales board art to 1200px on the long
 edge and converts to WebP. The trim pass then strips any blank margin left around the room. It only
@@ -191,4 +199,4 @@ uncluttered, or paint a hatch or opening there.
 | Master Suite / Wine Cellar | — | The priest hole |
 | Trophy Room / Armory | — | Behind the bear |
 | Smoking Room / Stables | — | The old coal chute |
-| Laboratory / Gazebo | — | Dr Orchid's poison garden |
+| Laboratory / Gazebo | — | Botanist Bloom's poison garden |

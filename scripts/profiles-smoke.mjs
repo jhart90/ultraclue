@@ -61,7 +61,7 @@ try {
 
   // Drive the human turns: whoever is up moves to the first reachable tile, then accuses wrongly.
   const wrong = (view) => {
-    const trio = { suspectId: 'suspect-scarlet', weaponId: 'weapon-rope', roomId: 'room-kitchen' };
+    const trio = { suspectId: 'suspect-valentine', weaponId: 'weapon-rope', roomId: 'room-kitchen' };
     return trio;
   };
   let accusedBy = null;

@@ -183,7 +183,7 @@ const PASSAGE_DEFS: [string, string, string][] = [
   ['room-chapel', 'room-cemetery', 'Down through the crypt'],
   ['room-smoking', 'room-stables', 'The old coal chute'],
   ['room-clock-tower', 'room-boiler', 'Down the weight shaft'],
-  ['room-laboratory', 'room-gazebo', "Dr Orchid's poison garden"],
+  ['room-laboratory', 'room-gazebo', "Botanist Bloom's poison garden"],
   ['room-theatre', 'room-workshop', 'The trapdoor under the stage'],
   ['room-boat-house', 'room-bunker', "The smugglers' tunnel"],
   ['room-walk-in-closet', 'room-wine-cellar', 'The empty barrel'],
@@ -213,12 +213,12 @@ const CHAMFER_DEFS: ChamferDef[] = [
 // ---- start tiles: every suspect starts near a room that suits them, 3–4 steps from its door ---
 // Listed in turn order, sections interleaved so early seats are spread across the whole house.
 const START_DEFS: [string, string][] = [
-  ['suspect-scarlet', 'room-theatre'],
-  ['suspect-mustard', 'room-armory'],
-  ['suspect-peacock', 'room-solarium'],
-  ['suspect-plum', 'room-hedge-maze'],
-  ['suspect-green', 'room-lounge'],
-  ['suspect-orchid', 'room-laboratory'],
+  ['suspect-valentine', 'room-theatre'],
+  ['suspect-dijon', 'room-armory'],
+  ['suspect-blue', 'room-solarium'],
+  ['suspect-mulberry', 'room-hedge-maze'],
+  ['suspect-verdant', 'room-lounge'],
+  ['suspect-bloom', 'room-laboratory'],
   ['suspect-slate', 'room-trophy'],
   ['suspect-rose', 'room-cemetery'],
   ['suspect-indigo', 'room-billiard'],

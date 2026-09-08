@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, type CSSProperties } from 'react';
 
 // A single Detective-Notes cell. Clicking cycles through 15 fill states, in the order specified:
 // 0 blank, 1 full, 2 X, 3-6 diagonal halves (UR, LR, LL, UL), 7-10 straight halves (top, right,
@@ -47,23 +47,35 @@ function Shape({ state }: { state: number }) {
   }
 }
 
+// The cell is memoised and its callbacks take (cardId, col), so the sheet can hand every cell the
+// same two stable functions — a click then re-renders only the one cell whose state changed, which
+// matters on a 40-seat table (3 × 40 × 40 = 4,800 cells).
 export const NoteBox = memo(function NoteBox({
   state,
-  onClick,
+  cardId,
+  col,
+  onCycle,
   onReset,
+  style,
 }: {
   state: number;
-  onClick: () => void;
+  cardId: string;
+  col: number;
+  /** Left-click advances the mark to its next state. */
+  onCycle: (cardId: string, col: number) => void;
   /** Right-click clears the cell back to blank (next left-click fills it again). */
-  onReset: () => void;
+  onReset: (cardId: string, col: number) => void;
+  /** Per-column look (tint, mark colour) — one shared object per column, never per cell. */
+  style?: CSSProperties;
 }) {
   return (
     <button
       className="notebox"
-      onClick={onClick}
+      style={style}
+      onClick={() => onCycle(cardId, col)}
       onContextMenu={(e) => {
         e.preventDefault();
-        onReset();
+        onReset(cardId, col);
       }}
       aria-label={`note mark state ${state}`}
     >

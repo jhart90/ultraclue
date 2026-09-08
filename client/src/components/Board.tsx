@@ -5,6 +5,7 @@ import { resolveBoardArt, sharedArtGroup } from '../render/boardArt';
 import { WEAPON_GLYPHS } from '../render/weaponGlyphs';
 import { highlightChat } from '../util/highlightChat';
 import { packRoom, type Packing, type Rect } from '../render/roomPacking';
+import { TS, roomBounds, artBounds, artTiles, insideObstacles, labelGeom, weaponAnchor } from '../render/roomLayout';
 import { BOARD_TEXTURES, textureUrl, texturePatternId, type BoardTexture } from '../render/boardTextures';
 import { EnvelopeArt, ENVELOPE_VIEWBOX } from './EnvelopeArt';
 import './Board.css';
@@ -14,7 +15,6 @@ interface LastMove {
   path: Coord[];
 }
 
-const TS = 26;
 const BW = BOARD.width * TS;
 const BH = BOARD.height * TS;
 const MIN_SCALE = 0.45;
@@ -105,76 +105,12 @@ const EMOJI: Record<string, string> = {
   'room-gazebo': '⛲', 'room-bunker': '🪖', 'room-sauna': '🧖', 'room-courtyard': '⛲',
 };
 
-function roomBounds(room: RoomLayout) {
-  const xs = room.tiles.map((t) => t.x);
-  const ys = room.tiles.map((t) => t.y);
-  const minX = Math.min(...xs);
-  const minY = Math.min(...ys);
-  return { x: minX * TS, y: minY * TS, w: (Math.max(...xs) - minX + 1) * TS, h: (Math.max(...ys) - minY + 1) * TS, minX, minY };
-}
-
-/** Obstacles that stand INSIDE a room rather than beside it — the Courtyard's fountain, the
- *  Cemetery's graves. They are not room tiles, so a room's art would be clipped into a ring around
- *  them and they would be cut out of their own painting. Where the room has art, it paints them and
- *  the board's own stand-in for them stands down. */
-function insideObstacles(room: RoomLayout): Coord[] {
-  const xs = room.tiles.map((t) => t.x);
-  const ys = room.tiles.map((t) => t.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const own = new Set(room.tiles.map((t) => coordKey(t)));
-  /** Does the room close in on this tile along `dir`, before the bounding box runs out? */
-  const reaches = (c: Coord, dx: number, dy: number) => {
-    for (let x = c.x + dx, y = c.y + dy; x >= minX && x <= maxX && y >= minY && y <= maxY; x += dx, y += dy) {
-      if (own.has(coordKey({ x, y }))) return true;
-    }
-    return false;
-  };
-  return BOARD.cells.filter((c) => {
-    if (c.type !== 'obstacle' && c.type !== 'fountain') return false;
-    if (c.x < minX || c.x > maxX || c.y < minY || c.y > maxY || own.has(coordKey(c))) return false;
-    // Enclosed, not merely inside the box: the room must close in on both sides along one axis.
-    // That takes in the Cemetery's graves and the Courtyard's fountain while leaving out the tiles
-    // bitten off an octagonal room's corners, which lie outside it and belong to the grounds.
-    return (reaches(c, -1, 0) && reaches(c, 1, 0)) || (reaches(c, 0, -1) && reaches(c, 0, 1));
-  });
-}
-/** Tiles a room's floor art is painted over: its own, plus the obstacles standing inside it. */
-function artTiles(room: RoomLayout): Coord[] {
-  const extra = insideObstacles(room);
-  return extra.length ? [...room.tiles, ...extra] : room.tiles;
-}
 /** Obstacle tiles already painted by some room's own art, so the board leaves them alone. */
 const PAINTED_OBSTACLES = new Set(
   Object.values(BOARD.rooms)
     .filter((room) => !!resolveBoardArt(room.id, getCard(room.id)?.title ?? room.id))
     .flatMap((room) => insideObstacles(room).map((c) => coordKey(c))),
 );
-
-/** The rectangle a room's floor art is stretched onto. Normally its own bounds; for rooms that
- *  share one painting it is the union of the group's bounds, so every room in the group lays the
- *  image down on the same rectangle and their shares line up. */
-function artBounds(room: RoomLayout) {
-  const group = sharedArtGroup(room.id);
-  if (!group) return roomBounds(room);
-  const boxes = group.map((id) => BOARD.rooms[id]).filter(Boolean).map(roomBounds);
-  const x = Math.min(...boxes.map((r) => r.x));
-  const y = Math.min(...boxes.map((r) => r.y));
-  return { x, y, w: Math.max(...boxes.map((r) => r.x + r.w)) - x, h: Math.max(...boxes.map((r) => r.y + r.h)) - y };
-}
-
-/** SVG path tracing only the outer edges of a room's tiles, so an L-shaped room gets a clean
- *  border that follows its real footprint instead of a bounding rectangle. */
-/** Where a room's name bubble sits and how big it is (also the keep-out for tokens). */
-function labelGeom(room: RoomLayout, title: string) {
-  const b = roomBounds(room);
-  const isRect = room.tiles.length === (b.w / TS) * (b.h / TS);
-  const cx = isRect ? b.x + b.w / 2 : room.label.x * TS + TS / 2;
-  const cy = isRect ? b.y + b.h / 2 : room.label.y * TS + TS / 2;
-  const fs = Math.max(6.5, Math.min(11, (b.w - 12) / (title.length * 0.62)));
-  const w = Math.min(b.w - 4, title.length * fs * 0.6 + 12);
-  const h = fs + 7;
-  return { isRect, cx, cy, fs, w, h };
-}
 
 /** Fill for a tile that isn't part of a room: a texture pattern when the file exists, else the flat
  *  theme colour. Halls take the floor of their level; outdoor lawn takes grass; an outdoor path
@@ -317,10 +253,11 @@ function packFor(room: RoomLayout, pawns: number, weapons: number): Packing {
   if (pk) return pk;
   const title = getCard(room.id)?.title ?? room.id;
   const lg = labelGeom(room, title);
-  const b = roomBounds(room);
+  // The thematic glyph above the name only shows on a room without its own painting.
+  const glyph = resolveBoardArt(room.id, title) ? 0 : 14;
   const reserved: Rect[] = [
     // the name bubble, plus the glyph line above it
-    { x: lg.cx - lg.w / 2 - 2, y: lg.cy - lg.h / 2 - 16, w: lg.w + 4, h: lg.h + 18 },
+    { x: lg.cx - lg.w / 2 - 2, y: lg.cy - lg.h / 2 - 2 - glyph, w: lg.w + 4, h: lg.h + 4 + glyph },
   ];
   if (room.shortcutTile) reserved.push({ x: room.shortcutTile.x * TS, y: room.shortcutTile.y * TS, w: TS, h: TS });
   pk = packRoom({
@@ -331,7 +268,7 @@ function packFor(room: RoomLayout, pawns: number, weapons: number): Packing {
     weapons,
     rMax: PAWN_R,
     anchor: { x: lg.cx, y: lg.cy + lg.h / 2 + PAWN_R },
-    top: { x: b.x + b.w / 2, y: b.y },
+    weaponAnchor: weaponAnchor(room, lg, reserved, PAWN_R),
   });
   PACK_CACHE.set(key, pk);
   return pk;

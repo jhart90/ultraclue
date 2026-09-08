@@ -1,14 +1,14 @@
 import type { SuspectCard } from '../types';
 
 // 40 suspects, each with a colour-based surname and the hex colour of their game piece.
-// `turnOrder` is the fixed seat order (1 = first). Miss Scarlet always leads, per tradition.
+// `turnOrder` is the fixed seat order (1 = first). Ruby Valentine always leads, per tradition.
 export const SUSPECTS: SuspectCard[] = [
-  { id: 'suspect-scarlet', type: 'suspect', title: 'Miss Scarlet', color: '#E12B38', turnOrder: 1, phrase: 'First to the scene, last to confess.' },
-  { id: 'suspect-mustard', type: 'suspect', title: 'Colonel Mustard', color: '#C9A227', turnOrder: 2, phrase: 'A temper as sharp as his sabre.' },
-  { id: 'suspect-peacock', type: 'suspect', title: 'Mrs. Peacock', color: '#1F6FB2', turnOrder: 3, phrase: 'Impeccable manners, immaculate alibis.' },
-  { id: 'suspect-plum', type: 'suspect', title: 'Professor Plum', color: '#6D3B8E', turnOrder: 4, phrase: 'Brilliant, distracted, conveniently forgetful.' },
-  { id: 'suspect-green', type: 'suspect', title: 'Mr. Green', color: '#2E8B57', turnOrder: 5, phrase: 'Mild-mannered to a fault — or so he would have you believe.' },
-  { id: 'suspect-orchid', type: 'suspect', title: 'Dr. Orchid', color: '#C57FC9', turnOrder: 6, phrase: 'Botanist by trade, poisoner by reputation.' },
+  { id: 'suspect-valentine', type: 'suspect', title: 'Ruby Valentine', color: '#E12B38', turnOrder: 1, phrase: 'First to the scene, last to confess.' },
+  { id: 'suspect-dijon', type: 'suspect', title: 'Colonel Dijon', color: '#C9A227', turnOrder: 2, phrase: 'A temper as sharp as his sabre.' },
+  { id: 'suspect-blue', type: 'suspect', title: 'Beatrice Blue', color: '#1F6FB2', turnOrder: 3, phrase: 'Impeccable manners, immaculate alibis.' },
+  { id: 'suspect-mulberry', type: 'suspect', title: 'Professor Mulberry', color: '#6D3B8E', turnOrder: 4, phrase: 'Brilliant, distracted, conveniently forgetful.' },
+  { id: 'suspect-verdant', type: 'suspect', title: 'Reverend Verdant', color: '#2E8B57', turnOrder: 5, phrase: 'Preaches forgiveness on Sunday; practises something else the rest of the week.' },
+  { id: 'suspect-bloom', type: 'suspect', title: 'Botanist Bloom', color: '#C57FC9', turnOrder: 6, phrase: 'Cultivates rare blooms, and rarer poisons.' },
   { id: 'suspect-slate', type: 'suspect', title: 'Sultan Slate', color: '#5A6B7B', turnOrder: 7, phrase: 'An opulent throne, a conscience cold as slate.' },
   { id: 'suspect-rose', type: 'suspect', title: 'Sister Rose', color: '#E58FA8', turnOrder: 8, phrase: 'All thorns beneath the petals.' },
   { id: 'suspect-indigo', type: 'suspect', title: 'Sir Indigo', color: '#3F4C9B', turnOrder: 9, phrase: 'Old money, darker secrets.' },

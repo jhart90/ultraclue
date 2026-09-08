@@ -7,24 +7,10 @@ const boardRoomUrls = import.meta.glob('../../../assets/board/rooms/*.{svg,png,j
   import: 'default',
 }) as Record<string, string>;
 
-/**
- * Rooms painted by a single shared image, listed with the room whose title names the file first.
- * The image is stretched over the union of the group's bounding boxes and each room clips its own
- * share out of it, so a wall drawn between them lands on the tile boundary they actually share.
- * The Master Suite and its Walk-in Closet are one such pair: the closet is a 2x2 notch bitten out
- * of the suite, and together they fill one rectangle.
- */
-const SHARED_ART: readonly (readonly string[])[] = [['room-master-suite', 'room-walk-in-closet']];
-
-/** The group this room shares its art with, primary room first, or undefined if it paints alone. */
-export function sharedArtGroup(roomId: string): readonly string[] | undefined {
-  return SHARED_ART.find((group) => group.includes(roomId));
-}
-
-/** "Clock Tower" -> "clock_tower", matching how the files are named. */
-function slug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-}
+// Which rooms share one painting, and the file-name slug, live in roomLayout.ts (which has no
+// Vite-only imports, so the board scripts can use them too); re-exported here for the board.
+import { sharedArtGroup, slug } from './roomLayout';
+export { sharedArtGroup };
 
 /**
  * Returns the URL of the board floorplan art for this room, or undefined if none has been painted

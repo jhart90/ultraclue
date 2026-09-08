@@ -22,7 +22,7 @@ function lobbyPlayer(id: string, suspectId: string): Player {
 
 describe('game statistics', () => {
   it('starts every player at zero and counts the opening turn', () => {
-    const s = startGame('S', [lobbyPlayer('p1', 'suspect-scarlet'), lobbyPlayer('p2', 'suspect-plum')], makeRng(3));
+    const s = startGame('S', [lobbyPlayer('p1', 'suspect-valentine'), lobbyPlayer('p2', 'suspect-mulberry')], makeRng(3));
     expect(s.stats).toBeTruthy();
     expect(s.stats!.turnsPlayed).toBe(1); // the first player's turn has begun
     expect(s.stats!.players.p1.turns).toBe(1);
@@ -31,7 +31,7 @@ describe('game statistics', () => {
   });
 
   it('counts tiles walked and rooms visited when a piece moves', () => {
-    let s = startGame('S', [lobbyPlayer('p1', 'suspect-scarlet'), lobbyPlayer('p2', 'suspect-plum')], makeRng(3));
+    let s = startGame('S', [lobbyPlayer('p1', 'suspect-valentine'), lobbyPlayer('p2', 'suspect-mulberry')], makeRng(3));
     const reach = activeReachable(s);
     const corridor = reach.find((t) => !roomIdAt(BOARD, t));
     const room = reach.find((t) => roomIdAt(BOARD, t));
@@ -47,7 +47,7 @@ describe('game statistics', () => {
   });
 
   it('tallies suggestions by suspect, weapon and room, and who showed a card', () => {
-    let s = startGame('S', [lobbyPlayer('p1', 'suspect-scarlet'), lobbyPlayer('p2', 'suspect-plum')], makeRng(3));
+    let s = startGame('S', [lobbyPlayer('p1', 'suspect-valentine'), lobbyPlayer('p2', 'suspect-mulberry')], makeRng(3));
     // teleport p1 into a room so a suggestion is legal
     const roomId = 'room-lounge';
     s.players[0].inRoomId = roomId;
@@ -55,7 +55,7 @@ describe('game statistics', () => {
     s.turnPhase = 'postMove';
     // pick a suspect/weapon p2 holds so a reveal happens
     const held = s.players[1].hand;
-    const suspect = held.find((c) => c.startsWith('suspect-')) ?? 'suspect-plum';
+    const suspect = held.find((c) => c.startsWith('suspect-')) ?? 'suspect-mulberry';
     const weapon = held.find((c) => c.startsWith('weapon-')) ?? 'weapon-rope';
     s = makeSuggestion(s, 'p1', suspect, weapon, roomId, makeRng(1));
     expect(s.stats!.suggestionCount).toBe(1);
@@ -71,7 +71,7 @@ describe('game statistics', () => {
   });
 
   it('remembers who took part, when, and stamps the finish', () => {
-    let s = startGame('S', [lobbyPlayer('p1', 'suspect-scarlet'), { ...lobbyPlayer('b1', 'suspect-plum'), name: 'Computer 2', isBot: true }], makeRng(3));
+    let s = startGame('S', [lobbyPlayer('p1', 'suspect-valentine'), { ...lobbyPlayer('b1', 'suspect-mulberry'), name: 'Computer 2', isBot: true }], makeRng(3));
     expect(s.stats!.startedAt).toBeGreaterThan(0);
     expect(s.stats!.participants!.map((p) => [p.name, p.kind])).toEqual([
       ['P1', 'human'],
@@ -81,8 +81,8 @@ describe('game statistics', () => {
     syncParticipants(
       s,
       [
-        { name: 'P1', kind: 'human', suspectId: 'suspect-scarlet' },
-        { name: 'Computer 2', kind: 'computer', suspectId: 'suspect-plum' },
+        { name: 'P1', kind: 'human', suspectId: 'suspect-valentine' },
+        { name: 'Computer 2', kind: 'computer', suspectId: 'suspect-mulberry' },
         { name: 'Watcher', kind: 'observer' },
       ],
       1000,
@@ -90,8 +90,8 @@ describe('game statistics', () => {
     syncParticipants(
       s,
       [
-        { name: 'Computer 1', kind: 'computer', suspectId: 'suspect-scarlet' },
-        { name: 'Computer 2', kind: 'computer', suspectId: 'suspect-plum' },
+        { name: 'Computer 1', kind: 'computer', suspectId: 'suspect-valentine' },
+        { name: 'Computer 2', kind: 'computer', suspectId: 'suspect-mulberry' },
         { name: 'Watcher', kind: 'observer' },
       ],
       2000,
@@ -105,7 +105,7 @@ describe('game statistics', () => {
   });
 
   it('counts accusations and exposes the stats only once the game has ended', () => {
-    let s = startGame('S', [lobbyPlayer('p1', 'suspect-scarlet'), lobbyPlayer('p2', 'suspect-plum')], makeRng(3));
+    let s = startGame('S', [lobbyPlayer('p1', 'suspect-valentine'), lobbyPlayer('p2', 'suspect-mulberry')], makeRng(3));
     expect(viewFor(s, 'p1').stats).toBeUndefined();
     s.turnPhase = 'postMove';
     const env = s.envelope;

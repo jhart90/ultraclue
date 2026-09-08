@@ -12,7 +12,7 @@ export const DICE_ANIM_MS = 2600;
 /** Beat at the start of every turn ("X's turn" flashes on screen) before that turn's dice roll shows. */
 export const TURN_FLASH_MS = 1000;
 /** Pause after a turn ends before the next player's turn is announced, so the last thing that
- *  happened ("Mr. Green reveals…") has the screen to itself for a moment. Clients hold the turn
+ *  happened ("Reverend Verdant reveals…") has the screen to itself for a moment. Clients hold the turn
  *  flash, the turn pill and the opening roll back by this much; bots wait it out too. */
 export const TURN_GAP_MS = 1000;
 /** Public games: a human on the clock has this long to act before the turn is passed for them. */

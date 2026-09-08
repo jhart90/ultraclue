@@ -22,19 +22,19 @@ function lobbyPlayer(id: string, suspectId: string, isBot = false): Player {
 /** p1 (human) suggests once, then accuses — correctly or not. A wrong accusation only ends the game
  *  when one opponent is left, so the wrong case plays against a single computer. Returns the ended state. */
 function finishedGame(seed: number, correct: boolean) {
-  const bots = [lobbyPlayer('b1', 'suspect-plum', true), lobbyPlayer('b2', 'suspect-green', true)].slice(0, correct ? 2 : 1);
-  let s = startGame('ROOM', [lobbyPlayer('p1', 'suspect-scarlet'), ...bots], makeRng(seed));
+  const bots = [lobbyPlayer('b1', 'suspect-mulberry', true), lobbyPlayer('b2', 'suspect-verdant', true)].slice(0, correct ? 2 : 1);
+  let s = startGame('ROOM', [lobbyPlayer('p1', 'suspect-valentine'), ...bots], makeRng(seed));
   // Stand p1 in a room so they can suggest: borrow the envelope's room to keep the test simple.
   s.turnPhase = 'postMove';
   const p1 = s.players.find((p) => p.id === 'p1')!;
   p1.inRoomId = s.envelope.roomId;
-  s = makeSuggestion(s, 'p1', 'suspect-plum', 'weapon-rope', s.envelope.roomId, makeRng(1));
+  s = makeSuggestion(s, 'p1', 'suspect-mulberry', 'weapon-rope', s.envelope.roomId, makeRng(1));
   // resolve whatever the suggestion is waiting on by ending it the blunt way: accuse next turn
   s.currentSuggestion = undefined;
   s.turnPhase = 'postMove';
   s.activeIdx = s.turnOrder.indexOf('p1');
   const env = s.envelope;
-  const trio = correct ? env : { suspectId: 'suspect-green', weaponId: env.weaponId, roomId: env.roomId };
+  const trio = correct ? env : { suspectId: 'suspect-verdant', weaponId: env.weaponId, roomId: env.roomId };
   s = makeAccusation(s, 'p1', trio.suspectId, trio.weaponId, trio.roomId, makeRng(2)).state;
   return s;
 }
@@ -73,7 +73,7 @@ describe('folding games into a profile', () => {
     expect(game?.result).toBe('won');
     expect(game?.solved).toBe(true);
     expect(game?.isPublic).toBe(true);
-    expect(game?.suspectId).toBe('suspect-scarlet');
+    expect(game?.suspectId).toBe('suspect-valentine');
     expect(game?.players).toBe(3);
     expect(game?.humans).toBe(1);
     expect(prof.games).toBe(1);
@@ -83,8 +83,8 @@ describe('folding games into a profile', () => {
     expect(prof.suggestions).toBe(1);
     expect(prof.accusations).toBe(1);
     expect(prof.accusationsCorrect).toBe(1);
-    expect(prof.characters).toEqual({ 'suspect-scarlet': 1 });
-    expect(prof.suspectedSuspects).toEqual({ 'suspect-plum': 1 });
+    expect(prof.characters).toEqual({ 'suspect-valentine': 1 });
+    expect(prof.suspectedSuspects).toEqual({ 'suspect-mulberry': 1 });
     expect(prof.suspectedWeapons).toEqual({ 'weapon-rope': 1 });
     expect(prof.suspectedRooms).toEqual({ [s.envelope.roomId]: 1 });
     expect(prof.recent).toHaveLength(1);

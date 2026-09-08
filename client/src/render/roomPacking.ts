@@ -5,8 +5,9 @@ import type { Coord } from 'shared';
 // The lattice pitch is the largest that gives every token a slot, so a couple of pawns sit at full
 // size and a crowd of forty shrinks and closes ranks. Tokens prefer to keep off the room's name
 // bubble, but will sit over it rather than shrink: a token is the same size in a broom cupboard as
-// in a ballroom. Weapons take the topmost slots (they read as sitting on the mantel); pawns gather
-// just under the name bubble and spread outward from there.
+// in a ballroom. Weapons cluster on the slots nearest their anchor (the calmest patch of the room's
+// painting, normally above the name bubble); pawns gather just under the name bubble and spread
+// outward from there.
 
 export interface Pt {
   x: number;
@@ -33,8 +34,9 @@ export interface PackOptions {
   rMin?: number;
   /** Pawns fill outward from here — normally just under the name bubble. */
   anchor: Pt;
-  /** Weapons fill from the slot nearest here — normally the middle of the top wall. */
-  top: Pt;
+  /** Weapons fill from the slot nearest here — the calmest patch of the room's painting (see
+   *  roomLayout.weaponAnchor), or just above the name bubble. */
+  weaponAnchor: Pt;
 }
 
 export interface Packing {
@@ -129,8 +131,8 @@ export function packRoom(o: PackOptions): Packing {
     for (let i = 0; i < n; i++) picked.push(sorted[i % sorted.length]);
     return picked;
   };
-  // Weapons first: the topmost slots, centred on the top wall's midpoint.
-  const weaponSlots = take(slots, o.weapons, (p) => p.y * 1000 + Math.abs(p.x - o.top.x));
+  // Weapons first: the slots nearest their anchor, so they form one cluster there.
+  const weaponSlots = take(slots, o.weapons, (p) => dist2(p, o.weaponAnchor));
   const usedW = new Set(weaponSlots.map((p) => `${p.x},${p.y}`));
   const rest = slots.filter((p) => !usedW.has(`${p.x},${p.y}`));
   const pawnSlots = take(rest.length ? rest : slots, o.pawns, (p) => dist2(p, o.anchor));

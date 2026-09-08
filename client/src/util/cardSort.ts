@@ -1,6 +1,6 @@
 import { SUSPECTS, WEAPONS, ROOMS, type AnyCard } from 'shared';
 
-/** Suspect surnames are the colour-based last word ("Miss Scarlet" -> "Scarlet"); used for sorting. */
+/** Suspect surnames are the last word ("Ruby Valentine" -> "Valentine"); used for sorting. */
 export const surname = (title: string): string => title.trim().split(/\s+/).pop() ?? title;
 
 const TYPE_ORDER: Record<string, number> = { suspect: 0, weapon: 1, room: 2 };

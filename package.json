@@ -16,7 +16,7 @@
     "dev:server": "npm -w server run dev",
     "dev:client": "npm -w client run dev",
     "build": "npm -w client run build",
-    "start": "npm -w server run start",
+    "start": "node scripts/migrate-suspect-ids.mjs && npm -w server run start",
     "test": "npm -w shared run test",
     "itest": "node scripts/integration-smoke.mjs",
     "typecheck": "npm -w shared run typecheck && npm -w server run typecheck && npm -w client run typecheck"

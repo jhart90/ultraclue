@@ -542,6 +542,7 @@ export function Board({
   activeId,
   round = 0,
   board = BOARD,
+  envelopeAway = false,
 }: {
   players: PlayerView[];
   /** Completed rounds so far. The faint start-position rings are shown only while the first round
@@ -550,6 +551,8 @@ export function Board({
   /** The board this game is played on: the whole house, or the house minus the wings the host
    *  closed (boardFor). Coordinates match the full board, so only what is drawn changes. */
   board?: Board;
+  /** True while the accusation reveal has lifted the envelope off the board: it fades out until it returns. */
+  envelopeAway?: boolean;
   reachable?: Coord[];
   lastMove?: LastMove;
   weaponLocations?: Record<string, string>;
@@ -1130,7 +1133,11 @@ export function Board({
             const ex = (blank.x * TS) / 2;
             const ey = (blank.y * TS) / 2;
             return (
-              <g transform={`translate(${ex} ${ey}) rotate(-12)`} filter="url(#board-env-shadow)" style={{ pointerEvents: 'none' }}>
+              <g
+                transform={`translate(${ex} ${ey}) rotate(-12)`}
+                filter="url(#board-env-shadow)"
+                style={{ pointerEvents: 'none', opacity: envelopeAway ? 0 : 1, transition: 'opacity 0.5s' }}
+              >
                 <svg x={-w / 2} y={-h / 2} width={w} height={h} viewBox={`0 0 ${ENVELOPE_VIEWBOX.w} ${ENVELOPE_VIEWBOX.h}`} overflow="visible">
                   <defs>
                     <filter id="board-env-shadow" x="-20%" y="-20%" width="140%" height="150%">

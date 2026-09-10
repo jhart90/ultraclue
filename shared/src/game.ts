@@ -15,6 +15,10 @@ export const TURN_FLASH_MS = 1000;
  *  happened ("Reverend Verdant reveals…") has the screen to itself for a moment. Clients hold the turn
  *  flash, the turn pill and the opening roll back by this much; bots wait it out too. */
 export const TURN_GAP_MS = 1000;
+/** How long the accusation reveal — the CLASSIFIED envelope opening on every screen — runs in its
+ *  longest cut (a wrong accuser's private look, the stamp, and the envelope leaving). Bots wait it out
+ *  before acting, like the dice. Keep in step with the client's AccusationReveal timeline. */
+export const ACCUSATION_ANIM_MS = 16_400;
 /** Public games: a human on the clock has this long to act before the turn is passed for them. */
 export const PUBLIC_TURN_MS = 90_000;
 

@@ -1,0 +1,379 @@
+/* The accusation reveal: the CLASSIFIED envelope opened centre-screen. Every duration is a
+   storyboard number times --pace (REVEAL_PACE in AccusationReveal.tsx), and every phase is a class
+   the component adds to this root at its moment: p-swoop, p-pry, p-fly, p-flap (+ flap-open past
+   vertical), p-rise, p-stamp, then either p-fade or p-back / p-close / p-sealback / p-out. */
+.accrev {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: var(--pad, 0);
+  right: var(--map-right, 0); /* over the map only — the chat stays usable */
+  z-index: 248; /* over the pop-ups (245) and hand fan (240), under the folders (250) */
+  overflow: hidden;
+  --pace: 2;
+  --env-w: 600px; /* set from the area's size by the component */
+  --area-w: 900px;
+  --card-zoom: 0.7;
+}
+.accrev.p-stamp {
+  animation: accrev-thud calc(260ms * var(--pace)) ease-out;
+}
+@keyframes accrev-thud {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translate(-3px, 2px);
+  }
+  40% {
+    transform: translate(3px, -2px);
+  }
+  60% {
+    transform: translate(-2px, 1px);
+  }
+  80% {
+    transform: translate(1px, -1px);
+  }
+}
+
+/* The scene is the envelope plus the room the cards stand up into above it, centred as one. */
+.accrev__scene {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: var(--env-w);
+  height: calc(var(--env-w) * 0.836);
+}
+.accrev__env {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--env-w) * 0.6875); /* 440 / 640 */
+  perspective: calc(var(--env-w) * 2);
+}
+.accrev__l {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* Layer order is fixed by z-index rather than 3D sorting: cards behind the body (so they hide inside
+   it), the body, the flap's shadow, the flap (in front while it swings, behind everything once open),
+   the seal on top. */
+.accrev__cards {
+  z-index: 1;
+}
+.accrev__body {
+  z-index: 2;
+  filter: drop-shadow(0 calc(var(--env-w) * 0.025) calc(var(--env-w) * 0.03) rgba(0, 0, 0, 0.55));
+}
+.accrev__flapshadow {
+  z-index: 3;
+  transition: opacity calc(280ms * var(--pace));
+}
+.accrev__flap {
+  z-index: 5;
+  transform-origin: 50% 13.64%; /* the fold line, y=60 of 440 */
+}
+.accrev__flap svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.35));
+}
+.accrev__seal {
+  z-index: 6;
+  transform-origin: 50% 56.8%; /* the seal's centre, (320, 250) */
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35));
+}
+/* Open past vertical we see the flap's back: its plain inside, no stamp, behind the cards. */
+.accrev.flap-open .accrev__flap {
+  z-index: 0;
+}
+.accrev.flap-open .env-flap__paper {
+  fill: url(#accrev-flapin);
+}
+.accrev.flap-open .env-flap__stamp {
+  opacity: 0;
+}
+
+/* ---- the three cards ---- */
+.accrev__slot {
+  position: absolute;
+  top: 34.1%; /* fully inside the body, hidden behind it */
+  width: 23.44%;
+  transform-origin: 50% 100%; /* the fan pivots from the tucked-in bottom edge */
+  perspective: calc(var(--env-w) * 1.4);
+  transition: transform calc(500ms * var(--pace)) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.accrev__slot-1 {
+  left: 10.16%;
+}
+.accrev__slot-2 {
+  left: 38.28%;
+}
+.accrev__slot-3 {
+  left: 66.4%;
+}
+.accrev.p-rise .accrev__slot-1 {
+  transform: translateY(-124%) rotate(-4deg);
+}
+.accrev.p-rise .accrev__slot-2 {
+  transform: translateY(-124%);
+  transition-delay: calc(130ms * var(--pace));
+}
+.accrev.p-rise .accrev__slot-3 {
+  transform: translateY(-124%) rotate(4deg);
+  transition-delay: calc(260ms * var(--pace));
+}
+.accrev.p-back .accrev__slot {
+  transform: none;
+  transition-duration: calc(450ms * var(--pace));
+  transition-timing-function: cubic-bezier(0.5, 0, 0.8, 0.4);
+}
+.accrev.p-back .accrev__slot-3 {
+  transition-delay: 0ms;
+}
+.accrev.p-back .accrev__slot-2 {
+  transition-delay: calc(100ms * var(--pace));
+}
+.accrev.p-back .accrev__slot-1 {
+  transition-delay: calc(200ms * var(--pace));
+}
+/* The flip is Roll67's: back and face stacked, rotated together, popping up at the midpoint. */
+.accrev__flipper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 200 / 306;
+  transform-style: preserve-3d;
+}
+.accrev__flipper.is-flipped {
+  animation: accrev-flip calc(600ms * var(--pace)) ease-out forwards;
+}
+@keyframes accrev-flip {
+  0% {
+    transform: rotateY(0deg) scale(0.9);
+  }
+  55% {
+    transform: rotateY(180deg) scale(1.25);
+  }
+  100% {
+    transform: rotateY(180deg) scale(1);
+  }
+}
+.accrev__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.accrev__face--front {
+  transform: rotateY(180deg);
+}
+/* Card and CardBack draw at 200px; zoom scales them (text included) to the slot. */
+.accrev .card,
+.accrev .cardback {
+  zoom: var(--card-zoom);
+}
+
+/* ---- the envelope's journey ---- */
+.accrev.p-swoop .accrev__scene {
+  animation: accrev-swoop-in calc(800ms * var(--pace)) cubic-bezier(0.22, 0.9, 0.3, 1) forwards;
+}
+@keyframes accrev-swoop-in {
+  0% {
+    transform: translate(-110%, -95%) rotate(-24deg) scale(0.28);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  78% {
+    transform: translate(1.5%, 1%) rotate(2deg) scale(1.03);
+  }
+  100% {
+    transform: none;
+  }
+}
+.accrev.p-out .accrev__scene {
+  animation: accrev-swoop-out calc(550ms * var(--pace)) cubic-bezier(0.6, 0, 0.9, 0.4) forwards;
+}
+@keyframes accrev-swoop-out {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-110%, -95%) rotate(-24deg) scale(0.28);
+    opacity: 0;
+  }
+}
+.accrev.p-fade .accrev__scene {
+  animation: accrev-fade calc(500ms * var(--pace)) ease-in forwards;
+}
+@keyframes accrev-fade {
+  to {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+/* Before the swoop starts the scene waits off-screen, so nothing flashes at mount. */
+.accrev:not(.p-swoop) .accrev__scene {
+  opacity: 0;
+}
+
+/* ---- the seal: pried, flicked away, and later pressed back ---- */
+.accrev.p-pry .accrev__seal {
+  animation: accrev-seal-pry calc(350ms * var(--pace)) ease-out forwards;
+  filter: drop-shadow(0 0.7em 0.5em rgba(0, 0, 0, 0.45));
+  transition: filter calc(350ms * var(--pace));
+}
+@keyframes accrev-seal-pry {
+  0% {
+    transform: none;
+  }
+  35% {
+    transform: rotate(-3deg);
+  }
+  60% {
+    transform: rotate(4deg) scale(1.04);
+  }
+  100% {
+    transform: translateY(-3%) rotate(-8deg) scale(1.14);
+  }
+}
+.accrev.p-fly .accrev__seal {
+  animation: accrev-seal-fly calc(400ms * var(--pace)) ease-in forwards;
+}
+@keyframes accrev-seal-fly {
+  0% {
+    transform: translateY(-3%) rotate(-8deg) scale(1.14);
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(48%, -95%) rotate(150deg) scale(0.75);
+    opacity: 0;
+  }
+}
+.accrev.p-sealback .accrev__seal {
+  animation: accrev-seal-back calc(400ms * var(--pace)) ease-out forwards;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35));
+}
+@keyframes accrev-seal-back {
+  0% {
+    transform: translate(40%, -85%) rotate(-140deg) scale(0.8);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(-1%) rotate(4deg) scale(1.1);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ---- the flap: swings open about its fold, and closed again ---- */
+.accrev.p-flap .accrev__flap {
+  animation: accrev-flap-open calc(700ms * var(--pace)) ease-in-out forwards;
+}
+@keyframes accrev-flap-open {
+  from {
+    transform: rotateX(0deg);
+  }
+  to {
+    transform: rotateX(176deg);
+  }
+}
+.accrev.p-flap .accrev__flapshadow {
+  opacity: 0;
+}
+.accrev.p-close .accrev__flap {
+  animation: accrev-flap-close calc(600ms * var(--pace)) ease-in-out forwards;
+}
+@keyframes accrev-flap-close {
+  from {
+    transform: rotateX(176deg);
+  }
+  to {
+    transform: rotateX(0deg);
+  }
+}
+.accrev.p-close .accrev__flapshadow {
+  opacity: 1;
+  transition-delay: calc(350ms * var(--pace));
+}
+
+/* ---- the verdict stamp ---- */
+.accrev__stamp {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  opacity: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+.accrev.p-stamp .accrev__stamp {
+  opacity: 1;
+}
+/* A wrong verdict's stamp fades as the cards slide back (p-unstamp), before the flap closes over its
+   own CLASSIFIED stamp; a correct one fades with the whole scene. */
+.accrev.p-unstamp .accrev__stamp,
+.accrev.p-fade .accrev__stamp {
+  opacity: 0;
+  transition: opacity calc(500ms * var(--pace));
+}
+.accrev__stampin {
+  transform: scale(2.6);
+  opacity: 0;
+}
+.accrev.p-stamp .accrev__stampin {
+  animation: accrev-stamp-slam calc(320ms * var(--pace)) cubic-bezier(0.2, 0.9, 0.25, 1.2) forwards;
+}
+@keyframes accrev-stamp-slam {
+  0% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.94);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.accrev__stamp svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+/* With reduced motion the component jumps to the finished picture; every animation just lands. */
+@media (prefers-reduced-motion: reduce) {
+  .accrev *,
+  .accrev.p-stamp {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+}

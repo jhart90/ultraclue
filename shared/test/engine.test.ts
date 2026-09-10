@@ -256,6 +256,16 @@ describe('per-player view (hidden-information boundary)', () => {
     expect(p2View.hand).toBeUndefined();
   });
 
+  it('shows the envelope to a wrong accuser once they are out, and still to no one else', () => {
+    const st = baseState();
+    st.players[0].hand = ['weapon-dagger'];
+    const { state } = makeAccusation(st, 'p1', 'suspect-valentine', 'weapon-rope', 'room-study', makeRng(1));
+    expect(state.phase).toBe('play'); // two detectives remain
+    expect(viewFor(state, 'p1').envelope).toEqual(state.envelope); // the eliminated accuser's private look
+    expect(viewFor(state, 'p2').envelope).toBeUndefined();
+    expect(viewFor(state, 'p3').envelope).toBeUndefined();
+  });
+
   it('reveals a disproving card to the suggester and the responder, but no one else', () => {
     const st = baseState();
     st.players[1].isBot = true;

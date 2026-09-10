@@ -78,6 +78,10 @@ export interface Room {
   /** When the last dice roll was broadcast, so bots let the roll animation finish before acting. */
   lastRollAt?: number;
   lastRollSeq?: number;
+  /** When the last accusation was announced, so bots (and the public clock) let its envelope
+   *  reveal play out on every screen before the table moves on. */
+  lastAccusationAt?: number;
+  lastAccusationSeq?: number;
   /** SERVER-ONLY: each human occupant's long-term profile id (from their name + optional PIN),
    *  keyed by occupant id. Never part of a lobby view, game view, or save. */
   profileIds?: Record<string, string>;

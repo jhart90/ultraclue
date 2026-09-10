@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { getCard, type Announcement } from 'shared';
 import { Card } from './Card';
 import { CardBack } from './CardBack';
@@ -6,67 +5,26 @@ import { Dice } from './Dice';
 import { highlightChat } from '../util/highlightChat';
 import './GamePopups.css';
 
-type Trio = { suspectId: string; weaponId: string; roomId: string };
-
 /**
- * The two-step accusation reveal everyone sees: first "<name> has made an accusation!" with the
- * three accused cards, then the verdict — a win (envelope revealed, "End Game") or a loss
- * ("Continue Game", or "End Game" if the loss left one player standing).
+ * The verdict a player sees once their own wrong accusation has played out on the envelope
+ * (AccusationReveal): "Continue Game", or "End Game" if the loss left one player standing. A
+ * correct accusation goes straight from the reveal to the end screen, so it has no panel here, and
+ * everyone else already has the verdict as a card in the chat.
  */
 export function AccusationFlow({
   announcement,
-  envelope,
   ended,
   winnerName,
   onContinue,
   onEndGame,
 }: {
   announcement: Announcement;
-  envelope?: Trio;
   ended: boolean;
   winnerName?: string;
   onContinue: () => void;
   onEndGame: () => void;
 }) {
-  const [stage, setStage] = useState<'announce' | 'result'>('announce');
   const a = announcement;
-  const trio = [a.suspectId, a.weaponId, a.roomId];
-  const cardsOf = (ids: string[]) =>
-    ids.map((id) => {
-      const c = getCard(id);
-      return c ? <Card key={id} card={c} /> : null;
-    });
-
-  if (stage === 'announce') {
-    return (
-      <div className="sp__backdrop">
-        <div className="sp sp--end">
-          <div className="sp__endtitle">{highlightChat(`${a.byName} has made an accusation!`)}</div>
-          <div className="sp__cards">{cardsOf(trio)}</div>
-          <button className="btn btn--primary" onClick={() => setStage('result')}>
-            See the verdict
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (a.correct) {
-    const env = envelope ? [envelope.suspectId, envelope.weaponId, envelope.roomId] : trio;
-    return (
-      <div className="sp__backdrop">
-        <div className="sp sp--end">
-          <div className="sp__endtitle">{highlightChat(`🎉 ${a.byName} Wins!`)}</div>
-          <div className="sp__hint">The CLASSIFIED envelope contained:</div>
-          <div className="sp__cards">{cardsOf(env)}</div>
-          <button className="btn btn--primary" onClick={onEndGame}>
-            End Game
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="sp__backdrop">
       <div className="sp sp--end">

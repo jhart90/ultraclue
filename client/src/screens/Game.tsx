@@ -15,6 +15,7 @@ import { DetectiveNotes, readNotesTheme, saveNotesTheme, type NotesTheme } from 
 import { SelectModal, RevealPanel, NoEvidencePanel } from '../components/SuggestPanels';
 import { EndScreen } from '../components/EndScreen';
 import { StatusModal, AccusationFlow, AccusingModal, type StatusButton } from '../components/GamePopups';
+import { AccusationReveal, revealTotalMs, type RevealVariant } from '../components/AccusationReveal';
 import { soundEnabled, setSoundEnabled } from '../util/sound';
 import { contrastInk } from '../render/colorUtils';
 import { highlightChat } from '../util/highlightChat';
@@ -132,15 +133,22 @@ export function Game() {
   const [statusOpen, setStatusOpen] = useState(false);
   const [elevatorReady, setElevatorReady] = useState(false); // gated until the piece reaches the lift
 
-  // A captured accusation (so its two-step reveal survives later announcements overwriting the live one).
+  // A captured accusation (so its reveal survives later announcements overwriting the live one):
+  // first the envelope opens on screen (AccusationReveal), then a wrong accuser gets their verdict.
   const [accFlow, setAccFlow] = useState<{
     ann: Announcement;
     envelope?: { suspectId: string; weaponId: string; roomId: string };
     ended: boolean;
     winnerName?: string;
+    /** Which cut of the reveal this viewer gets, and whether it is still playing. */
+    variant: RevealVariant;
+    revealing: boolean;
   } | null>(null);
   const accSeqRef = useRef(0);
   const annSeqRef = useRef(0);
+  /** When the reveal now playing will be over: the next turn's flash and pop-ups wait for it. */
+  const revealUntilRef = useRef(0);
+  const seededRef = useRef(false);
   const statusSigRef = useRef('');
   const rollSeqRef = useRef(0);
 
@@ -151,31 +159,42 @@ export function Game() {
   const suggestionPendingNow = !!sgNow && !sgNow.resolved;
   const iMustRevealNow = suggestionPendingNow && sgNow!.pendingResponderId === myId;
 
-  // New suggestion -> announce it to everyone (and clear any prior reveal pop-up). A fresh
-  // suggestion also retires a lingering accusation verdict, so a new pop-up always replaces the old
-  // one — important for observers, who never click "Dismiss".
+  // Announcements already on the table when this screen mounts (a reload, a late join) have had
+  // their moment: note their sequence so only what arrives from now on is played.
+  useEffect(() => {
+    if (!game || seededRef.current) return;
+    seededRef.current = true;
+    const seq = game.announcement?.seq ?? 0;
+    accSeqRef.current = seq;
+    annSeqRef.current = seq;
+  }, [game]);
+
+  // New suggestion -> note it (the toast comes from its chat card). It never cuts short an
+  // accusation's reveal, nor the verdict panel that follows one: only the wrong accuser gets that
+  // panel, and it has a button.
   useEffect(() => {
     const a = game?.announcement;
-    if (a && a.kind === 'suggestion' && a.seq !== annSeqRef.current) {
-      annSeqRef.current = a.seq;
-      setAccFlow((prev) => (prev && prev.ann.seq < a.seq ? null : prev));
-    }
+    if (a && a.kind === 'suggestion' && a.seq !== annSeqRef.current) annSeqRef.current = a.seq;
   }, [game?.announcement?.seq, game?.phase]);
 
-  // New accusation -> capture it for the two-step reveal (so it survives later announcements).
+  // New accusation -> everyone watches the envelope open. The cut depends on the verdict and on
+  // whose accusation it was: a wrong accuser alone sees the cards turn over (the server sends the
+  // envelope to an eliminated seat), then gets the verdict panel; a correct call ends in the end screen.
   useEffect(() => {
     const a = game?.announcement;
-    if (a && a.kind === 'accusation' && a.seq !== accSeqRef.current) {
-      accSeqRef.current = a.seq;
-      if (a.byId !== myId) return; // everyone else sees the verdict as a card in the chat
-      setAccFlow({
-        ann: a,
-        envelope: game?.envelope,
-        ended: game?.phase === 'ended',
-        winnerName: game?.players.find((p) => p.id === game?.winnerId)?.name,
-      });
-    }
-  }, [game?.announcement?.seq, game?.phase, game?.envelope, game?.winnerId, game?.players]);
+    if (!a || a.kind !== 'accusation' || a.seq === accSeqRef.current) return;
+    accSeqRef.current = a.seq;
+    const variant: RevealVariant = a.correct ? 'correct' : a.byId === myId ? 'accuser-wrong' : 'other-wrong';
+    revealUntilRef.current = Date.now() + revealTotalMs(variant);
+    setAccFlow({
+      ann: a,
+      envelope: game?.envelope,
+      ended: game?.phase === 'ended',
+      winnerName: game?.players.find((p) => p.id === game?.winnerId)?.name,
+      variant,
+      revealing: true,
+    });
+  }, [game?.announcement?.seq, game?.phase, game?.envelope, game?.winnerId, game?.players, myId]);
 
   // Floating notices — the "<name>'s turn" flash and each new event card's toast — share one spot
   // over the board. A new notice goes on top and pushes whatever is still showing down a row, so
@@ -237,7 +256,9 @@ export function Game() {
   useEffect(() => {
     if (!game || game.phase !== 'play' || turnKey === turnKeyRef.current) return;
     turnKeyRef.current = turnKey;
-    const gap = TURN_GAP_MS;
+    // A turn that opens with an accusation (a wrong one ends the accuser's turn in the same update)
+    // is announced only once the envelope reveal has finished playing.
+    const gap = TURN_GAP_MS + Math.max(0, revealUntilRef.current - Date.now());
     flashAtRef.current = Date.now() + gap;
     // Dice still resting from the previous turn fade out as this one begins — and are gone before
     // this turn's own roll (which waits out the flash) lands.
@@ -551,6 +572,7 @@ export function Game() {
             myId={myId}
             activeId={activeId}
             round={game.round ?? 0}
+            envelopeAway={!!accFlow?.revealing}
             board={board}
           />
         </div>
@@ -586,6 +608,7 @@ export function Game() {
               canMove={false}
               keyboardZoom={false}
               round={game.round ?? 0}
+              envelopeAway={!!accFlow?.revealing}
               board={board}
             />
           )}
@@ -682,11 +705,25 @@ export function Game() {
         />
       )}
 
-      {accFlow && (
+      {accFlow && accFlow.revealing && (
+        <AccusationReveal
+          key={accFlow.ann.seq}
+          variant={accFlow.variant}
+          trio={accFlow.envelope}
+          onDone={() =>
+            setAccFlow((cur) => {
+              if (!cur || !cur.revealing) return cur;
+              // A wrong accuser still gets their verdict panel; everyone else is done (a correct
+              // accusation hands over to the end screen, a wrong one to the next turn).
+              return cur.variant === 'accuser-wrong' ? { ...cur, revealing: false } : null;
+            })
+          }
+        />
+      )}
+      {accFlow && !accFlow.revealing && (
         <AccusationFlow
           key={accFlow.ann.seq}
           announcement={accFlow.ann}
-          envelope={accFlow.envelope}
           ended={accFlow.ended}
           winnerName={accFlow.winnerName}
           onContinue={() => setAccFlow(null)}

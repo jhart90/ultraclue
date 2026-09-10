@@ -11,6 +11,7 @@ import {
   DICE_ANIM_MS,
   TURN_FLASH_MS,
   TURN_GAP_MS,
+  ACCUSATION_ANIM_MS,
   PUBLIC_TURN_MS,
   BOT_SPEED_PACE,
   BOT_SPEED_PASS_PACE,
@@ -189,8 +190,10 @@ const botDelay = (room: Room): number => (room.isPublic ? PUBLIC_BOT_DELAY : BOT
 /** How long a bot waits before its next action: its pacing delay, stretched so a dice roll that is
  *  still animating on players' screens finishes first. */
 function botWait(room: Room): number {
-  const animEnds = (room.lastRollAt ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS + 400;
-  return Math.max(botDelay(room), animEnds - Date.now());
+  const rollEnds = (room.lastRollAt ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS + 400;
+  // …and an accusation's envelope reveal, which every screen plays before the next turn is shown.
+  const revealEnds = (room.lastAccusationAt ?? 0) + ACCUSATION_ANIM_MS + 400;
+  return Math.max(botDelay(room), rollEnds - Date.now(), revealEnds - Date.now());
 }
 /** A bot answering a suggestion: the usual pause, but a bot with nothing to show answers much
  *  faster on the Fast setting (there's nothing to think about). Always at least a second, so a
@@ -445,6 +448,12 @@ function progress(room: Room): void {
   // A winning accusation: hold its "case solved" reveal out of the chat for 30s (let the verdict
   // pop-up land first), then drop it in with a sign-off. Fires once per win, human or bot.
   const ann = g.announcement;
+  // Every accusation opens the case envelope on every screen for a while; note when, so bots and the
+  // public clock let the reveal finish before the table moves on.
+  if (ann?.kind === 'accusation' && room.lastAccusationSeq !== ann.seq) {
+    room.lastAccusationSeq = ann.seq;
+    room.lastAccusationAt = Date.now();
+  }
   if (g.phase === 'ended' && ann?.kind === 'accusation' && ann.correct && room.winAnnounced !== ann.seq) {
     room.winAnnounced = ann.seq;
     const winnerName = getPlayer(g, g.winnerId ?? '')?.name;
@@ -775,8 +784,10 @@ function armTurnTimer(room: Room): void {
   if (key === room.turnKey) return; // same wait — the clock keeps running
   clearTurnTimer(room);
   room.turnKey = key;
-  room.turnDeadline = Date.now() + PUBLIC_TURN_MS;
-  publicTurnTimer = setTimeout(forcePublicTurn, PUBLIC_TURN_MS);
+  // A turn that opens under an accusation's envelope reveal gets its full time after the reveal.
+  const hold = Math.max(0, (room.lastAccusationAt ?? 0) + ACCUSATION_ANIM_MS - Date.now());
+  room.turnDeadline = Date.now() + hold + PUBLIC_TURN_MS;
+  publicTurnTimer = setTimeout(forcePublicTurn, hold + PUBLIC_TURN_MS);
 }
 
 function forcePublicTurn(): void {

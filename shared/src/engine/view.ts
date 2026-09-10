@@ -7,7 +7,8 @@ import { boardOf } from './pool';
  * Project the authoritative state down to what a single viewer is allowed to see. This is the
  * security boundary for hidden information:
  *   - other players' hands become a count only;
- *   - the envelope is withheld until the game ends;
+ *   - the envelope is withheld until the game ends — except from an eliminated seat: a wrong
+ *     accuser checks the envelope in private, as in the boxed game;
  *   - a revealed card is shown only to the two players in on it: the suggester it was
  *     revealed to, and the responder who revealed it.
  */
@@ -65,7 +66,9 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     yourHand: getPlayer(state, viewerId)?.hand ?? [],
     currentSuggestion,
     announcement: state.announcement,
-    envelope: state.phase === 'ended' ? state.envelope : undefined,
+    // Elimination only ever follows a wrong accusation (makeAccusation), so an eliminated viewer is
+    // the accuser who has earned a look; their client turns the three cards over for them alone.
+    envelope: state.phase === 'ended' || getPlayer(state, viewerId)?.eliminated ? state.envelope : undefined,
     winnerId: state.winnerId,
     stats: state.phase === 'ended' ? state.stats : undefined,
     // A reveal's card id is only for the two players who saw it.

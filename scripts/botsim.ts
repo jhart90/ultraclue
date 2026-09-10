@@ -93,7 +93,8 @@ function runGame(seed: number): void {
   const mindOf = (pid: string) =>
     botMind(diff.get(pid), pid, getPlayer(g, pid)?.hand ?? [], g.turnOrder,
       log.map((e) => ({ ...e, revealedCardId: e.suggesterId === pid ? e.revealedCardId : undefined })), handCounts(), undefined, undefined,
-      getPlayer(g, pid)?.persona);
+      getPlayer(g, pid)?.persona,
+      { eliminatedIds: g.players.filter((p) => p.eliminated).map((p) => p.id), round: g.round ?? 0 });
   const queueFor = (pid: string) => {
     const o = g.turnOrder; const st = o.indexOf(pid); const q: string[] = [];
     for (let k = 1; k < o.length; k++) { const id = o[(st + k) % o.length]; if (!getPlayer(g, id)!.eliminated) q.push(id); }

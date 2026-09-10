@@ -62,5 +62,5 @@ Both run `npm install --include=dev && npm run build` then `npm start`.
 
 ## Overriding card art / text
 
-Drop your own assets into `assets/overrides/{suspects,weapons,rooms}/<card-id>.svg|png` to
+Drop your own assets into `assets/cards/{suspects,weapons,rooms}/<card-id>.svg|png` to
 replace the procedural art for any card. (Wired up in milestone M1.)

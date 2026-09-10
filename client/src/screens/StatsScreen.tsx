@@ -206,11 +206,9 @@ export function StatsScreen() {
 
           <h2 className="stats__h2">Character Statistics</h2>
           <div className="stats__grid stats__grid--4">
-            <Ranking title="Total tiles moved" tally={stats.characterTiles} all={SUSPECTS} />
             <Ranking title="Tiles moved per game" tally={stats.characterTiles} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
             <Ranking title="Total games played" tally={stats.characterGames} all={SUSPECTS} note="games the character was dealt into" />
             <Ranking title="Times suspected per game" tally={stats.characterSuspected} per={gamesForAll} all={SUSPECTS} note="per public game played" />
-            <Ranking title="Total accusations" tally={stats.characterAccusations} all={SUSPECTS} />
             <Ranking title="Accusations per game" tally={stats.characterAccusations} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
             <Ranking title="Incorrect accusations per game" tally={characterIncorrect} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
             <Ranking title="Correct accusations per game" tally={stats.characterCorrect} per={stats.characterGames} all={SUSPECTS} note="per game the character was dealt into" />
@@ -222,10 +220,8 @@ export function StatsScreen() {
             <Ranking title="Personalities by wins" tally={stats.personaWins ?? {}} all={PERSONAS} />
             <Ranking title="Win rate" tally={stats.personaWins ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="wins per game the personality was dealt into" />
             <Ranking title="Total games played" tally={stats.personaGames ?? {}} all={PERSONAS} note="computer seats dealt this personality" />
-            <Ranking title="Total tiles moved" tally={stats.personaTiles ?? {}} all={PERSONAS} />
             <Ranking title="Tiles moved per game" tally={stats.personaTiles ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />
             <Ranking title="Suggestions per game" tally={stats.personaSuggestions ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />
-            <Ranking title="Total accusations" tally={stats.personaAccusations ?? {}} all={PERSONAS} />
             <Ranking title="Accusations per game" tally={stats.personaAccusations ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />
             <Ranking title="Incorrect accusations per game" tally={personaIncorrect} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />
             <Ranking title="Correct accusations per game" tally={stats.personaCorrect ?? {}} per={stats.personaGames ?? {}} all={PERSONAS} note="per game the personality was dealt into" />

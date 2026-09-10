@@ -230,7 +230,10 @@ function mindFor(g: GameState, playerId: string, room: Room): BotMind {
   // the first time it has to think; seats that started as computers got theirs in startGame().
   if (p?.isBot && !p.persona) p.persona = randomPersona(RNG);
   const handCounts = new Map(g.players.map((pl) => [pl.id, pl.hand.length]));
-  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, eventsForPlayer(room, playerId), handCounts, poolOf(g), boardOf(g), p?.persona);
+  // Who is still in and how long the game has run: a persona weighs both when judging how likely
+  // it is that somebody else accuses before its next turn.
+  const table = { eliminatedIds: g.players.filter((pl) => pl.eliminated).map((pl) => pl.id), round: g.round ?? 0 };
+  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, eventsForPlayer(room, playerId), handCounts, poolOf(g), boardOf(g), p?.persona, table);
 }
 /** The order in which the other players would be asked to disprove this player's suggestion. */
 function responderQueue(g: GameState, suggesterId: string): string[] {

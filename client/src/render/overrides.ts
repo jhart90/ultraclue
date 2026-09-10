@@ -1,11 +1,11 @@
 import type { CardType } from 'shared';
 
-// Build-time map of override assets. Vite globs the repo-root override folder; the map is empty
-// until you drop files into assets/overrides/<type>/<card-id>.<ext>, at which point that art is
+// Build-time map of override assets. Vite globs the repo-root card-art folder; the map is empty
+// until you drop files into assets/cards/<type>/<card-id>.<ext>, at which point that art is
 // bundled and used in place of the procedural SVG. (Requires server.fs.allow to reach the root —
 // configured in vite.config.ts.)
 const overrideUrls = import.meta.glob(
-  '../../../assets/overrides/{suspects,weapons,rooms}/*.{svg,png,jpg,jpeg,webp}',
+  '../../../assets/cards/{suspects,weapons,rooms}/*.{svg,png,jpg,jpeg,webp}',
   { eager: true, query: '?url', import: 'default' },
 ) as Record<string, string>;
 
@@ -14,7 +14,7 @@ const overrideUrls = import.meta.glob(
 // instead — about a fifth of the bytes. Empty until thumbs are generated, in which case callers
 // silently fall back to the master.
 const thumbUrls = import.meta.glob(
-  '../../../assets/overrides/thumbs/**/*.{svg,png,jpg,jpeg,webp}',
+  '../../../assets/cards/thumbs/**/*.{svg,png,jpg,jpeg,webp}',
   { eager: true, query: '?url', import: 'default' },
 ) as Record<string, string>;
 
@@ -55,8 +55,8 @@ function lookup(
   prefix: string,
 ): string | undefined {
   const folder = TYPE_FOLDER[type];
-  const needles = [`/overrides/${prefix}${folder}/${cardId}.`];
-  if (title) needles.push(`/overrides/${prefix}${folder}/${slug(title)}.`);
+  const needles = [`/cards/${prefix}${folder}/${cardId}.`];
+  if (title) needles.push(`/cards/${prefix}${folder}/${slug(title)}.`);
   // Case-insensitive so art dropped in as `Boat_House.webp` still matches the slug `boat_house`.
   for (const [path, url] of Object.entries(urls)) {
     const lower = path.toLowerCase();

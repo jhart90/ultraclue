@@ -13,9 +13,11 @@ import {
   botShouldStay,
   botDecideAccusation,
   botThreatened,
+  botThreatLevel,
   type BotMind,
   FULL_POOL,
   NEUTRAL_PERSONA,
+  BOT_PERSONAS,
 } from '../src';
 
 /** Rule out everything except the given solution triple. */
@@ -120,6 +122,9 @@ describe('bot gambles when a rival is about to win', () => {
       pool: FULL_POOL,
       board: BOARD,
       events,
+      handCounts: new Map(),
+      activeIds: [bot, rival, ...others],
+      round: 0,
     };
   }
   const undisproved = { suggesterId: rival, trio: ['suspect-valentine', 'weapon-rope', 'room-study'], passers: [bot, ...others] };
@@ -151,5 +156,102 @@ describe('bot gambles when a rival is about to win', () => {
     const m = mind([undisproved]);
     m.k.ruledOut.delete('weapon-candlestick'); // 2 suspects x 2 weapons = 1 in 4
     expect(botDecideAccusation(m, makeRng(3))).toBeNull();
+  });
+});
+
+describe('bots read the table', () => {
+  const bot = 'bot';
+  const seats = [bot, 'A', 'B', 'C', 'D', 'E'];
+  /** A hard bot at a six-handed table with the weapon and room pinned and two suspects left. */
+  function mind(over: Partial<BotMind> = {}): BotMind {
+    const ruledOut = ruledOutExcept('suspect-valentine', 'weapon-rope', 'room-study');
+    ruledOut.delete('suspect-dijon'); // second suspect still possible
+    return {
+      difficulty: 'hard',
+      persona: NEUTRAL_PERSONA,
+      botId: bot,
+      hand: [],
+      k: { has: new Map(), hasnt: new Map(), groups: [], ruledOut },
+      envelope: new Set<string>(),
+      playerIds: seats,
+      pool: FULL_POOL,
+      board: BOARD,
+      events: [],
+      handCounts: new Map(seats.map((p) => [p, 19])),
+      activeIds: [...seats],
+      round: 0,
+      ...over,
+    };
+  }
+  const tellFrom = (p: string, trio = ['suspect-valentine', 'weapon-rope', 'room-study']) => ({
+    suggesterId: p,
+    trio,
+    passers: seats.filter((x) => x !== p),
+  });
+
+  it('sees more danger in a full table than in a duel', () => {
+    // Every rival still in takes a turn before this bot's next one, so each is another chance.
+    expect(botThreatLevel(mind())).toBeGreaterThan(botThreatLevel(mind({ activeIds: [bot, 'A'] })));
+  });
+
+  it('ignores a knocked-out rival, however good their last suggestion looked', () => {
+    const live = mind({ events: [tellFrom('A')] });
+    const dead = mind({ events: [tellFrom('A')], activeIds: seats.filter((p) => p !== 'A') });
+    expect(botThreatened(live)).toBe(true);
+    expect(botThreatLevel(dead)).toBeLessThan(botThreatLevel(live));
+    expect(botThreatened(dead)).toBe(false); // eliminated players never accuse again
+  });
+
+  it('takes rivals holding fat hands more seriously than rivals holding thin ones', () => {
+    const thin = botThreatLevel(mind({ handCounts: new Map(seats.map((p) => [p, 4])) }));
+    const fat = botThreatLevel(mind({ handCounts: new Map(seats.map((p) => [p, 30])) }));
+    expect(fat).toBeGreaterThan(thin);
+  });
+
+  it('counts the cards a rival has been shown, not just the ones they hold', () => {
+    const answered = Array.from({ length: 12 }, (_, i) => ({
+      suggesterId: 'A',
+      trio: [SUSPECTS[i].id, WEAPONS[i].id, ROOMS[i].id],
+      passers: [],
+      responderId: 'B',
+    }));
+    expect(botThreatLevel(mind({ events: answered }))).toBeGreaterThan(botThreatLevel(mind()));
+  });
+
+  it('the Understudy jumps at odds the by-the-book bot refuses', () => {
+    const tryIt = (persona: BotMind['persona']) => {
+      const m = mind({ persona, events: [tellFrom('A')] });
+      m.k.ruledOut.delete('weapon-candlestick'); // 2 suspects x 2 weapons = 1 in 4
+      return botDecideAccusation(m, makeRng(3));
+    };
+    expect(tryIt(NEUTRAL_PERSONA)).toBeNull();
+    expect(tryIt(BOT_PERSONAS.understudy)).not.toBeNull();
+  });
+
+  it('an impatient persona settles for worse odds as the rounds go by', () => {
+    const rambling = (round: number) => {
+      const m = mind({ persona: BOT_PERSONAS.rambler, round });
+      m.k.ruledOut.delete('weapon-candlestick');
+      m.k.ruledOut.delete('room-lounge'); // 2 x 2 x 2 = 1 in 8
+      return botDecideAccusation(m, makeRng(3));
+    };
+    expect(rambling(0)).toBeNull();
+    expect(rambling(40)).not.toBeNull();
+  });
+
+  it('the Bluffer swallows a rival\'s undisproved trio whole', () => {
+    const copied = ['suspect-dijon', 'weapon-rope', 'room-study'];
+    const m = mind({ persona: BOT_PERSONAS.bluffer, events: [tellFrom('A', copied)] });
+    // Widen the suspect field until the odds alone could never justify an accusation, so anything
+    // it does say has to have been copied rather than reasoned out.
+    for (const s of SUSPECTS.slice(0, 8)) m.k.ruledOut.delete(s.id);
+    const rng = makeRng(11);
+    const said: string[] = [];
+    for (let i = 0; i < 100; i++) {
+      const acc = botDecideAccusation(m, rng);
+      if (acc) said.push([acc.suspectId, acc.weaponId, acc.roomId].join('|'));
+    }
+    expect(said.length).toBeGreaterThan(0);
+    expect(said.every((t) => t === copied.join('|'))).toBe(true);
   });
 });

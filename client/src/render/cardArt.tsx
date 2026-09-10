@@ -3,7 +3,7 @@ import { shade, contrastInk, hashString } from './colorUtils';
 
 // Procedural SVG "illustrations" for each card type. Drawn into a 200x150 illustration area that
 // the Card frame sits around. These are intentional placeholders — clean, themed, and varied per
-// card — until real art is dropped into assets/overrides/.
+// card — until real art is dropped into assets/cards/.
 
 const W = 200;
 const H = 150;

@@ -1,5 +1,5 @@
 // Build-time map of top-down room art painted onto the board itself (assets/board/rooms/). This is
-// separate from the card art in assets/overrides/rooms/: the card shows a room from inside at eye
+// separate from the card art in assets/cards/rooms/: the card shows a room from inside at eye
 // level, the board shows its floor from above. See assets/board/README.md for the spec.
 const boardRoomUrls = import.meta.glob('../../../assets/board/rooms/*.{svg,png,jpg,jpeg,webp}', {
   eager: true,

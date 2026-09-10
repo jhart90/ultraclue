@@ -24,7 +24,7 @@ I'll start at Milestone 1.
    lets us unit-test the entire rulebook without a browser or socket.
 
 3. **Data-driven content.** The 120 cards and the board are JSON/TS data, not hardcoded UI.
-   Procedural SVG renders them. An `assets/overrides/` folder lets you drop in real art/text
+   Procedural SVG renders them. An `assets/cards/` folder lets you drop in real art/text
    that transparently replaces the procedural version by card id.
 
 4. **One deployable.** In production the server serves the built client as static files and
@@ -92,7 +92,7 @@ clue-ultra/
 │  │  └─ render/              # procedural SVG generators + override resolver
 │  └─ ...
 └─ assets/
-   └─ overrides/
+   └─ cards/
       ├─ suspects/<id>.svg|png
       ├─ weapons/<id>.svg|png
       └─ rooms/<id>.svg|png
@@ -251,7 +251,7 @@ I'll pause for your review at the end of each milestone.
 - **Secret passages / multi-floor board:** out of scope v1; the board format leaves room for it.
 - **Mobile layout:** target desktop first; M9 makes it usable on tablets.
 - **Card phrases/names:** I'll auto-generate thematically (color surnames per spec). You can
-  override any of the 120 via `assets/overrides/` + a text override file. Tell me if you have a
+  override any of the 120 via `assets/cards/` + a text override file. Tell me if you have a
   specific naming scheme in mind.
 
 ---

@@ -20,6 +20,9 @@ import { personaOf, type BotPersona, type BotPersonaId } from './persona';
 //            stops walking back into the solution room.
 //   easy   — remembers only the last few dozen suggestions, probes at random, never lingers in a
 //            room, and gambles on an accusation once the field looks small.
+// No tier keeps a perfect sheet: each mark it witnesses has a small chance of never being written
+// down — about one in 400 for hard, one in 200 for medium, one in 50 for easy (`rollForgotten`
+// in botNotes.ts). The server rolls those lapses once per suggestion and passes them in `events`.
 
 export interface BotMind {
   difficulty: BotDifficulty;

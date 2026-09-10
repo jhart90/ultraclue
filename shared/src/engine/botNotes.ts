@@ -1,4 +1,6 @@
 import { FULL_POOL, type CardPool } from './pool';
+import type { BotDifficulty } from '../game';
+import type { RNG } from '../rng';
 
 // A bot's Clue deduction. From the suggestions it has witnessed it works out, for each player:
 //  - cards they definitely HOLD (a card was shown, or it's deducible),
@@ -6,6 +8,8 @@ import { FULL_POOL, type CardPool } from './pool';
 //  - "holds one of these" possibility groups (they disproved a suggestion but we didn't see which
 //    card), which get refined as more is learned.
 // This drives both the bot's Detective Notes sheet and its move/suggest/accuse decisions.
+// The bookkeeping is not quite perfect: now and then a mark never makes it onto the sheet (see
+// `rollForgotten`), and a mark that was never written stays missing for the rest of the game.
 
 export interface SuggestionEvent {
   suggesterId: string;
@@ -14,6 +18,35 @@ export interface SuggestionEvent {
   responderId?: string; // player who disproved by showing a card
   /** The shown card — present only for events where THIS bot is allowed to know it (it suggested). */
   revealedCardId?: string;
+  /** Marks THIS bot never wrote down from the suggestion, in `suggestionMarks` form — the odd lapse
+   *  `rollForgotten` deals out. Rolled once, when the suggestion is witnessed, and kept. */
+  forgot?: string[];
+}
+
+/**
+ * The marks a bot would write on its sheet from one suggestion, as it is entitled to see it: an X
+ * per card each passer showed nothing for (`player:card`), a solid for the card shown to the bot
+ * itself (`player:card`), or a "holds one of these" tag when somebody else's suggestion was
+ * disproved out of its sight (`player:*`). These are the keys an event's `forgot` list uses.
+ */
+export function suggestionMarks(e: SuggestionEvent): string[] {
+  const marks: string[] = [];
+  for (const p of e.passers) for (const c of e.trio) marks.push(`${p}:${c}`);
+  if (e.responderId) marks.push(`${e.responderId}:${e.revealedCardId ?? '*'}`);
+  return marks;
+}
+
+/** Odds that a computer fails to note any single mark it witnesses — the one crack in its
+ *  bookkeeping. They apply per mark, so a suggestion three players pass on is nine separate rolls. */
+export const BOT_LAPSE_ODDS: Record<BotDifficulty, number> = { easy: 0.02, medium: 0.005, hard: 0.0025 };
+
+/** Which of a suggestion's marks a computer of this tier fails to write down. Roll it once, when
+ *  the suggestion is witnessed, and keep the answer as the event's `forgot`: a mark that never made
+ *  it onto the sheet stays off it for the rest of the game. A lapse only ever loses a true fact,
+ *  so the bot's deduction stays sound — merely a little behind. */
+export function rollForgotten(e: SuggestionEvent, difficulty: BotDifficulty, rng: RNG): string[] {
+  const odds = BOT_LAPSE_ODDS[difficulty];
+  return suggestionMarks(e).filter(() => rng() < odds);
 }
 
 export interface BotKnowledge {
@@ -54,13 +87,16 @@ export function deduceBotKnowledge(
     for (const p of playerIds) if (p !== botId) setHasnt(p, c);
   }
 
-  // Direct facts from each witnessed suggestion.
+  // Direct facts from each witnessed suggestion — less any mark the bot forgot to write down.
   const groups: { playerId: string; cards: Set<string> }[] = [];
   for (const e of events) {
-    for (const p of e.passers) for (const c of e.trio) setHasnt(p, c);
+    const forgot = e.forgot?.length ? new Set(e.forgot) : undefined;
+    const noted = (p: string, c: string) => !forgot?.has(`${p}:${c}`);
+    for (const p of e.passers) for (const c of e.trio) if (noted(p, c)) setHasnt(p, c);
     if (e.responderId) {
-      if (e.revealedCardId) setHas(e.responderId, e.revealedCardId);
-      else groups.push({ playerId: e.responderId, cards: new Set(e.trio) });
+      if (e.revealedCardId) {
+        if (noted(e.responderId, e.revealedCardId)) setHas(e.responderId, e.revealedCardId);
+      } else if (noted(e.responderId, '*')) groups.push({ playerId: e.responderId, cards: new Set(e.trio) });
     }
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deduceBotKnowledge, botNotesGrid, type SuggestionEvent } from '../src';
+import { deduceBotKnowledge, botNotesGrid, suggestionMarks, rollForgotten, BOT_LAPSE_ODDS, makeRng, type SuggestionEvent } from '../src';
 
 const PLAYERS = ['bot', 'p1', 'p2', 'p3'];
 
@@ -84,5 +84,76 @@ describe('bot detective-notes deduction', () => {
     expect(grid['suspect-valentine'][39]).toBe(2); // the last seat cannot hold the bot's own card
     expect(grid['suspect-mulberry'][39]).toBeGreaterThanOrEqual(3); // the responder's group symbol lands in column 39
     expect(grid['suspect-mulberry'].every((v) => Number.isInteger(v))).toBe(true);
+  });
+});
+
+describe('the odd forgotten mark', () => {
+  const trio = ['suspect-mulberry', 'weapon-dagger', 'room-study'];
+
+  it('lists the marks a suggestion would put on the sheet, as this bot is entitled to see it', () => {
+    const shownToMe: SuggestionEvent = { suggesterId: 'bot', trio, passers: ['p1', 'p3'], responderId: 'p2', revealedCardId: 'weapon-dagger' };
+    expect(suggestionMarks(shownToMe).sort()).toEqual(
+      ['p1:suspect-mulberry', 'p1:weapon-dagger', 'p1:room-study', 'p3:suspect-mulberry', 'p3:weapon-dagger', 'p3:room-study', 'p2:weapon-dagger'].sort(),
+    );
+    const outOfSight: SuggestionEvent = { suggesterId: 'p1', trio, passers: [], responderId: 'p2' };
+    expect(suggestionMarks(outOfSight)).toEqual(['p2:*']);
+    expect(suggestionMarks({ suggesterId: 'p1', trio, passers: [] })).toEqual([]);
+  });
+
+  it('leaves a forgotten X off the sheet but keeps the rest of the pass', () => {
+    const events: SuggestionEvent[] = [{ suggesterId: 'p3', trio, passers: ['p1'], forgot: ['p1:weapon-dagger'] }];
+    const k = deduceBotKnowledge('bot', [], PLAYERS, events);
+    expect(k.hasnt.get('p1')!.has('suspect-mulberry')).toBe(true);
+    expect(k.hasnt.get('p1')!.has('room-study')).toBe(true);
+    expect(k.hasnt.get('p1')!.has('weapon-dagger')).toBe(false);
+  });
+
+  it('forgets a card it was shown outright: no solid, and no group in its place', () => {
+    const events: SuggestionEvent[] = [
+      { suggesterId: 'bot', trio, passers: ['p1'], responderId: 'p2', revealedCardId: 'weapon-dagger', forgot: ['p2:weapon-dagger'] },
+    ];
+    const k = deduceBotKnowledge('bot', [], PLAYERS, events);
+    expect(k.has.get('p2')!.has('weapon-dagger')).toBe(false);
+    expect(k.ruledOut.has('weapon-dagger')).toBe(false);
+    expect(k.groups).toEqual([]);
+    expect(k.hasnt.get('p1')!.has('weapon-dagger')).toBe(true); // the pass it did note still counts
+  });
+
+  it('can forget a "one of these" tag', () => {
+    const events: SuggestionEvent[] = [{ suggesterId: 'p1', trio, passers: [], responderId: 'p2', forgot: ['p2:*'] }];
+    expect(deduceBotKnowledge('bot', [], PLAYERS, events).groups).toEqual([]);
+  });
+
+  it('never invents a fact: with every mark forgotten it knows only its own hand', () => {
+    const e: SuggestionEvent = { suggesterId: 'bot', trio, passers: ['p1', 'p3'], responderId: 'p2', revealedCardId: 'weapon-dagger' };
+    const k = deduceBotKnowledge('bot', ['suspect-valentine'], PLAYERS, [{ ...e, forgot: suggestionMarks(e) }]);
+    const blank = deduceBotKnowledge('bot', ['suspect-valentine'], PLAYERS, []);
+    for (const p of PLAYERS) {
+      expect([...k.has.get(p)!].sort()).toEqual([...blank.has.get(p)!].sort());
+      expect([...k.hasnt.get(p)!].sort()).toEqual([...blank.hasnt.get(p)!].sort());
+    }
+    expect(k.groups).toEqual([]);
+  });
+
+  it("rolls every mark on its own, at the tier's odds: 2% easy, 0.5% medium, 0.25% hard", () => {
+    expect(BOT_LAPSE_ODDS).toEqual({ easy: 0.02, medium: 0.005, hard: 0.0025 });
+    const e: SuggestionEvent = { suggesterId: 'p1', trio, passers: ['bot', 'p2', 'p3'] }; // nine marks
+    const marks = suggestionMarks(e);
+    expect(marks).toHaveLength(9);
+    for (const d of ['easy', 'medium', 'hard'] as const) {
+      const rng = makeRng(7);
+      const N = 20_000;
+      let forgot = 0;
+      for (let i = 0; i < N; i++) {
+        const f = rollForgotten(e, d, rng);
+        forgot += f.length;
+        for (const m of f) expect(marks).toContain(m);
+      }
+      const rate = forgot / (N * marks.length);
+      expect(rate).toBeGreaterThan(BOT_LAPSE_ODDS[d] * 0.85);
+      expect(rate).toBeLessThan(BOT_LAPSE_ODDS[d] * 1.15);
+    }
+    expect(rollForgotten(e, 'easy', () => 0.999)).toEqual([]); // a lucky day
+    expect(rollForgotten(e, 'hard', () => 0)).toEqual(marks); // a very bad one
   });
 });

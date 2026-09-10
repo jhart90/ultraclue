@@ -36,6 +36,12 @@ import {
   TURN_GAP_MS,
 } from 'shared';
 
+/** A resolved suggestion as the server saw it — the revealed card included — plus, per seat id, the
+ *  marks a computer in that seat failed to write down (see `rollForgotten` in shared). Lapses are
+ *  rolled the first time a seat looks at the suggestion and kept here, so they survive a save and
+ *  follow the seat to whoever holds it next. */
+export type LoggedSuggestion = SuggestionEvent & { lapses?: Record<string, string[]> };
+
 export interface Room {
   code: string;
   hostId: string;
@@ -49,7 +55,7 @@ export interface Room {
   lastRevealWhisper?: string; // dedup key for the private "reveals <card>" whisper
   lastLoggedSuggestion?: string; // dedup key for appending a resolved suggestion to the log below
   /** Every resolved suggestion (server truth, incl. the revealed card) — feeds bot deductions. */
-  suggestionLog: SuggestionEvent[];
+  suggestionLog: LoggedSuggestion[];
   /** Every player's private Detective Notes, keyed by player id, so they're in every save. */
   notes: Record<string, string>;
   /** A freshly loaded game is paused (all seats are bots) until a human takes a seat. */
@@ -719,6 +725,15 @@ function remapId(saved: Room, oldId: string, newId: string): void {
     if (e.suggesterId === oldId) e.suggesterId = newId;
     if (e.responderId === oldId) e.responderId = newId;
     e.passers = e.passers.map((id) => (id === oldId ? newId : id));
+    if (!e.lapses) continue;
+    // Lapses are keyed by the seat that suffered them, and each mark names the seat it is about.
+    for (const seat of Object.keys(e.lapses)) {
+      e.lapses[seat] = e.lapses[seat].map((m) => (m.startsWith(`${oldId}:`) ? `${newId}${m.slice(oldId.length)}` : m));
+    }
+    if (e.lapses[oldId] !== undefined) {
+      e.lapses[newId] = e.lapses[oldId];
+      delete e.lapses[oldId];
+    }
   }
 }
 

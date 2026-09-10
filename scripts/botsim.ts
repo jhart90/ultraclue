@@ -34,6 +34,8 @@ import {
   roomIdAt,
   type BotDifficulty,
   type Player,
+  rollForgotten,
+  suggestionMarks,
   type SuggestionEvent,
 } from 'shared';
 
@@ -65,7 +67,7 @@ const S = {
   games: 0, finished: 0, solved: 0, lastStanding: 0, wrongPerGame: [] as number[],
   turnsToEnd: [] as number[], wins: z(), wrong: z(), eliminated: z(), turns: z(), seats: z(),
   moves: z(), intoUnknownRoom: z(), intoKnownRoom: z(), corridor: z(), stays: z(), shortcuts: z(), noSuggestion: z(),
-  suggestions: z(), reveals: z(), revealsKnown: z(), nobody: z(),
+  suggestions: z(), reveals: z(), revealsKnown: z(), nobody: z(), marks: z(), forgot: z(),
 };
 
 function runGame(seed: number): void {
@@ -92,11 +94,29 @@ function runGame(seed: number): void {
   const shown = new Map<string, Set<string>>();
   let lastKey = '';
   const handCounts = () => new Map(g.players.map((p) => [p.id, p.hand.length]));
-  const mindOf = (pid: string) =>
-    botMind(diff.get(pid), pid, getPlayer(g, pid)?.hand ?? [], g.turnOrder,
-      log.map((e) => ({ ...e, revealedCardId: e.suggesterId === pid ? e.revealedCardId : undefined })), handCounts(), undefined, undefined,
+  // Like the server: each seat's forgotten marks are rolled the first time it looks at a suggestion
+  // and kept, keyed by log index, so a lapse stays a lapse.
+  const lapses = new Map<string, Map<number, string[]>>();
+  const mindOf = (pid: string) => {
+    const d = diff.get(pid)!;
+    let mine = lapses.get(pid);
+    if (!mine) lapses.set(pid, (mine = new Map()));
+    const events = log.map((e, i) => {
+      const view: SuggestionEvent = { ...e, revealedCardId: e.suggesterId === pid ? e.revealedCardId : undefined };
+      let forgot = mine!.get(i);
+      if (!forgot) {
+        forgot = rollForgotten(view, d, rng);
+        mine!.set(i, forgot);
+        S.marks[d] += suggestionMarks(view).length;
+        S.forgot[d] += forgot.length;
+      }
+      if (forgot.length) view.forgot = forgot;
+      return view;
+    });
+    return botMind(d, pid, getPlayer(g, pid)?.hand ?? [], g.turnOrder, events, handCounts(), undefined, undefined,
       getPlayer(g, pid)?.persona,
       { eliminatedIds: g.players.filter((p) => p.eliminated).map((p) => p.id), round: g.round ?? 0, wrongTrios: wrongAccusationTrios(g) });
+  };
   const queueFor = (pid: string) => {
     const o = g.turnOrder; const st = o.indexOf(pid); const q: string[] = [];
     for (let k = 1; k < o.length; k++) { const id = o[(st + k) % o.length]; if (!getPlayer(g, id)!.eliminated) q.push(id); }
@@ -220,6 +240,7 @@ for (const d of ['easy', 'medium', 'hard'] as BotDifficulty[]) {
   console.log(`--- ${d}: ${S.seats[d]} seats, ${S.wins[d]} wins (${pct(S.wins[d], S.seats[d])} per seat), ${S.wrong[d]} wrong accusations`);
   console.log(`  moves into unknown room ${pct(S.intoUnknownRoom[d], S.moves[d])}, known room ${pct(S.intoKnownRoom[d], S.moves[d])}, corridor ${pct(S.corridor[d], S.moves[d])}; stays ${pct(S.stays[d], S.turns[d])} of turns; shortcuts ${S.shortcuts[d]}`);
   console.log(`  turns with no suggestion ${pct(S.noSuggestion[d], S.turns[d])}; reveals ${S.reveals[d]}, already-known shown ${pct(S.revealsKnown[d], S.reveals[d])}, nobody disproved ${S.nobody[d]}`);
+  console.log(`  marks witnessed ${S.marks[d]}, never written down ${S.forgot[d]} (${(S.marks[d] ? (100 * S.forgot[d]) / S.marks[d] : 0).toFixed(2)}%)`);
 }
 console.log('--- by personality (per seat): wins, wrong accusations; per turn: stays, passages, lift rides, moves into unknown/known rooms, corridor stops, own-hand suggestions');
 for (const [id, r] of [...PS.entries()].sort()) {

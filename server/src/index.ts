@@ -49,6 +49,7 @@ import {
   noteWouldAccuse,
   botNotesGrid,
   type BotMind,
+  rollForgotten,
   type SuggestionEvent,
   type GameState,
   type CreateGamePayload,
@@ -216,16 +217,26 @@ function memFor(room: Room) {
   return m;
 }
 /** The suggestion history as a given player is entitled to know it: the revealed card is filled in
- *  only for the suggestions that player made (they alone saw what was shown to them). `upTo`
- *  truncates the history (e.g. -1 leaves out the game's final suggestion). */
+ *  only for the suggestions that player made (they alone saw what was shown to them), and the marks
+ *  a computer in that seat failed to note are left off. Those lapses are rolled the first time the
+ *  seat looks at a suggestion — normally the moment it resolves, when every computer's notes are
+ *  refreshed — and kept on the log entry, so a mark that slipped past stays forgotten for good.
+ *  `upTo` truncates the history (e.g. -1 leaves out the game's final suggestion). */
 function eventsForPlayer(room: Room, playerId: string, upTo?: number): SuggestionEvent[] {
-  return room.suggestionLog.slice(0, upTo).map((e) => ({
-    suggesterId: e.suggesterId,
-    trio: e.trio,
-    passers: e.passers,
-    responderId: e.responderId,
-    revealedCardId: e.suggesterId === playerId ? e.revealedCardId : undefined,
-  }));
+  const difficulty = (room.game && getPlayer(room.game, playerId)?.difficulty) ?? roomBotDifficulty(room);
+  return room.suggestionLog.slice(0, upTo).map((e) => {
+    const view: SuggestionEvent = {
+      suggesterId: e.suggesterId,
+      trio: e.trio,
+      passers: e.passers,
+      responderId: e.responderId,
+      revealedCardId: e.suggesterId === playerId ? e.revealedCardId : undefined,
+    };
+    const lapses = (e.lapses ??= {});
+    const forgot = (lapses[playerId] ??= rollForgotten(view, difficulty, RNG));
+    if (forgot.length) view.forgot = forgot;
+    return view;
+  });
 }
 /** A bot's current understanding of the game, as good as its difficulty allows. With
  *  `beforeFinalSuggestion` it is the understanding it had before the game's last suggestion was

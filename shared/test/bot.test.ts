@@ -14,6 +14,8 @@ import {
   botDecideAccusation,
   botThreatened,
   botThreatLevel,
+  botMind,
+  botBestGuess,
   type BotMind,
   FULL_POOL,
   NEUTRAL_PERSONA,
@@ -125,6 +127,7 @@ describe('bot gambles when a rival is about to win', () => {
       handCounts: new Map(),
       activeIds: [bot, rival, ...others],
       round: 0,
+      wrongTrios: [],
     };
   }
   const undisproved = { suggesterId: rival, trio: ['suspect-valentine', 'weapon-rope', 'room-study'], passers: [bot, ...others] };
@@ -180,6 +183,7 @@ describe('bots read the table', () => {
       handCounts: new Map(seats.map((p) => [p, 19])),
       activeIds: [...seats],
       round: 0,
+      wrongTrios: [],
       ...over,
     };
   }
@@ -253,5 +257,158 @@ describe('bots read the table', () => {
     }
     expect(said.length).toBeGreaterThan(0);
     expect(said.every((t) => t === copied.join('|'))).toBe(true);
+  });
+});
+
+describe('bots learn from a failed accusation', () => {
+  const bot = 'bot';
+  const seats = [bot, 'A', 'B', 'C'];
+  const [SUS, WEA] = ['suspect-valentine', 'weapon-rope'];
+
+  /** A hard bot with the suspect and weapon pinned and `rooms` still open. `tell` makes a rival
+   *  look about to win, which is what the by-the-book persona needs before it will gamble at all. */
+  function mind(rooms: string[], wrongTrios: string[][] = [], tell = true): BotMind {
+    const ruledOut = ruledOutExcept(SUS, WEA, rooms[0]);
+    for (const r of rooms) ruledOut.delete(r);
+    return {
+      difficulty: 'hard',
+      persona: NEUTRAL_PERSONA,
+      botId: bot,
+      hand: [],
+      k: { has: new Map(), hasnt: new Map(), groups: [], ruledOut },
+      envelope: new Set<string>(),
+      playerIds: seats,
+      pool: FULL_POOL,
+      board: BOARD,
+      events: tell ? [{ suggesterId: 'A', trio: [SUS, WEA, rooms[0]], passers: [bot, 'B', 'C'] }] : [],
+      handCounts: new Map(seats.map((p) => [p, 29])),
+      activeIds: [...seats],
+      round: 0,
+      wrongTrios,
+    };
+  }
+
+  it('never re-accuses a trio the table has already disproved', () => {
+    // One trio left and a rival closing in: without the record of the failure it accuses at once.
+    expect(botDecideAccusation(mind(['room-study']), makeRng(4))).not.toBeNull();
+    expect(botDecideAccusation(mind(['room-study'], [[SUS, WEA, 'room-study']]), makeRng(4))).toBeNull();
+  });
+
+  it('steers its guess away from the burned trio', () => {
+    const m = mind(['room-study', 'room-lounge'], [[SUS, WEA, 'room-lounge']]);
+    const rng = makeRng(9);
+    let said = 0;
+    for (let i = 0; i < 40; i++) {
+      const acc = botDecideAccusation(m, rng);
+      if (!acc) continue;
+      said++;
+      expect(acc.roomId).toBe('room-study');
+    }
+    expect(said).toBeGreaterThan(0);
+  });
+
+  it('prices a burned trio out of the odds', () => {
+    // Three rooms open is a 1-in-3 shot, just under the by-the-book floor once CAUTION is applied,
+    // so it waits. Burn one of the three and the remaining field is a coin flip, which it takes.
+    const rooms = ['room-study', 'room-lounge', 'room-kitchen'];
+    expect(botDecideAccusation(mind(rooms), makeRng(2))).toBeNull();
+    const acc = botDecideAccusation(mind(rooms, [[SUS, WEA, 'room-kitchen']]), makeRng(2));
+    expect(acc).not.toBeNull();
+    expect(acc!.roomId).not.toBe('room-kitchen');
+  });
+
+  it('does not cross off the cards of a failed accusation on their own', () => {
+    // With nothing else settled, "not this combination" says nothing about any single card. A bot
+    // that crossed all three off would be ruling the real solution out of its own notes.
+    const m = botMind('hard', bot, [], seats, [], undefined, FULL_POOL, BOARD, undefined, {
+      wrongTrios: [['suspect-dijon', 'weapon-dagger', 'room-lounge']],
+    });
+    for (const c of ['suspect-dijon', 'weapon-dagger', 'room-lounge']) expect(m.k.ruledOut.has(c)).toBe(false);
+  });
+
+  it('pins the third card once the other two categories are settled', () => {
+    // A hand holding all but one suspect and all but one weapon settles both by elimination, and
+    // leaves three rooms open.
+    const hand = [
+      ...SUSPECTS.filter((s) => s.id !== SUS).map((s) => s.id),
+      ...WEAPONS.filter((w) => w.id !== WEA).map((w) => w.id),
+      ...ROOMS.filter((r) => !['room-study', 'room-lounge', 'room-library'].includes(r.id)).map((r) => r.id),
+    ];
+    const build = (wrongTrios: string[][]) =>
+      botMind('hard', bot, hand, seats, [], undefined, FULL_POOL, BOARD, undefined, { wrongTrios });
+    expect(build([]).k.ruledOut.has('room-lounge')).toBe(false);
+    const after = build([[SUS, WEA, 'room-lounge']]);
+    expect(after.k.ruledOut.has('room-lounge')).toBe(true); // that room cannot be the answer...
+    expect(after.k.ruledOut.has(SUS)).toBe(false); // ...but the settled pair is untouched
+    expect(after.k.ruledOut.has(WEA)).toBe(false);
+  });
+
+  it('chains one refutation into the next', () => {
+    // Two rooms open and two failed accusations naming both: the first settles the room, and with
+    // it the whole case, so nothing is left to guess at.
+    const hand = [
+      ...SUSPECTS.filter((s) => s.id !== SUS).map((s) => s.id),
+      ...WEAPONS.filter((w) => w.id !== WEA).map((w) => w.id),
+      ...ROOMS.filter((r) => !['room-study', 'room-lounge'].includes(r.id)).map((r) => r.id),
+    ];
+    const m = botMind('hard', bot, hand, seats, [], undefined, FULL_POOL, BOARD, undefined, {
+      wrongTrios: [[SUS, WEA, 'room-lounge']],
+    });
+    expect(m.k.ruledOut.has('room-lounge')).toBe(true);
+    expect(botDecideAccusation(m, makeRng(1))).toEqual({ suspectId: SUS, weaponId: WEA, roomId: 'room-study' });
+  });
+});
+
+describe('what a bot would accuse if made to', () => {
+  const bot = 'bot';
+  const seats = [bot, 'A', 'B', 'C'];
+  const [SUS, WEA] = ['suspect-valentine', 'weapon-rope'];
+
+  function mind(rooms: string[], wrongTrios: string[][] = []): BotMind {
+    const ruledOut = ruledOutExcept(SUS, WEA, rooms[0]);
+    for (const r of rooms) ruledOut.delete(r);
+    return {
+      difficulty: 'hard',
+      persona: NEUTRAL_PERSONA,
+      botId: bot,
+      hand: [],
+      k: { has: new Map(), hasnt: new Map(), groups: [], ruledOut },
+      envelope: new Set<string>(),
+      playerIds: seats,
+      pool: FULL_POOL,
+      board: BOARD,
+      events: [],
+      handCounts: new Map(seats.map((p) => [p, 29])),
+      activeIds: [...seats],
+      round: 0,
+      wrongTrios,
+    };
+  }
+
+  it('names the solved case with one combination open', () => {
+    const g = botBestGuess(mind(['room-study']), makeRng(1));
+    expect(g).toEqual({ suspectId: SUS, weaponId: WEA, roomId: 'room-study', combos: 1 });
+  });
+
+  it('keeps the settled cards and guesses the open category, never a burned trio', () => {
+    const m = mind(['room-study', 'room-lounge', 'room-kitchen'], [[SUS, WEA, 'room-kitchen']]);
+    const rng = makeRng(7);
+    for (let i = 0; i < 30; i++) {
+      const g = botBestGuess(m, rng)!;
+      expect(g.suspectId).toBe(SUS);
+      expect(g.weaponId).toBe(WEA);
+      expect(['room-study', 'room-lounge']).toContain(g.roomId);
+      expect(g.combos).toBe(2); // three rooms open, one of them already disproved
+    }
+  });
+
+  it('always answers, even with nothing ruled out', () => {
+    const m = botMind('easy', bot, [], seats, []);
+    const g = botBestGuess(m, makeRng(3))!;
+    expect(g).not.toBeNull();
+    expect(g.suspectId.startsWith('suspect-')).toBe(true);
+    expect(g.weaponId.startsWith('weapon-')).toBe(true);
+    expect(g.roomId.startsWith('room-')).toBe(true);
+    expect(g.combos).toBe(40 * 40 * 40);
   });
 });

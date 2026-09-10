@@ -1,4 +1,4 @@
-import type { GameState, GameStats, GameView, Participant, PlayerStats } from '../game';
+import type { GameState, GameStats, GameView, Guess, Participant, PlayerStats } from '../game';
 
 const emptyPlayer = (): PlayerStats => ({
   turns: 0,
@@ -106,10 +106,19 @@ export function noteReveal(state: GameState, responderId: string): void {
   playerStats(state, responderId).reveals++;
 }
 
-export function noteAccusation(state: GameState, byId: string, correct = false): void {
+export function noteAccusation(state: GameState, byId: string, correct = false, trio?: Guess): void {
   const ps = playerStats(state, byId);
   ps.accusations++;
   if (correct) ps.accusationsCorrect = (ps.accusationsCorrect ?? 0) + 1;
+  if (trio) ps.accusation = { suspectId: trio.suspectId, weaponId: trio.weaponId, roomId: trio.roomId, correct };
+}
+
+/** Remember what a computer that never accused would have named (see `PlayerStats.wouldAccuse`).
+ *  A player who did accuse keeps their real accusation instead. */
+export function noteWouldAccuse(state: GameState, playerId: string, guess: Guess): void {
+  const ps = playerStats(state, playerId);
+  if (ps.accusation) return;
+  ps.wouldAccuse = { ...guess };
 }
 
 // ---- summary for the end-of-game screen -----------------------------------------------------
@@ -228,4 +237,67 @@ export function summarizeStats(view: GameView): StatsSummary | undefined {
       };
     }),
   };
+}
+
+// ---- who accused what, and how close everyone else was --------------------------------------
+
+export type AccusationLineKind =
+  /** Made an accusation (right or wrong). */
+  | 'accused'
+  /** A computer that never accused: what it would have named as the game ended. */
+  | 'would'
+  /** A human who never accused — there is no telling what they would have named. */
+  | 'none';
+
+export interface AccusationLine {
+  playerId: string;
+  kind: AccusationLineKind;
+  guess?: Guess;
+  /** Accusations only: was it right? */
+  correct?: boolean;
+  /** How many of the three cards match the envelope (0–3), when a guess is known. */
+  matches?: number;
+  /** Which of [suspect, weapon, room] match the envelope, when a guess is known. */
+  hits?: [boolean, boolean, boolean];
+}
+
+/**
+ * One line per dealt player: the accusation they made, or — for a computer that never accused —
+ * the trio it would have named. Ordered so the story reads top-down: the winning accusation, then
+ * the wrong ones in turn order, then the computers' hypothetical guesses closest-first, and
+ * finally the humans who never accused. Empty until the game has ended (the envelope is needed).
+ */
+export function summarizeAccusations(view: GameView): AccusationLine[] {
+  const st = view.stats;
+  const env = view.envelope;
+  if (!st || !env) return [];
+  const score = (g: Guess): [boolean, boolean, boolean] => [g.suspectId === env.suspectId, g.weaponId === env.weaponId, g.roomId === env.roomId];
+  const lines: AccusationLine[] = [];
+  for (const playerId of view.turnOrder) {
+    const p = view.players.find((x) => x.id === playerId);
+    const ps = st.players[playerId];
+    if (!p || !ps) continue;
+    if (ps.accusation) {
+      const hits = score(ps.accusation);
+      lines.push({ playerId, kind: 'accused', guess: ps.accusation, correct: ps.accusation.correct, matches: hits.filter(Boolean).length, hits });
+    } else if (ps.wouldAccuse) {
+      const hits = score(ps.wouldAccuse);
+      lines.push({ playerId, kind: 'would', guess: ps.wouldAccuse, matches: hits.filter(Boolean).length, hits });
+    } else {
+      lines.push({ playerId, kind: 'none' });
+    }
+  }
+  const rank = (l: AccusationLine) => (l.kind === 'accused' ? (l.correct ? 0 : 1) : l.kind === 'would' ? 2 : 3);
+  const order = new Map(view.turnOrder.map((id, i) => [id, i]));
+  return lines.sort((a, b) => {
+    const d = rank(a) - rank(b);
+    if (d) return d;
+    if (a.kind === 'would' && b.kind === 'would') {
+      const m = (b.matches ?? 0) - (a.matches ?? 0);
+      if (m) return m;
+      const c = (a.guess?.combos ?? Infinity) - (b.guess?.combos ?? Infinity);
+      if (c) return c;
+    }
+    return (order.get(a.playerId) ?? 0) - (order.get(b.playerId) ?? 0);
+  });
 }

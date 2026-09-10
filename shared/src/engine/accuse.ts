@@ -12,6 +12,24 @@ export interface AccusationOutcome {
 }
 
 /**
+ * Every trio somebody has accused and got wrong, oldest first.
+ *
+ * An accusation is announced to the whole table, so this is public knowledge — but it proves less
+ * than it looks. All it establishes is that the *combination* is not the solution: any one of the
+ * three cards may still be in the envelope, so none of them can be crossed off on its own. What it
+ * is good for is refusing to walk into the same wall twice, and — once two of the three categories
+ * are certain — pinning the third. See `botMind`, which does both.
+ */
+export function wrongAccusationTrios(state: Pick<GameState, 'log'>): string[][] {
+  const out: string[][] = [];
+  for (const e of state.log) {
+    const c = e.card;
+    if (c?.kind === 'accusation' && !c.correct) out.push([c.suspectId, c.weaponId, c.roomId]);
+  }
+  return out;
+}
+
+/**
  * Resolve an accusation against the envelope.
  *  - All three match  -> the accuser wins, game ends.
  *  - Any mismatch     -> the accuser is eliminated; their hand is shuffled and redistributed
@@ -37,7 +55,7 @@ export function makeAccusation(
     s.envelope.suspectId === suspectId &&
     s.envelope.weaponId === weaponId &&
     s.envelope.roomId === roomId;
-  noteAccusation(s, accuserId, correct);
+  noteAccusation(s, accuserId, correct, { suspectId, weaponId, roomId });
 
   s.announcement = {
     seq: (s.announcement?.seq ?? 0) + 1,

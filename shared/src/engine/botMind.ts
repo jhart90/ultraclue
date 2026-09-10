@@ -46,6 +46,8 @@ export interface BotMind {
   activeIds: string[];
   /** Completed rounds so far — what an impatient persona counts. */
   round: number;
+  /** Trios already accused and proven wrong, from `wrongAccusationTrios`. Public knowledge. */
+  wrongTrios: string[][];
 }
 
 /** What a bot can see of the table beyond the suggestion log. */
@@ -54,6 +56,8 @@ export interface BotTable {
   eliminatedIds?: readonly string[];
   /** Completed rounds (`GameState.round`). */
   round?: number;
+  /** Trios already proven wrong (`wrongAccusationTrios(state)`). */
+  wrongTrios?: readonly string[][];
 }
 
 // A bot gambles on an accusation once its odds reach the floor its persona will settle for. That
@@ -71,6 +75,16 @@ const PATIENT_ROUNDS = 6; // rounds an impatient persona sits through before its
 const RACE_GATE = 0.6; // no swinging wildly until the threat is real...
 const RACE_MAX_COMBOS = 60; // ...and never on odds so long that accusing just hands the seat away
 const MIN_ODDS = 1 / 40; // however impatient, no bot accuses on worse than this
+// Global balance dial on top of every persona's own nerve: each one holds out for this much better
+// odds than its dials alone would ask, and takes the wild routes (racing, copying) proportionally
+// less often. Raise it to calm the whole table down, lower it to wind everyone up.
+//
+// The target it is tuned against is a 40-seat all-hard table: essentially every game should end
+// with somebody naming the envelope rather than with a last detective standing, while still
+// carrying one or more wrong accusations along the way. Check both with
+//   npx tsx scripts/botsim.ts 40 <games> 800 7 hard
+// which reports exactly those two figures.
+const CAUTION = 1.1;
 /** Cards (among `ids`, the cards in play) that must be in the envelope: no player, me included,
  *  can hold them. */
 function envelopeKnown(k: BotKnowledge, botId: string, playerIds: string[], hand: string[], ids: string[]): Set<string> {
@@ -117,7 +131,16 @@ export function botMind(
       k = deduceBotKnowledge(botId, hand, playerIds, evs, pool);
     }
   }
-  const envelope = d === 'easy' ? new Set<string>() : envelopeKnown(k, botId, playerIds, hand, ids);
+  const wrongTrios = (table?.wrongTrios ?? []).map((t) => [...t]);
+  let envelope = d === 'easy' ? new Set<string>() : envelopeKnown(k, botId, playerIds, hand, ids);
+  if (d !== 'easy' && wrongTrios.length) {
+    // Fold in what the table's failed accusations prove. This can rule a card out, which can settle
+    // a category, which can prove the next card — so it runs to a fixpoint, and the confirmed
+    // envelope has to be recomputed afterwards.
+    if (refuteFromAccusations(k, envelope, wrongTrios, pool)) {
+      envelope = envelopeKnown(k, botId, playerIds, hand, ids);
+    }
+  }
   const out = new Set(table?.eliminatedIds ?? []);
   const activeIds = playerIds.filter((p) => !out.has(p));
   return {
@@ -134,7 +157,52 @@ export function botMind(
     handCounts: handCounts ?? new Map(),
     activeIds,
     round: table?.round ?? 0,
+    wrongTrios,
   };
+}
+
+/** The card a category has settled on, or null while it is still open: one confirmed in the
+ *  envelope, or a lone survivor of elimination. */
+function settled(cands: { id: string }[], envelope: Set<string>): string | null {
+  const confirmed = cands.find((x) => envelope.has(x.id));
+  if (confirmed) return confirmed.id;
+  return cands.length === 1 ? cands[0].id : null;
+}
+
+/**
+ * Cross off what the table's failed accusations prove, extending `k.ruledOut` in place and
+ * reporting whether anything moved.
+ *
+ * A wrong accusation only says the *combination* was wrong, so no single card of it can be crossed
+ * off on its own — that trap is why this is worth spelling out. But once two of its three
+ * categories have settled, the third card of a matching trio cannot be the answer. Ruling it out
+ * can settle a fresh category, so the pass repeats until it stops finding anything.
+ */
+function refuteFromAccusations(k: BotKnowledge, envelope: Set<string>, wrongTrios: string[][], pool: CardPool): boolean {
+  let moved = false;
+  for (let guard = 0; guard < 8; guard++) {
+    const c = botCandidates(k.ruledOut, pool);
+    const s = settled(c.suspects, envelope);
+    const w = settled(c.weapons, envelope);
+    const r = settled(c.rooms, envelope);
+    if (!s && !w && !r) break; // nothing settled yet, so nothing can fall out
+    let changed = false;
+    // Never contradict a card already confirmed in the envelope: with sound deduction that cannot
+    // happen, and if it somehow does, the confirmed card is the safer of the two beliefs.
+    const rule = (card: string) => {
+      if (envelope.has(card) || k.ruledOut.has(card)) return;
+      k.ruledOut.add(card);
+      changed = true;
+    };
+    for (const [ws, ww, wr] of wrongTrios) {
+      if (s && w && ws === s && ww === w) rule(wr);
+      if (s && r && ws === s && wr === r) rule(ww);
+      if (w && r && ww === w && wr === r) rule(ws);
+    }
+    if (!changed) break;
+    moved = true;
+  }
+  return moved;
 }
 
 /** Which rivals floated a trio, within the last round (one suggestion per seat at most, so the last
@@ -219,13 +287,13 @@ function oddsFloor(m: BotMind, level: number): number {
   const P = m.persona;
   const slid = P.gambleMinOdds + (P.threatOdds - P.gambleMinOdds) * level;
   const late = Math.max(0, m.round - PATIENT_ROUNDS);
-  return Math.max(MIN_ODDS, slid / (1 + P.impatience * late));
+  return CAUTION * Math.max(MIN_ODDS, slid / (1 + P.impatience * late));
 }
 
 /** The most recent trio a rival floated that nobody could disprove and that this bot cannot rule
  *  out itself. Null when there is none — including when the bot holds one of the three, which is
  *  the tell that the suggestion was a bluff rather than a solution. */
-function copycatTrio(m: BotMind): BotAccusation | null {
+function copycatTrio(m: BotMind, refuted: Set<string>): BotAccusation | null {
   const window = Math.max(1, m.playerIds.length - 1);
   const recent = m.events.slice(-window);
   for (let i = recent.length - 1; i >= 0; i--) {
@@ -233,9 +301,73 @@ function copycatTrio(m: BotMind): BotAccusation | null {
     if (e.suggesterId === m.botId || e.suggesterId === '' || e.responderId) continue;
     if (e.trio.length !== 3) continue; // synthetic hand-count events are not suggestions
     if (!e.trio.every((c) => !m.k.ruledOut.has(c) && !m.hand.includes(c))) continue;
+    if (refuted.has(e.trio.join('|'))) continue; // somebody already tried this one and lost
     return { suspectId: e.trio[0], weaponId: e.trio[1], roomId: e.trio[2] };
   }
   return null;
+}
+
+/** Trios already proven wrong, as lookup keys. */
+function refutedTrios(m: BotMind): Set<string> {
+  return new Set(m.wrongTrios.map((t) => t.join('|')));
+}
+
+/** How many of the trios still open to this bot have already been accused and lost. */
+function refutedWithin(refuted: Set<string>, S: { id: string }[], W: { id: string }[], R: { id: string }[]): number {
+  if (!refuted.size) return 0;
+  const has = (cands: { id: string }[], id: string) => cands.some((x) => x.id === id);
+  let n = 0;
+  for (const key of refuted) {
+    const [s, w, r] = key.split('|');
+    if (has(S, s) && has(W, w) && has(R, r)) n++;
+  }
+  return n;
+}
+
+/** Pick a trio from the open candidates, never one the table has already disproved. */
+function pickTrio(
+  S: { id: string }[],
+  W: { id: string }[],
+  R: { id: string }[],
+  refuted: Set<string>,
+  rng: RNG,
+): BotAccusation | null {
+  if (!S.length || !W.length || !R.length) return null;
+  for (let i = 0; i < 24; i++) {
+    const s = pick(S, rng).id;
+    const w = pick(W, rng).id;
+    const r = pick(R, rng).id;
+    if (!refuted.has(`${s}|${w}|${r}`)) return { suspectId: s, weaponId: w, roomId: r };
+  }
+  // Two dozen misses means the field is nearly all disproved, so it is small: take what is left.
+  const left: BotAccusation[] = [];
+  if (S.length * W.length * R.length <= 4096) {
+    for (const s of S) for (const w of W) for (const r of R) {
+      if (!refuted.has(`${s.id}|${w.id}|${r.id}`)) left.push({ suspectId: s.id, weaponId: w.id, roomId: r.id });
+    }
+  }
+  return left.length ? pick(left, rng) : null;
+}
+
+/** What this bot would accuse if it had to accuse right now, whatever its nerve: every category it
+ *  has settled is taken as read, and the rest is a pick from what it cannot rule out, steering
+ *  clear of trios the table has already disproved. `combos` is how many trios were still open to
+ *  it — 1 means it had the case solved. Null only if its notes have collapsed to nothing (which
+ *  sound deduction never does). Used for the end-of-game screen's "would have accused" line. */
+export function botBestGuess(m: BotMind, rng: RNG): (BotAccusation & { combos: number }) | null {
+  const c = botCandidates(m.k.ruledOut, m.pool);
+  const refuted = refutedTrios(m);
+  const open = (cands: { id: string }[], all: { id: string }[]) => {
+    if (!cands.length) return all; // notes contradict themselves: fall back to the whole category
+    const pinned = settled(cands, m.envelope);
+    return pinned ? cands.filter((x) => x.id === pinned) : cands;
+  };
+  const S = open(c.suspects, m.pool.suspects);
+  const W = open(c.weapons, m.pool.weapons);
+  const R = open(c.rooms, m.pool.rooms);
+  const combos = Math.max(1, S.length * W.length * R.length - refutedWithin(refuted, S, W, R));
+  const trio = pickTrio(S, W, R, refuted, rng) ?? pickTrio(S, W, R, new Set(), rng);
+  return trio ? { ...trio, combos } : null;
 }
 
 /** Rooms still worth visiting to learn about: not held by anyone, not confirmed in the envelope. */
@@ -254,29 +386,30 @@ export function botDecideAccusation(m: BotMind, rng: RNG): BotAccusation | null 
   const P = m.persona;
   const level = botThreatLevel(m);
   const floor = oddsFloor(m, level);
+  // Whatever else a bot works out, it does not walk into a wall somebody else already walked into.
+  // Even the easy tier gets this: an accusation is announced to the table, so remembering one is
+  // memory, not deduction.
+  const refuted = refutedTrios(m);
   if (m.difficulty === 'easy') {
     if (c.suspects.length === 1 && c.weapons.length === 1 && c.rooms.length === 1) {
-      return { suspectId: c.suspects[0].id, weaponId: c.weapons[0].id, roomId: c.rooms[0].id };
+      const only = { suspectId: c.suspects[0].id, weaponId: c.weapons[0].id, roomId: c.rooms[0].id };
+      return refuted.has(`${only.suspectId}|${only.weaponId}|${only.roomId}`) ? null : only;
     }
     // Feeling lucky: once the field is small, guess rather than keep grinding. A gambling persona —
     // or one that can see a rival closing in — is happy with a much longer shot than that.
-    const combos = c.suspects.length * c.weapons.length * c.rooms.length;
+    const combos = c.suspects.length * c.weapons.length * c.rooms.length - refutedWithin(refuted, c.suspects, c.weapons, c.rooms);
     const limit = Math.max(EASY_GAMBLE_COMBOS, Math.round(1 / floor));
-    if (combos > 0 && combos <= limit) {
-      return { suspectId: pick(c.suspects, rng).id, weaponId: pick(c.weapons, rng).id, roomId: pick(c.rooms, rng).id };
-    }
+    if (combos > 0 && combos <= limit) return pickTrio(c.suspects, c.weapons, c.rooms, refuted, rng);
     return null;
   }
   // Medium/hard: each category pinned either by elimination or by a confirmed envelope card.
-  const one = (cands: { id: string }[]): string | null => {
-    const confirmed = cands.find((x) => m.envelope.has(x.id));
-    if (confirmed) return confirmed.id;
-    return cands.length === 1 ? cands[0].id : null;
-  };
-  const s = one(c.suspects);
-  const w = one(c.weapons);
-  const r = one(c.rooms);
-  if (s && w && r) return { suspectId: s, weaponId: w, roomId: r };
+  const s = settled(c.suspects, m.envelope);
+  const w = settled(c.weapons, m.envelope);
+  const r = settled(c.rooms, m.envelope);
+  // All three pinned is a solved case — unless the table has already disproved that very trio, in
+  // which case one of the three pins is wrong and it is better to keep playing than to hand the
+  // seat away on a certainty that cannot be true.
+  if (s && w && r) return refuted.has(`${s}|${w}|${r}`) ? null : { suspectId: s, weaponId: w, roomId: r };
 
   // Not certain — but if a rival looks about to win (or the persona simply likes a punt), a good
   // enough guess beats waiting to lose.
@@ -284,24 +417,26 @@ export function botDecideAccusation(m: BotMind, rng: RNG): BotAccusation | null 
   const S = open(c.suspects, s);
   const W = open(c.weapons, w);
   const R = open(c.rooms, r);
-  const combos = S.length * W.length * R.length;
+  // Trios the table has already disproved are not live guesses, so they do not count towards the
+  // odds either: a field of four with one of them already burned is a one-in-three shot.
+  const combos = S.length * W.length * R.length - refutedWithin(refuted, S, W, R);
   if (combos <= 0) return null;
 
   // Somebody just floated a trio nobody could disprove: a copycat takes it at face value, which is
   // as often a bluff swallowed whole as it is a solution stolen.
-  if (P.copycatChance > 0 && rng() < P.copycatChance) {
-    const copy = copycatTrio(m);
+  if (P.copycatChance > 0 && rng() < P.copycatChance / CAUTION) {
+    const copy = copycatTrio(m, refuted);
     if (copy) return copy;
   }
   // Odds good enough for this persona, the floor having already slid toward `threatOdds` if the
   // table looks dangerous.
   if (1 / combos >= floor && (!P.gambleNeedsThreat || level >= THREAT_GATE)) {
-    return { suspectId: pick(S, rng).id, weaponId: pick(W, rng).id, roomId: pick(R, rng).id };
+    return pickTrio(S, W, R, refuted, rng);
   }
   // Losing anyway: swing at it rather than sit and watch. Not on odds so long that accusing is
   // simply handing the seat away.
-  if (level >= RACE_GATE && combos <= RACE_MAX_COMBOS && rng() < P.raceChance * level) {
-    return { suspectId: pick(S, rng).id, weaponId: pick(W, rng).id, roomId: pick(R, rng).id };
+  if (level >= RACE_GATE && combos <= RACE_MAX_COMBOS && rng() < (P.raceChance * level) / CAUTION) {
+    return pickTrio(S, W, R, refuted, rng);
   }
   return null;
 }

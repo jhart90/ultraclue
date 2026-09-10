@@ -10,6 +10,9 @@ import {
   makeRng,
   roomIdAt,
   summarizeStats,
+  summarizeAccusations,
+  noteWouldAccuse,
+  ROOMS,
   syncParticipants,
   viewFor,
   BOARD,
@@ -118,5 +121,63 @@ describe('game statistics', () => {
     expect(summary.turnsPlayed).toBe(1);
     expect(summary.rows.map((r) => r.playerId)).toEqual(view.turnOrder);
     expect(summary.rows.find((r) => r.playerId === 'p1')!.accusations).toBe(1);
+  });
+});
+
+describe('accusations on the details screen', () => {
+  const seats = () => [lobbyPlayer('p1', 'suspect-valentine'), lobbyPlayer('p2', 'suspect-mulberry'), lobbyPlayer('p3', 'suspect-dijon')];
+
+  it('records the cards of every accusation made, right or wrong', () => {
+    let s = startGame('S', seats(), makeRng(3));
+    const env = s.envelope;
+    const first = s.turnOrder[0];
+    s.turnPhase = 'postMove';
+    // a wrong accusation: same suspect and weapon, a different room
+    const wrongRoom = ROOMS.find((r) => r.id !== env.roomId)!.id;
+    s = makeAccusation(s, first, env.suspectId, env.weaponId, wrongRoom, makeRng(1)).state;
+    expect(s.stats!.players[first].accusation).toEqual({ suspectId: env.suspectId, weaponId: env.weaponId, roomId: wrongRoom, correct: false });
+    // …then the next player closes the case
+    const second = s.turnOrder[s.activeIdx];
+    s.turnPhase = 'postMove';
+    s = makeAccusation(s, second, env.suspectId, env.weaponId, env.roomId, makeRng(2)).state;
+    expect(s.phase).toBe('ended');
+    expect(s.stats!.players[second].accusation).toEqual({ ...env, correct: true });
+
+    const lines = summarizeAccusations(viewFor(s, ''));
+    // the winning accusation first, then the wrong one, then whoever never accused
+    expect(lines.map((l) => [l.playerId, l.kind, l.matches])).toEqual([
+      [second, 'accused', 3],
+      [first, 'accused', 2],
+      [s.turnOrder.find((id) => id !== first && id !== second)!, 'none', undefined],
+    ]);
+    expect(lines[1].hits).toEqual([true, true, false]);
+  });
+
+  it('files a computer guess only for a seat that never accused, and ranks guesses closest first', () => {
+    let s = startGame('S', seats(), makeRng(5));
+    const env = s.envelope;
+    const [a, b, c] = s.turnOrder;
+    for (const id of [b, c]) s.players.find((p) => p.id === id)!.isBot = true;
+    s.turnPhase = 'postMove';
+    s = makeAccusation(s, a, env.suspectId, env.weaponId, env.roomId, makeRng(1)).state;
+    const otherRoom = ROOMS.find((r) => r.id !== env.roomId)!.id;
+    const otherWeapon = s.weaponIds?.find((w) => w !== env.weaponId) ?? 'weapon-rope';
+    noteWouldAccuse(s, b, { suspectId: env.suspectId, weaponId: otherWeapon, roomId: otherRoom, combos: 12 });
+    noteWouldAccuse(s, c, { suspectId: env.suspectId, weaponId: env.weaponId, roomId: otherRoom, combos: 3 });
+    noteWouldAccuse(s, a, { suspectId: env.suspectId, weaponId: env.weaponId, roomId: otherRoom }); // ignored: a accused
+    expect(s.stats!.players[a].wouldAccuse).toBeUndefined();
+    expect(s.stats!.players[b].wouldAccuse?.combos).toBe(12);
+
+    const lines = summarizeAccusations(viewFor(s, ''));
+    expect(lines.map((l) => [l.playerId, l.kind, l.matches])).toEqual([
+      [a, 'accused', 3],
+      [c, 'would', 2],
+      [b, 'would', 1],
+    ]);
+  });
+
+  it('says nothing before the game has ended', () => {
+    const s = startGame('S', seats(), makeRng(3));
+    expect(summarizeAccusations(viewFor(s, 'p1'))).toEqual([]);
   });
 });

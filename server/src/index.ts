@@ -44,6 +44,9 @@ import {
   botDecideMove,
   botDecideFloor,
   randomPersona,
+  wrongAccusationTrios,
+  botBestGuess,
+  noteWouldAccuse,
   botNotesGrid,
   type BotMind,
   type SuggestionEvent,
@@ -213,9 +216,10 @@ function memFor(room: Room) {
   return m;
 }
 /** The suggestion history as a given player is entitled to know it: the revealed card is filled in
- *  only for the suggestions that player made (they alone saw what was shown to them). */
-function eventsForPlayer(room: Room, playerId: string): SuggestionEvent[] {
-  return room.suggestionLog.map((e) => ({
+ *  only for the suggestions that player made (they alone saw what was shown to them). `upTo`
+ *  truncates the history (e.g. -1 leaves out the game's final suggestion). */
+function eventsForPlayer(room: Room, playerId: string, upTo?: number): SuggestionEvent[] {
+  return room.suggestionLog.slice(0, upTo).map((e) => ({
     suggesterId: e.suggesterId,
     trio: e.trio,
     passers: e.passers,
@@ -223,8 +227,10 @@ function eventsForPlayer(room: Room, playerId: string): SuggestionEvent[] {
     revealedCardId: e.suggesterId === playerId ? e.revealedCardId : undefined,
   }));
 }
-/** A bot's current understanding of the game, as good as its difficulty allows. */
-function mindFor(g: GameState, playerId: string, room: Room): BotMind {
+/** A bot's current understanding of the game, as good as its difficulty allows. With
+ *  `beforeFinalSuggestion` it is the understanding it had before the game's last suggestion was
+ *  made — what it knew before the case gave itself away. */
+function mindFor(g: GameState, playerId: string, room: Room, opts?: { beforeFinalSuggestion?: boolean }): BotMind {
   const p = getPlayer(g, playerId);
   // A seat that became a computer mid-game (a dropped or booted human) is dealt its personality
   // the first time it has to think; seats that started as computers got theirs in startGame().
@@ -232,8 +238,35 @@ function mindFor(g: GameState, playerId: string, room: Room): BotMind {
   const handCounts = new Map(g.players.map((pl) => [pl.id, pl.hand.length]));
   // Who is still in and how long the game has run: a persona weighs both when judging how likely
   // it is that somebody else accuses before its next turn.
-  const table = { eliminatedIds: g.players.filter((pl) => pl.eliminated).map((pl) => pl.id), round: g.round ?? 0 };
-  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, eventsForPlayer(room, playerId), handCounts, poolOf(g), boardOf(g), p?.persona, table);
+  const table = {
+    eliminatedIds: g.players.filter((pl) => pl.eliminated).map((pl) => pl.id),
+    round: g.round ?? 0,
+    wrongTrios: wrongAccusationTrios(g),
+  };
+  const events = eventsForPlayer(room, playerId, opts?.beforeFinalSuggestion ? -1 : undefined);
+  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, events, handCounts, poolOf(g), boardOf(g), p?.persona, table);
+}
+/**
+ * An accusation has just been resolved (`before` → `after`). If it ended the game, ask every
+ * computer that never accused what it would have named — judged on what it knew BEFORE the game's
+ * final suggestion and the closing accusation, since the last suggestion is so often the one that
+ * gives the case away (nobody could disprove it) — and file the guesses in the finished game's
+ * stats for the details screen. A seat that already accused keeps that record instead.
+ */
+function recordFinalGuesses(room: Room, before: GameState, after: GameState): void {
+  if (after.phase !== 'ended' || before.phase !== 'play') return;
+  for (const p of after.players) {
+    if (!p.isBot || after.stats?.players[p.id]?.accusation) continue;
+    try {
+      const guess = botBestGuess(mindFor(before, p.id, room, { beforeFinalSuggestion: true }), RNG);
+      if (guess) noteWouldAccuse(after, p.id, guess);
+      // mindFor may have just dealt a mid-game computer its personality — on the old state.
+      const was = getPlayer(before, p.id);
+      if (!p.persona && was?.persona) p.persona = was.persona;
+    } catch (err) {
+      console.error('[end-of-game] could not work out a computer\'s guess:', (err as Error).message);
+    }
+  }
 }
 /** The order in which the other players would be asked to disprove this player's suggestion. */
 function responderQueue(g: GameState, suggesterId: string): string[] {
@@ -583,7 +616,9 @@ function scheduleBots(room: Room): void {
         if (s2.turnPhase === 'postMove') {
           const accusation = botDecideAccusation(mind, RNG);
           if (accusation) {
+            const before = s2;
             s2 = makeAccusation(s2, cur.id, accusation.suspectId, accusation.weaponId, accusation.roomId, RNG).state;
+            recordFinalGuesses(room, before, s2);
             room.game = s2;
             progress(room);
             return;
@@ -1201,10 +1236,12 @@ io.on('connection', (socket) => {
     withGame(socket, (_room, g) => passSuggestion(g, cid(socket), RNG)),
   );
   socket.on(SOCKET_EVENTS.MAKE_ACCUSATION, (p: MakeAccusationPayload) =>
-    withGame(socket, (_room, g) => {
+    withGame(socket, (room, g) => {
       if (currentPlayerId(g) !== cid(socket)) throw new Error('Not your turn.');
       if (g.turnPhase !== 'postMove') throw new Error('You can only accuse after the movement phase.');
-      return makeAccusation(g, cid(socket), p.suspectId, p.weaponId, p.roomId, RNG).state;
+      const after = makeAccusation(g, cid(socket), p.suspectId, p.weaponId, p.roomId, RNG).state;
+      recordFinalGuesses(room, g, after);
+      return after;
     }),
   );
 

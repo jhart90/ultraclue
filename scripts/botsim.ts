@@ -24,6 +24,7 @@ import {
   activeReachable,
   botRevealCard,
   botMind,
+  wrongAccusationTrios,
   botDecideAccusation,
   botDecideSuggestion,
   botDecideStay,
@@ -61,7 +62,8 @@ const prow = (id: string): PersonaRow => {
   return r;
 };
 const S = {
-  games: 0, finished: 0, turnsToEnd: [] as number[], wins: z(), wrong: z(), eliminated: z(), turns: z(), seats: z(),
+  games: 0, finished: 0, solved: 0, lastStanding: 0, wrongPerGame: [] as number[],
+  turnsToEnd: [] as number[], wins: z(), wrong: z(), eliminated: z(), turns: z(), seats: z(),
   moves: z(), intoUnknownRoom: z(), intoKnownRoom: z(), corridor: z(), stays: z(), shortcuts: z(), noSuggestion: z(),
   suggestions: z(), reveals: z(), revealsKnown: z(), nobody: z(),
 };
@@ -94,7 +96,7 @@ function runGame(seed: number): void {
     botMind(diff.get(pid), pid, getPlayer(g, pid)?.hand ?? [], g.turnOrder,
       log.map((e) => ({ ...e, revealedCardId: e.suggesterId === pid ? e.revealedCardId : undefined })), handCounts(), undefined, undefined,
       getPlayer(g, pid)?.persona,
-      { eliminatedIds: g.players.filter((p) => p.eliminated).map((p) => p.id), round: g.round ?? 0 });
+      { eliminatedIds: g.players.filter((p) => p.eliminated).map((p) => p.id), round: g.round ?? 0, wrongTrios: wrongAccusationTrios(g) });
   const queueFor = (pid: string) => {
     const o = g.turnOrder; const st = o.indexOf(pid); const q: string[] = [];
     for (let k = 1; k < o.length; k++) { const id = o[(st + k) % o.length]; if (!getPlayer(g, id)!.eliminated) q.push(id); }
@@ -128,6 +130,8 @@ function runGame(seed: number): void {
   };
 
   let turns = 0;
+  let wrongHere = 0;
+  let solvedIt = false;
   while (g.phase === 'play' && turns < MAX_TURNS) {
     turns++;
     const cur = getPlayer(g, currentPlayerId(g))!;
@@ -165,7 +169,8 @@ function runGame(seed: number): void {
     if (acc) {
       const out = makeAccusation(g, cur.id, acc.suspectId, acc.weaponId, acc.roomId, rng);
       g = out.state;
-      if (!out.correct) { S.wrong[d]++; S.eliminated[d]++; pr.wrong++; }
+      if (out.correct) solvedIt = true;
+      else { S.wrong[d]++; S.eliminated[d]++; pr.wrong++; wrongHere++; }
       continue;
     }
     if (g.turnPhase === 'postMove' && me.inRoomId) {
@@ -186,8 +191,13 @@ function runGame(seed: number): void {
     g = g.turnPhase === 'postMove' ? endTurn(g, cur.id, rng) : passTurn(g, cur.id, rng);
   }
   S.games++;
+  S.wrongPerGame.push(wrongHere);
   if (g.phase === 'ended') {
     S.finished++;
+    // A game ends one of two ways: somebody names the envelope, or wrong accusations knock everyone
+    // else out and the survivor wins by default. Only the first is a real finish.
+    if (solvedIt) S.solved++;
+    else S.lastStanding++;
     S.turnsToEnd.push(turns);
     const w = diff.get(g.winnerId ?? '');
     if (w) S.wins[w]++;
@@ -202,6 +212,9 @@ const avg = (a: number[]) => (a.length ? (a.reduce((x, y) => x + y, 0) / a.lengt
 const pct = (a: number, b: number) => (b ? ((100 * a) / b).toFixed(1) + '%' : 'n/a');
 console.log(`\n=== ${N_PLAYERS} players × ${N_GAMES} games, mode=${MODE} (${((Date.now() - t0) / 1000).toFixed(1)}s) ===`);
 console.log(`finished: ${S.finished}/${S.games}  avg turns to end: ${avg(S.turnsToEnd)}  (cap ${MAX_TURNS})`);
+const withWrong = S.wrongPerGame.filter((n) => n > 0).length;
+console.log(`solved by a correct accusation: ${S.solved}/${S.games} (${pct(S.solved, S.games)}); last detective standing: ${S.lastStanding}; unfinished: ${S.games - S.finished}`);
+console.log(`wrong accusations per game: avg ${avg(S.wrongPerGame)}, at least one in ${withWrong}/${S.games} (${pct(withWrong, S.games)}), max ${Math.max(0, ...S.wrongPerGame)}`);
 for (const d of ['easy', 'medium', 'hard'] as BotDifficulty[]) {
   if (!S.seats[d]) continue;
   console.log(`--- ${d}: ${S.seats[d]} seats, ${S.wins[d]} wins (${pct(S.wins[d], S.seats[d])} per seat), ${S.wrong[d]} wrong accusations`);

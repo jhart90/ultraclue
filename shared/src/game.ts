@@ -137,6 +137,20 @@ export interface Announcement {
   correct?: boolean; // accusations only
 }
 
+/** Three cards somebody named — or would have named — as the solution. */
+export interface Guess {
+  suspectId: string;
+  weaponId: string;
+  roomId: string;
+  /** How many combinations were still open to the guesser when they chose (computers only). */
+  combos?: number;
+}
+
+/** An accusation as it was made, and how it went. */
+export interface AccusationRecord extends Guess {
+  correct: boolean;
+}
+
 /** What one player did over the course of a game. */
 export interface PlayerStats {
   turns: number;
@@ -151,6 +165,15 @@ export interface PlayerStats {
   /** Accusations that were right (at most one — a correct accusation ends the game). Absent on
    *  games saved before it was tracked. */
   accusationsCorrect?: number;
+  /** The accusation this player made, if any. A player accuses at most once: a wrong one knocks
+   *  them out, a right one ends the game. Absent on games saved before it was tracked. */
+  accusation?: AccusationRecord;
+  /** Computers only, and only for one that never accused: the trio it would have named had it been
+   *  made to accuse on what it knew BEFORE the game's final suggestion and the closing accusation
+   *  (the last suggestion is usually the one that gives the case away). `combos` is how many
+   *  trios were still open to it then — 1 means it had the case solved and was biding its time.
+   *  Recorded by the server, which alone holds the computers' deductions. */
+  wouldAccuse?: Guess;
   /** Which suspect / weapon / room cards this player named in their own suggestions. Feeds the
    *  long-term player profile ("most suspected"). Absent on games saved before it was tracked. */
   suggested?: {

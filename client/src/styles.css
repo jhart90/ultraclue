@@ -23,6 +23,16 @@
   font-display: swap;
 }
 
+/* Alegreya Italic 500 (Latin subset; SIL Open Font Licence, see assets/fonts/OFL-alegreya.txt) —
+   the serif sibling of the display face, used for the title-screen tagline. */
+@font-face {
+  font-family: 'Alegreya';
+  src: url(../../assets/fonts/alegreya-italic-500.woff2) format('woff2');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
 /* All header / title text across screens and pop-up windows. */
 h1,
 h2,

@@ -231,7 +231,7 @@ export function DetectiveNotes({
         })}
       </div>
       <div className="sheet__foot">
-        Ultra Clue / Detective Notes / {page} of 3
+        40 Alibis / Detective Notes / {page} of 3
       </div>
     </section>
   );

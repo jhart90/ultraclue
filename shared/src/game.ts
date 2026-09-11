@@ -153,6 +153,10 @@ export interface Guess {
 /** An accusation as it was made, and how it went. */
 export interface AccusationRecord extends Guess {
   correct: boolean;
+  /** When it was made: the accuser's own turn number and the game's overall turn number (both
+   *  counted as each turn begins). Absent on games saved before they were tracked. */
+  playerTurn?: number;
+  overallTurn?: number;
 }
 
 /** What one player did over the course of a game. */

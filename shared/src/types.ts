@@ -1,4 +1,4 @@
-// Core domain types for Ultra Clue. These are shared verbatim by the client, the server, and
+// Core domain types for 40 Alibis. These are shared verbatim by the client, the server, and
 // the rules engine so there is a single source of truth for what a card / player / game is.
 
 export type CardType = 'suspect' | 'weapon' | 'room';

@@ -1,7 +1,7 @@
-# Ultra Clue — Architecture & Build Plan
+# 40 Alibis — Architecture & Build Plan
 
 A browser-based, real-time multiplayer murder-mystery board game for up to 8 players on
-separate computers. A scaled-up *Clue*: **40 suspects, 40 weapons, 40 rooms** (120 cards),
+separate computers. A preposterously large whodunit: **40 suspects, 40 weapons, 40 rooms** (120 cards),
 a tile-based mansion board, hidden hands, and a full Murder → Deal → Movement → Suspect →
 Accuse game loop.
 
@@ -14,7 +14,7 @@ I'll start at Milestone 1.
 
 1. **Authoritative server.** The server owns the one true game state. Clients send *intents*
    ("I want to move to tile X"); the server validates, mutates state, and broadcasts results.
-   This is non-negotiable for Clue because of **hidden information** — a player must *never*
+   This is non-negotiable for a deduction game because of **hidden information** — a player must *never*
    receive another player's hand or the contents of the envelope over the wire. The server
    sends each client a **tailored view** containing only what that player is allowed to see.
 
@@ -198,7 +198,7 @@ ENDED → show result + the envelope to everyone. Host can return to a fresh lob
 
 ## 7. The board (the hard part — flagged honestly)
 
-Classic Clue has 9 rooms; **40 is a large mansion**. Plan:
+A classic murder-mystery board has 9 rooms; **40 is a large mansion**. Plan:
 
 - A single hand-authored **board JSON** (~`board.ts`) on a grid roughly **32×32**. Rooms are
   rectangular footprints arranged in a mansion layout (wings/floors-as-regions), each with
@@ -247,7 +247,7 @@ I'll pause for your review at the end of each milestone.
 
 - **Reconnect after refresh:** v1 keeps state in server memory; a refresh currently drops the
   player. Proposed: short-lived rejoin token so a refresh re-attaches to the same seat. (M9)
-- **Spectators / mid-game join:** out of scope for v1 (Clue hands are fixed at deal).
+- **Spectators / mid-game join:** out of scope for v1 (hands are fixed at deal).
 - **Secret passages / multi-floor board:** out of scope v1; the board format leaves room for it.
 - **Mobile layout:** target desktop first; M9 makes it usable on tablets.
 - **Card phrases/names:** I'll auto-generate thematically (color surnames per spec). You can

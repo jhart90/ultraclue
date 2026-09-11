@@ -1,4 +1,4 @@
-# Render Blueprint — one-click deploy of Ultra Clue.
+# Render Blueprint — one-click deploy of 40 Alibis.
 # In the Render dashboard: New > Blueprint > pick the jhart90/ultraclue repo. Render reads this
 # file, builds the client, and runs the Node + Socket.IO server (WebSockets work on the free tier;
 # the instance sleeps after ~15 min idle and wakes on the next request).

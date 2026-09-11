@@ -1,7 +1,7 @@
-# Ultra Clue
+# 40 Alibis
 
 A browser-based, real-time multiplayer murder-mystery board game for up to 8 players on
-separate computers. A scaled-up *Clue*: 40 suspects, 40 weapons, 40 rooms.
+separate computers. A preposterously large whodunit: 40 suspects, 40 weapons, 40 rooms.
 
 See [PLAN.md](PLAN.md) for the full architecture and milestone plan.
 
@@ -36,7 +36,7 @@ npm run typecheck
 
 ## Deploy to a public URL (multiplayer over the internet)
 
-Ultra Clue is a persistent Node + Socket.IO server, so it needs a host that supports
+40 Alibis is a persistent Node + Socket.IO server, so it needs a host that supports
 long-running processes and WebSockets (not a static host like GitHub Pages). It serves the built
 client from the same origin and binds to `process.env.PORT`, so no extra config is needed. Two
 one-click options, both deploy straight from this repo:

@@ -45,10 +45,10 @@ function fmtCountdown(ms: number): string {
  *  falling back to the SMS composer where Web Share isn't available. */
 async function sendInvite(code: string): Promise<void> {
   const url = `${window.location.origin}${window.location.pathname}?join=${code}`;
-  const msg = `Join my Ultra Clue game — room ${code}!`;
+  const msg = `Join my 40 Alibis game — room ${code}!`;
   if (navigator.share) {
     try {
-      await navigator.share({ title: 'Ultra Clue', text: msg, url });
+      await navigator.share({ title: '40 Alibis', text: msg, url });
     } catch {
       /* the user dismissed the share sheet */
     }

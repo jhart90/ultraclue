@@ -169,6 +169,18 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
+/* An accusation's verdict with, beneath it, the turn it was made on. */
+.acc__verdictcell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: 10rem;
+}
+.acc__when {
+  font-size: 0.7rem;
+  line-height: 1.25;
+  color: var(--muted, #9a93b3);
+}
 .acc__verdict--right {
   color: var(--end-hit);
   font-weight: 700;

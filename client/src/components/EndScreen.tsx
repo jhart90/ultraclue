@@ -11,6 +11,7 @@ import {
 } from 'shared';
 import { Card } from './Card';
 import { CardName } from './CardName';
+import { ordinal } from './ChatCard';
 import { contrastInk } from '../render/colorUtils';
 import './EndScreen.css';
 
@@ -134,10 +135,19 @@ function Honour({
 
 function Verdict({ line }: { line: AccusationLine }) {
   if (line.kind === 'accused') {
-    return line.correct ? (
-      <span className="acc__verdict acc__verdict--right">Solved the case</span>
-    ) : (
-      <span className="acc__verdict acc__verdict--wrong">Accused wrongly</span>
+    return (
+      <div className="acc__verdictcell">
+        {line.correct ? (
+          <span className="acc__verdict acc__verdict--right">Solved the case</span>
+        ) : (
+          <span className="acc__verdict acc__verdict--wrong">Accused wrongly</span>
+        )}
+        {line.playerTurn && line.overallTurn ? (
+          <span className="acc__when">
+            {ordinal(line.playerTurn)} turn individually, {ordinal(line.overallTurn)} turn overall
+          </span>
+        ) : null}
+      </div>
     );
   }
   if (line.kind === 'would') return <span className="acc__verdict acc__verdict--would">Would have accused</span>;
@@ -254,7 +264,7 @@ export function EndScreen({
         pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, pageW, h * ratio);
       }
       const stamp = new Date(game.stats?.endedAt ?? Date.now()).toISOString().slice(0, 10);
-      pdf.save(`ultra-clue-${game.code}-${stamp}.pdf`);
+      pdf.save(`40-alibis-${game.code}-${stamp}.pdf`);
     } catch (err) {
       console.error('PDF export failed', err);
     } finally {
@@ -481,7 +491,7 @@ export function EndScreen({
               Next public game forms in <strong>{mmss(remaining)}</strong>
             </div>
           ) : (
-            <div className="end__countdown end__countdown--quiet">Thanks for playing ULTRA CLUE!</div>
+            <div className="end__countdown end__countdown--quiet">Thanks for playing 40 ALIBIS!</div>
           )}
           <div className="end__actions">
             <button className="btn end__pdf" onClick={downloadPdf} disabled={saving} title="Save this report as a PDF">

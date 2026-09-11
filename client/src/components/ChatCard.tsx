@@ -30,7 +30,7 @@ function MiniDie({ value, color, pips }: { value: number; color: string; pips: s
 }
 
 /** 1 -> "1st", 22 -> "22nd", 113 -> "113th". */
-function ordinal(n: number): string {
+export function ordinal(n: number): string {
   const mod100 = n % 100;
   const suffix = mod100 >= 11 && mod100 <= 13 ? 'th' : n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th';
   return `${n}${suffix}`;

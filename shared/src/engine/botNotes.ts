@@ -2,7 +2,7 @@ import { FULL_POOL, type CardPool } from './pool';
 import type { BotDifficulty } from '../game';
 import type { RNG } from '../rng';
 
-// A bot's Clue deduction. From the suggestions it has witnessed it works out, for each player:
+// A bot's deduction. From the suggestions it has witnessed it works out, for each player:
 //  - cards they definitely HOLD (a card was shown, or it's deducible),
 //  - cards they definitely DON'T hold (they passed, or someone else holds it),
 //  - "holds one of these" possibility groups (they disproved a suggestion but we didn't see which

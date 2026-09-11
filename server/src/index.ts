@@ -464,7 +464,7 @@ function progress(room: Room): void {
         const r = getRoom(code);
         if (!r) return;
         addChat(r, 'System', `The accusation is CORRECT — ${winnerName} has solved the case and wins!`, true);
-        addChat(r, 'System', 'Thanks for playing ULTRA CLUE!', true);
+        addChat(r, 'System', 'Thanks for playing 40 ALIBIS!', true);
         emitChat(r);
       }, 30_000);
     }
@@ -1369,12 +1369,12 @@ if (serveClient) {
   app.get('*', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
 } else {
   app.get('/', (_req, res) =>
-    res.send('Ultra Clue server is running (dev mode). The client lives on the Vite dev server.'),
+    res.send('40 Alibis server is running (dev mode). The client lives on the Vite dev server.'),
   );
 }
 
 httpServer.listen(PORT, () => {
   console.log(
-    `Ultra Clue server listening on :${PORT}  (${serveClient ? 'serving built client' : 'dev / API only'})`,
+    `40 Alibis server listening on :${PORT}  (${serveClient ? 'serving built client' : 'dev / API only'})`,
   );
 });

@@ -110,7 +110,17 @@ export function noteAccusation(state: GameState, byId: string, correct = false, 
   const ps = playerStats(state, byId);
   ps.accusations++;
   if (correct) ps.accusationsCorrect = (ps.accusationsCorrect ?? 0) + 1;
-  if (trio) ps.accusation = { suspectId: trio.suspectId, weaponId: trio.weaponId, roomId: trio.roomId, correct };
+  if (trio) {
+    ps.accusation = {
+      suspectId: trio.suspectId,
+      weaponId: trio.weaponId,
+      roomId: trio.roomId,
+      correct,
+      // beginTurn counts the turn before anything happens in it, so these are the turn it's made on
+      playerTurn: ps.turns,
+      overallTurn: statsOf(state).turnsPlayed,
+    };
+  }
 }
 
 /** Remember what a computer that never accused would have named (see `PlayerStats.wouldAccuse`).
@@ -255,6 +265,10 @@ export interface AccusationLine {
   guess?: Guess;
   /** Accusations only: was it right? */
   correct?: boolean;
+  /** Accusations only: the accuser's own turn number and the game's overall turn number when it
+   *  was made (absent on games recorded before these were tracked). */
+  playerTurn?: number;
+  overallTurn?: number;
   /** How many of the three cards match the envelope (0–3), when a guess is known. */
   matches?: number;
   /** Which of [suspect, weapon, room] match the envelope, when a guess is known. */
@@ -279,7 +293,8 @@ export function summarizeAccusations(view: GameView): AccusationLine[] {
     if (!p || !ps) continue;
     if (ps.accusation) {
       const hits = score(ps.accusation);
-      lines.push({ playerId, kind: 'accused', guess: ps.accusation, correct: ps.accusation.correct, matches: hits.filter(Boolean).length, hits });
+      const { correct, playerTurn, overallTurn } = ps.accusation;
+      lines.push({ playerId, kind: 'accused', guess: ps.accusation, correct, playerTurn, overallTurn, matches: hits.filter(Boolean).length, hits });
     } else if (ps.wouldAccuse) {
       const hits = score(ps.wouldAccuse);
       lines.push({ playerId, kind: 'would', guess: ps.wouldAccuse, matches: hits.filter(Boolean).length, hits });

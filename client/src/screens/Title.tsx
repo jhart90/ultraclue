@@ -17,7 +17,6 @@ const TAGLINES = [
   'A preposterously large mystery to solve.',
   "A mystery so large you probably don't want to solve it.",
   "The world's most unnecessarily complicated whodunit.",
-  'Finally, a board game that asks: "What if Clue had absolutely no self-control?"',
   "If you finish a game before sunrise, you're probably cheating.",
   "Because solving one murder wasn't nearly enough paperwork.",
 ];

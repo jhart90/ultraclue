@@ -135,15 +135,26 @@ describe('accusations on the details screen', () => {
     // a wrong accusation: same suspect and weapon, a different room
     const wrongRoom = ROOMS.find((r) => r.id !== env.roomId)!.id;
     s = makeAccusation(s, first, env.suspectId, env.weaponId, wrongRoom, makeRng(1)).state;
-    expect(s.stats!.players[first].accusation).toEqual({ suspectId: env.suspectId, weaponId: env.weaponId, roomId: wrongRoom, correct: false });
-    // …then the next player closes the case
+    expect(s.stats!.players[first].accusation).toEqual({
+      suspectId: env.suspectId,
+      weaponId: env.weaponId,
+      roomId: wrongRoom,
+      correct: false,
+      playerTurn: 1,
+      overallTurn: 1,
+    });
+    // …then the next player closes the case, on their own first turn but the game's second
     const second = s.turnOrder[s.activeIdx];
     s.turnPhase = 'postMove';
     s = makeAccusation(s, second, env.suspectId, env.weaponId, env.roomId, makeRng(2)).state;
     expect(s.phase).toBe('ended');
-    expect(s.stats!.players[second].accusation).toEqual({ ...env, correct: true });
+    expect(s.stats!.players[second].accusation).toEqual({ ...env, correct: true, playerTurn: 1, overallTurn: 2 });
 
     const lines = summarizeAccusations(viewFor(s, ''));
+    expect(lines.filter((l) => l.kind === 'accused').map((l) => [l.playerId, l.playerTurn, l.overallTurn])).toEqual([
+      [second, 1, 2],
+      [first, 1, 1],
+    ]);
     // the winning accusation first, then the wrong one, then whoever never accused
     expect(lines.map((l) => [l.playerId, l.kind, l.matches])).toEqual([
       [second, 'accused', 3],

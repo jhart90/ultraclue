@@ -27,6 +27,10 @@ import {
   wrongAccusationTrios,
   botDecideAccusation,
   botDecideSuggestion,
+  botSplitValue,
+  getCard,
+  BOT_PERSONAS,
+  type BotMind,
   botDecideStay,
   botDecideShortcut,
   botDecideMove,
@@ -54,13 +58,28 @@ const TIERS: Record<string, BotDifficulty[]> = {
   eh: ['easy', 'hard'],
 };
 const tiers = TIERS[MODE] ?? TIERS.mixed;
+// INTERROGATE=<0..1> overrides every personality's appetite for putting a "holds one of these" note
+// to its holder, so the same seed can be replayed with the habit switched off (0) or on for all (1).
+if (process.env.INTERROGATE !== undefined) {
+  for (const p of Object.values(BOT_PERSONAS)) p.interrogate = Number(process.env.INTERROGATE);
+}
+/** Whether the bot has a note it could put to its holder from here: a note card it may name (an
+ *  open suspect or weapon, or this very room) whose holder answers before anyone known to hold it
+ *  or this room — a room somebody earlier in the queue holds blocks every question asked from it. */
+function noteReachable(m: BotMind, q: string[], roomId: string): boolean {
+  return m.k.groups.some(
+    (g) =>
+      q.includes(g.playerId) &&
+      g.cards.some((cd) => (cd === roomId || (!m.k.ruledOut.has(cd) && getCard(cd)?.type !== 'room')) && botSplitValue(m, q, cd === roomId ? [cd] : [cd, roomId]) > 0),
+  );
+}
 
 const z = () => ({ easy: 0, medium: 0, hard: 0 });
-type PersonaRow = { seats: number; wins: number; wrong: number; turns: number; stays: number; shortcuts: number; lifts: number; unknown: number; known: number; corridor: number; bluffs: number };
+type PersonaRow = { seats: number; wins: number; wrong: number; turns: number; stays: number; shortcuts: number; lifts: number; unknown: number; known: number; corridor: number; bluffs: number; noteTurns: number; splits: number };
 const PS = new Map<string, PersonaRow>();
 const prow = (id: string): PersonaRow => {
   let r = PS.get(id);
-  if (!r) { r = { seats: 0, wins: 0, wrong: 0, turns: 0, stays: 0, shortcuts: 0, lifts: 0, unknown: 0, known: 0, corridor: 0, bluffs: 0 }; PS.set(id, r); }
+  if (!r) { r = { seats: 0, wins: 0, wrong: 0, turns: 0, stays: 0, shortcuts: 0, lifts: 0, unknown: 0, known: 0, corridor: 0, bluffs: 0, noteTurns: 0, splits: 0 }; PS.set(id, r); }
   return r;
 };
 const S = {
@@ -194,8 +213,15 @@ function runGame(seed: number): void {
       continue;
     }
     if (g.turnPhase === 'postMove' && me.inRoomId) {
-      const sugg = botDecideSuggestion(m2, me.inRoomId, queueFor(cur.id), rng);
+      const q = queueFor(cur.id);
+      const sugg = botDecideSuggestion(m2, me.inRoomId, q, rng);
       if (me.hand.includes(sugg.suspectId) && me.hand.includes(sugg.weaponId)) pr.bluffs++;
+      // Interrogation: of the turns where it held a "holds one of these" note about a rival still to
+      // answer, how often its suggestion put one of that note's cards to them.
+      if (noteReachable(m2, q, me.inRoomId)) {
+        pr.noteTurns++;
+        if (botSplitValue(m2, q, [sugg.suspectId, sugg.weaponId, me.inRoomId]) > 0) pr.splits++;
+      }
       const v = visited.get(cur.id) ?? new Set<string>(); v.add(me.inRoomId); visited.set(cur.id, v);
       S.suggestions[d]++;
       g = makeSuggestion(g, cur.id, sugg.suspectId, sugg.weaponId, me.inRoomId, rng);
@@ -242,8 +268,8 @@ for (const d of ['easy', 'medium', 'hard'] as BotDifficulty[]) {
   console.log(`  turns with no suggestion ${pct(S.noSuggestion[d], S.turns[d])}; reveals ${S.reveals[d]}, already-known shown ${pct(S.revealsKnown[d], S.reveals[d])}, nobody disproved ${S.nobody[d]}`);
   console.log(`  marks witnessed ${S.marks[d]}, never written down ${S.forgot[d]} (${(S.marks[d] ? (100 * S.forgot[d]) / S.marks[d] : 0).toFixed(2)}%)`);
 }
-console.log('--- by personality (per seat): wins, wrong accusations; per turn: stays, passages, lift rides, moves into unknown/known rooms, corridor stops, own-hand suggestions');
+console.log('--- by personality (per seat): wins, wrong accusations; per turn: stays, passages, lift rides, moves into unknown/known rooms, corridor stops, own-hand suggestions; notes: suggestions that put a note to its holder, of turns it could');
 for (const [id, r] of [...PS.entries()].sort()) {
   const pt = (n: number) => pct(n, r.turns);
-  console.log(`  ${id.padEnd(9)} seats ${String(r.seats).padStart(3)}  wins ${pct(r.wins, r.seats).padStart(6)}  wrong ${pct(r.wrong, r.seats).padStart(6)} | stays ${pt(r.stays).padStart(5)} passages ${pt(r.shortcuts).padStart(5)} lifts ${pt(r.lifts).padStart(5)} unknown ${pt(r.unknown).padStart(5)} known ${pt(r.known).padStart(5)} corridor ${pt(r.corridor).padStart(5)} bluffs ${pt(r.bluffs).padStart(5)}`);
+  console.log(`  ${id.padEnd(9)} seats ${String(r.seats).padStart(3)}  wins ${pct(r.wins, r.seats).padStart(6)}  wrong ${pct(r.wrong, r.seats).padStart(6)} | stays ${pt(r.stays).padStart(5)} passages ${pt(r.shortcuts).padStart(5)} lifts ${pt(r.lifts).padStart(5)} unknown ${pt(r.unknown).padStart(5)} known ${pt(r.known).padStart(5)} corridor ${pt(r.corridor).padStart(5)} bluffs ${pt(r.bluffs).padStart(5)} | notes ${pct(r.splits, r.noteTurns).padStart(6)} of ${String(r.noteTurns).padStart(4)}`);
 }

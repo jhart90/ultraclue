@@ -20,6 +20,10 @@ import {
   FULL_POOL,
   NEUTRAL_PERSONA,
   BOT_PERSONAS,
+  botDecideSuggestion,
+  botDecideMove,
+  botSplitValue,
+  type BotPersona,
 } from '../src';
 
 /** Rule out everything except the given solution triple. */
@@ -410,5 +414,94 @@ describe('what a bot would accuse if made to', () => {
     expect(g.weaponId.startsWith('weapon-')).toBe(true);
     expect(g.roomId.startsWith('room-')).toBe(true);
     expect(g.combos).toBe(40 * 40 * 40);
+  });
+});
+
+describe('bots settle what a rival showed', () => {
+  const bot = 'bot';
+  const seats = [bot, 'A', 'B', 'C'];
+  const queue = ['A', 'B', 'C'];
+  /** A hard bot holding the Study and the Rope, with two suspects still open (Valentine and Dijon)
+   *  and one weapon (the Candlestick), that saw A disprove Valentine / Dagger / Library without
+   *  seeing the card — so A "holds one of these". */
+  function mind(over: Partial<BotMind> = {}, persona: BotPersona = NEUTRAL_PERSONA): BotMind {
+    const ruledOut = ruledOutExcept('suspect-valentine', 'weapon-candlestick', 'room-library');
+    ruledOut.delete('suspect-dijon'); // a second open suspect, on nobody's note
+    return {
+      difficulty: 'hard',
+      persona,
+      botId: bot,
+      hand: ['room-study', 'weapon-rope'],
+      k: { has: new Map(), hasnt: new Map(), groups: [{ playerId: 'A', cards: ['suspect-valentine', 'weapon-dagger', 'room-library'] }], ruledOut },
+      envelope: new Set<string>(),
+      playerIds: seats,
+      pool: FULL_POOL,
+      board: BOARD,
+      events: [],
+      handCounts: new Map(),
+      activeIds: [...seats],
+      round: 0,
+      wrongTrios: [],
+      ...over,
+    };
+  }
+
+  it('counts the note cards a suggestion names for each rival still to answer, and stops at a known holder', () => {
+    const m = mind();
+    expect(botSplitValue(m, queue, ['suspect-valentine', 'weapon-rope', 'room-study'])).toBe(1);
+    expect(botSplitValue(m, queue, ['suspect-valentine', 'weapon-dagger', 'room-study'])).toBe(2);
+    expect(botSplitValue(m, queue, ['suspect-dijon', 'weapon-rope', 'room-study'])).toBe(0);
+    // B is known to hold the Candlestick: asked before A, B shows it and A is never put the question…
+    const has = new Map([['B', new Set(['weapon-candlestick'])]]);
+    const trio = ['suspect-valentine', 'weapon-candlestick', 'room-study'];
+    expect(botSplitValue(mind({ k: { ...m.k, has } }), ['B', 'A', 'C'], trio)).toBe(0);
+    // …but asked first, A still is.
+    expect(botSplitValue(mind({ k: { ...m.k, has } }), ['A', 'B', 'C'], trio)).toBe(1);
+  });
+
+  /** How often, over many seeds, the bot isolates the suspect on A's note rather than the other one. */
+  const noteRate = (persona: BotPersona, over: Partial<BotMind> = {}, n = 300) => {
+    let hits = 0;
+    for (let seed = 1; seed <= n; seed++) {
+      const sugg = botDecideSuggestion(mind(over, persona), 'room-study', queue, makeRng(seed));
+      if (sugg.suspectId === 'suspect-valentine') hits++;
+    }
+    return hits / n;
+  };
+
+  it("isolates the suspect on a rival's note, as hard as its personality says", () => {
+    // In its own Study with the Rope in hand only the suspect can be shown: the cleanest question.
+    for (let seed = 1; seed <= 20; seed++) expect(botDecideSuggestion(mind(), 'room-study', queue, makeRng(seed)).weaponId).toBe('weapon-rope');
+    expect(noteRate({ ...NEUTRAL_PERSONA, interrogate: 0 })).toBeLessThan(0.62); // a plain draw between two
+    expect(noteRate(NEUTRAL_PERSONA)).toBeGreaterThan(0.66); // puts the question half the time
+    expect(noteRate(BOT_PERSONAS.stalker)).toBeGreaterThan(0.95); // every time
+    expect(noteRate(BOT_PERSONAS.stalker)).toBeGreaterThan(noteRate(BOT_PERSONAS.tourist));
+    expect(noteRate(BOT_PERSONAS.tourist)).toBeLessThan(noteRate(NEUTRAL_PERSONA));
+  });
+
+  it('a medium bot with a note to settle weighs who will answer, too', () => {
+    // Not an isolation (no suspect in hand), so a by-the-book medium bot would draw at random.
+    const keen = noteRate({ ...NEUTRAL_PERSONA, interrogate: 1 }, { difficulty: 'medium', hand: ['weapon-rope'] });
+    const cold = noteRate({ ...NEUTRAL_PERSONA, interrogate: 0 }, { difficulty: 'medium', hand: ['weapon-rope'] });
+    expect(keen).toBeGreaterThan(0.66);
+    expect(cold).toBeLessThan(0.62);
+  });
+
+  it("walks toward a room on a rival's note when its personality cares", () => {
+    // Two rooms nobody is known to hold in reach: the Library (on A's note) and the Lounge.
+    const reach = [...BOARD.rooms['room-library'].tiles, ...BOARD.rooms['room-lounge'].tiles];
+    const libraryRate = (persona: BotPersona, n = 300) => {
+      let hits = 0;
+      for (let seed = 1; seed <= n; seed++) {
+        const m = mind({}, persona);
+        m.k.ruledOut.delete('room-lounge');
+        const t = botDecideMove(m, reach, makeRng(seed), queue)!;
+        if (BOARD.rooms['room-library'].tiles.some((x) => coordKey(x) === coordKey(t))) hits++;
+      }
+      return hits / n;
+    };
+    expect(libraryRate({ ...NEUTRAL_PERSONA, interrogate: 0 })).toBeLessThan(0.62);
+    expect(libraryRate(BOT_PERSONAS.stalker)).toBeGreaterThan(0.95);
+    expect(libraryRate(BOT_PERSONAS.stalker)).toBeGreaterThan(libraryRate(BOT_PERSONAS.rambler));
   });
 });

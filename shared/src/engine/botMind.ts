@@ -23,6 +23,10 @@ import { personaOf, type BotPersona, type BotPersonaId } from './persona';
 // No tier keeps a perfect sheet: each mark it witnesses has a small chance of never being written
 // down — about one in 400 for hard, one in 200 for medium, one in 50 for easy (`rollForgotten`
 // in botNotes.ts). The server rolls those lapses once per suggestion and passes them in `events`.
+// Every tier above easy also works its "holds one of these" notes — a rival it saw disprove a
+// suggestion without seeing the card. Naming one of those cards while that rival is still to
+// answer settles the note either way (they show it, or they pass and it is crossed off), so
+// suggestions and destinations go for such cards, as often as the persona's `interrogate` says.
 
 export interface BotMind {
   difficulty: BotDifficulty;
@@ -462,10 +466,61 @@ function stalkTarget(m: BotMind, queue: string[]): string | undefined {
   return best;
 }
 
+/** Weight of naming a card from a rival's "holds one of these" note, per card, in the probe score
+ *  on a turn the bot has decided to put the question (see `interrogate`). Well above what a pair
+ *  can earn from the players who might have to show something, so it decides the suggestion. */
+const KEEN_BONUS = 10;
+
+/** The cards of `trio` that sit on a note the bot keeps about player `p` ("holds one of these"). */
+function groupHits(m: BotMind, p: string, trio: string[]): number {
+  let n = 0;
+  for (const g of m.k.groups) if (g.playerId === p) for (const c of trio) if (g.cards.includes(c)) n++;
+  return n;
+}
+
+/**
+ * How much suggesting `trio` would settle the bot's "holds one of these" notes: one per note card
+ * named, for every rival reached before someone known to hold a card of the trio (who would show
+ * that and end the round). A reached rival either shows the note's card, pinning it, or passes and
+ * has it crossed off the note; both are progress.
+ */
+export function botSplitValue(m: BotMind, queue: string[], trio: string[]): number {
+  let n = 0;
+  for (const p of queue) {
+    const has = m.k.has.get(p);
+    if (trio.some((c) => has?.has(c))) break;
+    n += groupHits(m, p, trio);
+  }
+  return n;
+}
+
+/** Whether a rival in the queue has a note that one of these cards could settle. */
+function hasSplittableGroup(m: BotMind, queue: string[], cards: string[]): boolean {
+  return m.k.groups.some((g) => queue.includes(g.playerId) && g.cards.some((c) => cards.includes(c)));
+}
+
+/** Pick one of `cands` for a suggestion. On a turn the bot is putting a question (`keen`) it takes
+ *  whichever settles the most notes, ties drawn at random; otherwise a plain draw. `trioOf`
+ *  completes the suggestion. */
+function pickInterrogating(m: BotMind, queue: string[], cands: { id: string }[], trioOf: (id: string) => string[], rng: RNG, keen: boolean): string {
+  if (!keen || cands.length < 2) return pick(cands, rng).id;
+  let best: { id: string }[] = [];
+  let bestValue = 0;
+  for (const c of cands) {
+    const v = botSplitValue(m, queue, trioOf(c.id));
+    if (v > bestValue) {
+      bestValue = v;
+      best = [c];
+    } else if (v === bestValue && v > 0) best.push(c);
+  }
+  return pick(best.length ? best : cands, rng).id;
+}
+
 /** Score probe pairs by walking the responders: a player known to hold one of the three ends the
  *  walk (they'll show a card I already know); a player who might hold an unknown card is a chance
- *  to learn something. A stalking persona also rewards pairs its target may have to answer. */
-function scoredProbe(m: BotMind, roomId: string, queue: string[], sus: { id: string }[], wea: { id: string }[], rng: RNG): BotSuggestion {
+ *  to learn something; on a turn the bot is putting a question (`keen`), a card on that player's
+ *  note is the thing to name. A stalking persona also rewards pairs its target may have to answer. */
+function scoredProbe(m: BotMind, roomId: string, queue: string[], sus: { id: string }[], wea: { id: string }[], rng: RNG, keen = false): BotSuggestion {
   const target = m.persona.stalk ? stalkTarget(m, queue) : undefined;
   const tries = Math.min(80, sus.length * wea.length);
   let best: BotSuggestion[] = [];
@@ -484,6 +539,7 @@ function scoredProbe(m: BotMind, roomId: string, queue: string[], sus: { id: str
       const maybe = [s, w, roomId].filter((x) => !hasnt?.has(x) && !m.k.ruledOut.has(x)).length;
       score += maybe + (maybe > 0 ? 0.25 : 0);
       if (p === target) score += 2 * maybe;
+      if (keen) score += KEEN_BONUS * groupHits(m, p, [s, w, roomId]);
     }
     if (score > bestScore) {
       bestScore = score;
@@ -511,19 +567,26 @@ export function botDecideSuggestion(m: BotMind, roomId: string, queue: string[],
       weaponId: pick(c.weapons.length ? c.weapons : m.pool.weapons, rng).id,
     };
   }
+  // Whether, this turn, it puts a "holds one of these" note to its holder: as often as its
+  // personality bothers, and only when it has such a note about somebody still to answer.
+  const P = m.persona;
+  const keen =
+    P.interrogate > 0 &&
+    hasSplittableGroup(m, queue, [...c.suspects.map((x) => x.id), ...c.weapons.map((x) => x.id), roomId]) &&
+    rng() < P.interrogate;
   if (m.difficulty === 'medium') {
-    if (m.persona.stalk) {
-      const sus = c.suspects.length ? c.suspects : m.pool.suspects;
-      const wea = c.weapons.length ? c.weapons : m.pool.weapons;
-      return scoredProbe(m, roomId, queue, sus, wea, rng);
-    }
+    const sus = c.suspects.length ? c.suspects : m.pool.suspects;
+    const wea = c.weapons.length ? c.weapons : m.pool.weapons;
+    // A stalker always weighs who will answer; anyone else does so on a turn it puts a question.
+    if (P.stalk || keen) return scoredProbe(m, roomId, queue, sus, wea, rng, keen);
     return botSuggestion(m.k.ruledOut, m.hand, roomId, rng, m.pool);
   }
 
   // ---- hard ----
   const roomUnknown = !m.k.ruledOut.has(roomId) && !m.envelope.has(roomId);
-  // Isolate the room: only the room card could be shown.
-  if (roomUnknown && heldSuspects.length && heldWeapons.length) {
+  // Isolate the room: only the room card could be shown. On a turn it is putting a question, only
+  // if the room itself is on the note — otherwise the question goes to the suspect or weapon below.
+  if (roomUnknown && heldSuspects.length && heldWeapons.length && (!keen || botSplitValue(m, queue, [roomId]) > 0)) {
     return { suspectId: pick(heldSuspects, rng), weaponId: pick(heldWeapons, rng) };
   }
   // In a room nobody can show, isolate a suspect or a weapon with one of my own cards.
@@ -531,16 +594,20 @@ export function botDecideSuggestion(m: BotMind, roomId: string, queue: string[],
   const openSus = c.suspects.filter((x) => !m.envelope.has(x.id));
   const openWea = c.weapons.filter((x) => !m.envelope.has(x.id));
   if (roomSafe) {
+    // Isolating a card that sits on a rival's note is the cleanest interrogation there is: only
+    // that card can be shown, so the answer settles the note outright.
     if (openSus.length > 1 && heldWeapons.length && (openSus.length >= openWea.length || !heldSuspects.length)) {
-      return { suspectId: pick(openSus, rng).id, weaponId: pick(heldWeapons, rng) };
+      const w = pick(heldWeapons, rng);
+      return { suspectId: pickInterrogating(m, queue, openSus, (x) => [x, w, roomId], rng, keen), weaponId: w };
     }
     if (openWea.length > 1 && heldSuspects.length) {
-      return { suspectId: pick(heldSuspects, rng), weaponId: pick(openWea, rng).id };
+      const s = pick(heldSuspects, rng);
+      return { suspectId: s, weaponId: pickInterrogating(m, queue, openWea, (x) => [s, x, roomId], rng, keen) };
     }
   }
   const sus = openSus.length ? openSus : c.suspects.length ? c.suspects : m.pool.suspects;
   const wea = openWea.length ? openWea : c.weapons.length ? c.weapons : m.pool.weapons;
-  return scoredProbe(m, roomId, queue, sus, wea, rng);
+  return scoredProbe(m, roomId, queue, sus, wea, rng, keen);
 }
 
 /** Whether an in-room bot should skip moving and suggest again from here. `staysHere` counts the
@@ -593,8 +660,14 @@ function roomClasses(m: BotMind): { cls: RoomClass; rooms: Set<string>; weight: 
   ].sort((a, b) => b.weight - a.weight);
 }
 
-/** Pick a room tile, every room weighted equally except for a persona's door bias. */
-function pickRoomTileBiased(m: BotMind, tiles: Coord[], rng: RNG): Coord {
+/** Pick a room tile, every room weighted equally except for a persona's door bias. On a move the
+ *  bot is putting a question (`keen`), only rooms on a note about a rival still to answer (`queue`)
+ *  count, when any are in reach: standing there puts the question to that rival directly. */
+function pickRoomTileBiased(m: BotMind, tiles: Coord[], rng: RNG, queue: string[] = [], keen = false): Coord {
+  if (keen) {
+    const noted = tiles.filter((t) => botSplitValue(m, queue, [roomIdAt(m.board, t)!]) > 0);
+    if (noted.length) tiles = noted;
+  }
   const bias = m.persona.doorBias;
   if (bias <= 0) return pickRoomTile(tiles, rng, m.board);
   const byRoom = new Map<string, Coord[]>();
@@ -633,6 +706,8 @@ export function botDecideMove(m: BotMind, reach: Coord[], rng: RNG, queue: strin
     return pick(reach, rng);
   }
 
+  // Whether, this move, it heads for a room on a "holds one of these" note to put the question.
+  const keen = P.interrogate > 0 && m.k.groups.length > 0 && queue.length > 0 && rng() < P.interrogate;
   const classes = roomClasses(m);
   for (const cls of classes) {
     if (cls.weight <= 0) break; // refused while a heavier class still has rooms anywhere
@@ -653,10 +728,10 @@ export function botDecideMove(m: BotMind, reach: Coord[], rng: RNG, queue: strin
           bestTiles = [t];
         } else if (ahead === bestAhead && bestAhead > 1) bestTiles.push(t);
       }
-      if (bestTiles.length) return pickRoomTileBiased(m, bestTiles, rng);
+      if (bestTiles.length) return pickRoomTileBiased(m, bestTiles, rng, queue, keen);
       continue; // no such room: walk toward something better instead
     }
-    return pickRoomTileBiased(m, tiles, rng);
+    return pickRoomTileBiased(m, tiles, rng, queue, keen);
   }
 
   // No room worth entering in reach: walk the corridor toward the nearest room of the best class
@@ -678,7 +753,7 @@ export function botDecideMove(m: BotMind, reach: Coord[], rng: RNG, queue: strin
       if (best.length && bestD < Infinity) return pick(best, rng);
     }
   }
-  if (roomTiles.length) return pickRoomTileBiased(m, roomTiles, rng);
+  if (roomTiles.length) return pickRoomTileBiased(m, roomTiles, rng, queue, keen);
   // Nothing useful anywhere: any room beats standing in a corridor.
   if (allRoomTiles.length) return pickRoomTileBiased(m, allRoomTiles, rng);
   return pick(reach, rng);

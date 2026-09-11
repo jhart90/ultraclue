@@ -50,6 +50,12 @@ export interface BotPersona {
   bluffChance: number;
   /** Aim suggestions at the player with the most cards still unaccounted for. */
   stalk: boolean;
+  /** How often it puts a "holds one of these" note to its holder — a rival it saw disprove a
+   *  suggestion without seeing the card. On the turns it does (this chance, whenever it has such a
+   *  note about somebody still to answer), its suggestion names one of the note's cards so that
+   *  rival must show it or pass and have it crossed off, and it heads for a room on the note if one
+   *  is in reach. 0 never bothers; 1 does it every time it can. */
+  interrogate: number;
   // ---- when to accuse --------------------------------------------------------------------
   /** Accuse on a guess once the odds are at least this good, with nobody looking close. */
   gambleMinOdds: number;
@@ -91,6 +97,7 @@ export const NEUTRAL_PERSONA: BotPersona = {
   maxStays: 2,
   bluffChance: 0,
   stalk: false,
+  interrogate: 0.5,
   gambleMinOdds: 1 / 3,
   threatOdds: 1 / 3,
   threatSense: 1,
@@ -112,6 +119,7 @@ export const BOT_PERSONAS: Record<BotPersonaId, BotPersona> = {
     avoidVisited: true,
     corridorWalk: true,
     maxStays: 0,
+    interrogate: 0.15,
     gambleNeedsThreat: false,
     threatOdds: 1 / 12,
     impatience: 0.03,
@@ -120,11 +128,12 @@ export const BOT_PERSONAS: Record<BotPersonaId, BotPersona> = {
     ...NEUTRAL_PERSONA,
     id: 'homebody',
     title: 'The Homebody',
-    blurb: 'Found a comfortable room and squatted there, probing suspects and weapons turn after turn — and spooked easily, being the last to hear anything.',
+    blurb: 'Found a comfortable room and squatted there, probing suspects and weapons turn after turn — pinning down what its neighbours had shown one another — and spooked easily, being the last to hear anything.',
     unknownRoomWeight: 0.4,
     probeRoomWeight: 1,
     knownRoomWeight: 0.1,
     maxStays: 5,
+    interrogate: 0.9,
     gambleNeedsThreat: false,
     threatOdds: 1 / 10,
     threatSense: 1.3,
@@ -138,6 +147,7 @@ export const BOT_PERSONAS: Record<BotPersonaId, BotPersona> = {
     gambleMinOdds: 1 / 10,
     threatOdds: 1 / 25,
     raceChance: 0.5,
+    interrogate: 0.15,
   },
   bluffer: {
     ...NEUTRAL_PERSONA,
@@ -145,6 +155,7 @@ export const BOT_PERSONAS: Record<BotPersonaId, BotPersona> = {
     title: 'The Bluffer',
     blurb: 'Kept naming cards from its own hand so nobody could disprove it, then fell for the very same trick whenever a rival tried it.',
     bluffChance: 0.6,
+    interrogate: 0.3,
     gambleNeedsThreat: false,
     threatOdds: 1 / 8,
     copycatChance: 0.3,
@@ -153,11 +164,12 @@ export const BOT_PERSONAS: Record<BotPersonaId, BotPersona> = {
     ...NEUTRAL_PERSONA,
     id: 'stalker',
     title: 'The Stalker',
-    blurb: 'Read the table rather than the map: every suggestion was aimed at whoever had the most to hide, and it always knew who was closing in.',
+    blurb: 'Read the table rather than the map: every suggestion was aimed at whoever had the most to hide, it pressed anyone it caught showing a card until it knew which one, and it always knew who was closing in.',
     unknownRoomWeight: 1,
     knownRoomWeight: 0.7,
     probeRoomWeight: 0.5,
     stalk: true,
+    interrogate: 1,
     gambleNeedsThreat: false,
     threatOdds: 1 / 9,
     threatSense: 1.6,
@@ -171,6 +183,7 @@ export const BOT_PERSONAS: Record<BotPersonaId, BotPersona> = {
     liftChance: 0.6,
     farFloors: true,
     shortcutChance: 0.8,
+    interrogate: 0.1,
     gambleNeedsThreat: false,
     threatOdds: 1 / 12,
     impatience: 0.05,
@@ -183,6 +196,7 @@ export const BOT_PERSONAS: Record<BotPersonaId, BotPersona> = {
     doorBias: 1,
     corridorWalk: true,
     maxStays: 1,
+    interrogate: 0.6,
     gambleNeedsThreat: false,
     threatOdds: 1 / 12,
     raceChance: 0.4,
@@ -197,6 +211,7 @@ export const BOT_PERSONAS: Record<BotPersonaId, BotPersona> = {
     knownRoomWeight: 0.1,
     corridorWalk: true,
     maxStays: 3,
+    interrogate: 0.5,
     gambleNeedsThreat: false,
     threatOdds: 1 / 16,
     threatSense: 1.5,

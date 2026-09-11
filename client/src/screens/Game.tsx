@@ -11,7 +11,7 @@ import { CardName, RoomName } from '../components/CardName';
 import { Board, WALK_STEP_MS } from '../components/Board';
 import { Dice } from '../components/Dice';
 import { Wordmark } from '../components/Wordmark';
-import { DetectiveNotes, readNotesTheme, saveNotesTheme, type NotesTheme } from '../components/DetectiveNotes';
+import { CaseNotes, readNotesTheme, saveNotesTheme, type NotesTheme } from '../components/CaseNotes';
 import { SelectModal, RevealPanel, NoEvidencePanel } from '../components/SuggestPanels';
 import { EndScreen } from '../components/EndScreen';
 import { StatusModal, AccusationFlow, AccusingModal, type StatusButton } from '../components/GamePopups';
@@ -111,7 +111,7 @@ export function Game() {
   const setDice = useStore((s) => s.setDice);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [handShelf, setHandShelf] = useState(readHandShelf);
-  // Detective Notes look: the printed sepia sheet, or columns tinted in each player's colour.
+  // Case Notes look: the printed sepia sheet, or columns tinted in each player's colour.
   const [notesTheme, setNotesTheme] = useState<NotesTheme>(readNotesTheme);
   // "Lock camera on player to move": off means the map never follows a move or recentres on a turn.
   const [cameraLock, setCameraLock] = useState(readCameraLock);
@@ -126,7 +126,7 @@ export function Game() {
   const animUntilRef = useRef(0);
   const retireDice = useCallback(() => setDiceShow(null), []);
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
-  const [dock, setDock] = useState<null | 'map' | 'notes'>(null); // bottom dock: Manor Map / Detective Notes
+  const [dock, setDock] = useState<null | 'map' | 'notes'>(null); // bottom dock: Manor Map / Case Notes
   const [mapMounted, setMapMounted] = useState(false); // mount the (heavy) second board only once opened
 
   // --- pop-up overlays (status / announcement / reveal) ---
@@ -595,7 +595,7 @@ export function Game() {
         )}
       </div>
 
-      {/* Bottom dock — Manor Map + Detective Notes folders. Only one opens at a time; the open one
+      {/* Bottom dock — Manor Map + Case Notes folders. Only one opens at a time; the open one
           slides up over everything (above every pop-up), and the tabs stay reachable at the bottom. */}
       <div className={`dock__panel${dock === 'map' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'map'}>
         <div className="dock__folder">
@@ -617,7 +617,7 @@ export function Game() {
       {!observer && (
         <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
           <div className="dock__folder dock__folder--notes">
-            <DetectiveNotes
+            <CaseNotes
               roomCode={game.code}
               players={orderedPlayers}
               selfId={myId}
@@ -646,7 +646,7 @@ export function Game() {
             className={`dock__tab${dock === 'notes' ? ' dock__tab--active' : ''}`}
             onClick={() => setDock((d) => (d === 'notes' ? null : 'notes'))}
           >
-            <span className="dock__tabicon">📓</span> <span className="dock__tablabel">Detective Notes</span>
+            <span className="dock__tabicon">📓</span> <span className="dock__tablabel">Case Notes</span>
           </button>
         )}
       </div>
@@ -848,7 +848,7 @@ export function Game() {
               Classic shelf (a row of small thumbnails instead of the fan)
             </label>
 
-            <div className="game__settinghead2">Detective Notes</div>
+            <div className="game__settinghead2">Case Notes</div>
             {(
               [
                 ['sepia', 'Sepia sheet (monotone, like the printed notes)'],

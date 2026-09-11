@@ -73,7 +73,7 @@ export const initialJoinCode = (() => {
 })();
 
 // A single saved-game slot lives in browser storage (manual save + per-turn auto-save). It also
-// carries this player's private Detective Notes so they survive a save/load.
+// carries this player's private Case Notes so they survive a save/load.
 const SAVE_KEY = 'ultraclue-savegame';
 type SaveSlot = { meta: SavedGameMeta; blob: unknown; notes?: string };
 function readSave(): SaveSlot | null {
@@ -92,7 +92,7 @@ function writeSave(payload: SaveSlot): void {
   }
 }
 
-// Detective Notes persist in localStorage keyed by room code; carry them across a save/load.
+// Case Notes persist in localStorage keyed by room code; carry them across a save/load.
 const notesKey = (code: string) => `ultraclue-notes-${code}`;
 let pendingNotes: string | null = null; // notes to restore once the loaded game's (new) code arrives
 let pendingName = ''; // the name typed on the Join form, reused if we have to pick a seat
@@ -152,7 +152,7 @@ interface StoreState {
   savedAt?: number;
   /** Set when we joined an in-progress (loaded) game and must pick a seat to take over. */
   seatPick?: { code: string; slots: Slot[] };
-  /** Bumps when the server hands us restored Detective Notes, so the notes sheet re-reads them. */
+  /** Bumps when the server hands us restored Case Notes, so the notes sheet re-reads them. */
   notesEpoch: number;
   /** serverClock - ourClock (ms), from the last lobby view — corrects the public countdown. */
   serverOffset: number;
@@ -335,7 +335,7 @@ socket.on(SOCKET_EVENTS.LOBBY, (p: LobbyPayload) => {
 
 socket.on(SOCKET_EVENTS.CHAT, (p: ChatBroadcastPayload) => useStore.setState({ chat: p.chat }));
 
-// The server handed us the Detective Notes for our seat (on resume / rejoin / takeover).
+// The server handed us the Case Notes for our seat (on resume / rejoin / takeover).
 socket.on(SOCKET_EVENTS.NOTES, (p: { notes: string }) => {
   const code = useStore.getState().game?.code;
   if (code && p?.notes) {
@@ -346,7 +346,7 @@ socket.on(SOCKET_EVENTS.NOTES, (p: { notes: string }) => {
 
 socket.on(SOCKET_EVENTS.GAME_STARTED, (p: GameStartedPayload) => {
   if (pendingNotes) {
-    restoreNotes(p.view.code, pendingNotes); // bring the saved Detective Notes into the new room
+    restoreNotes(p.view.code, pendingNotes); // bring the saved Case Notes into the new room
     pendingNotes = null;
   }
   saveRoom(p.view.code);

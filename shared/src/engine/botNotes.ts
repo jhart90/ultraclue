@@ -7,7 +7,7 @@ import type { RNG } from '../rng';
 //  - cards they definitely DON'T hold (they passed, or someone else holds it),
 //  - "holds one of these" possibility groups (they disproved a suggestion but we didn't see which
 //    card), which get refined as more is learned.
-// This drives both the bot's Detective Notes sheet and its move/suggest/accuse decisions.
+// This drives both the bot's Case Notes sheet and its move/suggest/accuse decisions.
 // The bookkeeping is not quite perfect: now and then a mark never makes it onto the sheet (see
 // `rollForgotten`), and a mark that was never written stays missing for the rest of the game.
 
@@ -137,7 +137,7 @@ export function deduceBotKnowledge(
 // to tag a possibility group (each group gets a distinct symbol, in matching sets across its cards).
 const GROUP_SYMBOLS = [11, 12, 13, 14, 3, 4, 5, 6, 7, 8, 9, 10];
 
-/** Render a deduction into the Detective Notes grid (cardId -> one column state per seat in turn
+/** Render a deduction into the Case Notes grid (cardId -> one column state per seat in turn
  *  order, up to 40) — the same shape the human notes sheet persists. */
 export function botNotesGrid(k: BotKnowledge, turnOrder: string[]): Record<string, number[]> {
   const col = new Map(turnOrder.map((id, i) => [id, i]));

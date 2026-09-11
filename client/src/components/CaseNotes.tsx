@@ -4,14 +4,18 @@ import { useStore } from '../store';
 import { NoteBox, NOTE_STATES } from './NoteBox';
 import { WeaponIcon } from './CardName';
 import { shade } from '../render/colorUtils';
-import './DetectiveNotes.css';
+import './CaseNotes.css';
 
 /** A sheet holds one column per seat, and a table seats at most 40. */
 export const MAX_NOTE_COLS = 40;
+/** The sepia sheet shades alternate blocks of five columns only from this many seats up; a
+ *  smaller table's row is short enough to follow without them. */
+const BAND_FROM_COLS = 10;
 const EMPTY_ROW: number[] = [];
 
 // Two looks, chosen in Settings and remembered per browser:
-//  - 'sepia'  — the printed sheet: parchment, ink grid, every other block of five columns shaded;
+//  - 'sepia'  — the printed sheet: parchment, ink grid, and (10+ seats) every other block of five
+//               columns shaded;
 //  - 'colour' — the same sheet with each seat's column washed in a light tint of its character's
 //               colour, and marks inked in that colour.
 export type NotesTheme = 'sepia' | 'colour';
@@ -82,7 +86,7 @@ function columnLabel(p: PlayerView): string {
 // (Suspects / Weapons / Rooms), each a ruled grid with one clickable cell per seat at the table —
 // up to 40 columns. Marks persist to localStorage per room (and ride along in saves), so a refresh
 // keeps your deductions. Pages sit side by side while they fit and stack once the table is wide.
-export function DetectiveNotes({
+export function CaseNotes({
   roomCode,
   players,
   selfId,
@@ -231,17 +235,17 @@ export function DetectiveNotes({
         })}
       </div>
       <div className="sheet__foot">
-        40 Alibis / Detective Notes / {page} of 3
+        40 Alibis / Case Notes / {page} of 3
       </div>
     </section>
   );
 
   return (
     <>
-      <button className="dnotes__bar" onClick={onClose} title="Close Detective Notes">
-        Detective Notes <span className="dnotes__barclose">▾ click to close</span>
+      <button className="cnotes__bar" onClick={onClose} title="Close Case Notes">
+        Case Notes <span className="cnotes__barclose">▾ click to close</span>
       </button>
-      <div className={`notes__body notes__body--${theme}`}>
+      <div className={`notes__body notes__body--${theme}${cols >= BAND_FROM_COLS ? ' notes__body--banded' : ''}`}>
         {renderPage('Suspects', sortedSuspects, 1)}
         {renderPage('Weapons', sortedWeapons, 2)}
         {renderPage('Rooms', sortedRooms, 3)}

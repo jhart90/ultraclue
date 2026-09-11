@@ -214,7 +214,7 @@
   display: flex;
   align-items: stretch;
   gap: 0.8rem;
-  /* leave room beneath the hand for the Detective Notes folder tab pinned to the screen bottom */
+  /* leave room beneath the hand for the Case Notes folder tab pinned to the screen bottom */
   padding-bottom: 44px;
 }
 /* With the fan, the hand is a fixed band over the screen bottom; this row just holds its space. */
@@ -589,7 +589,7 @@
   .game--fan .fan {
     right: var(--pad);
   }
-  /* On phones the Manor Map / Detective Notes folder tabs would float over the cards in the hand, so
+  /* On phones the Manor Map / Case Notes folder tabs would float over the cards in the hand, so
      they become small round icon buttons stacked just above the settings wheel, all on the left. */
   .dock__tabs,
   .game--fan .dock__tabs {

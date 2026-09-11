@@ -3,7 +3,7 @@ import { deduceBotKnowledge, botNotesGrid, suggestionMarks, rollForgotten, BOT_L
 
 const PLAYERS = ['bot', 'p1', 'p2', 'p3'];
 
-describe('bot detective-notes deduction', () => {
+describe('bot case-notes deduction', () => {
   it('marks its own hand held, and absent from everyone else', () => {
     const k = deduceBotKnowledge('bot', ['suspect-valentine', 'weapon-rope'], PLAYERS, []);
     expect(k.has.get('bot')!.has('suspect-valentine')).toBe(true);

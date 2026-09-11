@@ -88,7 +88,7 @@ clue-ultra/
 │  │  ├─ main.tsx
 │  │  ├─ store.ts             # Zustand store; socket wiring
 │  │  ├─ screens/             # Title, Lobby, Game
-│  │  ├─ components/          # Board, Tile, Piece, Card, Hand, Chat, DetectiveNotes, Dice, Envelope
+│  │  ├─ components/          # Board, Tile, Piece, Card, Hand, Chat, CaseNotes, Dice, Envelope
 │  │  └─ render/              # procedural SVG generators + override resolver
 │  └─ ...
 └─ assets/
@@ -225,8 +225,8 @@ on the layout visually before wiring movement to it.
   suite. No UI. *Done = `npm test` green for a scripted 3-player game.*
 - **M3 — Title + Lobby + networking.** Create/join by room code, 8 slots with OPEN/CLOSED/BOT,
   suspect picking, chat, host START. *Done = real cross-browser lobby.*
-- **M4 — Hand, Detective Notes, Chat in-game.** Hand viewer (flip/reorder), the 14-state
-  Detective Notes grid overlay, live chat. *Done = post-deal a player sees only their hand + notes.*
+- **M4 — Hand, Case Notes, Chat in-game.** Hand viewer (flip/reorder), the 14-state
+  Case Notes grid overlay, live chat. *Done = post-deal a player sees only their hand + notes.*
 - **M5 — Board layout + rendering.** Generate + render the 40-room mansion, pieces, weapon
   tokens, envelope space, start positions. *Done = board renders, pieces sit on start tiles.*
 - **M6 — Turn loop: movement.** Dice (3D CSS), reachable-tile highlighting, click-to-move,

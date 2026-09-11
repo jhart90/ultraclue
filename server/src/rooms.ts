@@ -56,7 +56,7 @@ export interface Room {
   lastLoggedSuggestion?: string; // dedup key for appending a resolved suggestion to the log below
   /** Every resolved suggestion (server truth, incl. the revealed card) — feeds bot deductions. */
   suggestionLog: LoggedSuggestion[];
-  /** Every player's private Detective Notes, keyed by player id, so they're in every save. */
+  /** Every player's private Case Notes, keyed by player id, so they're in every save. */
   notes: Record<string, string>;
   /** A freshly loaded game is paused (all seats are bots) until a human takes a seat. */
   paused?: boolean;
@@ -758,7 +758,7 @@ export function loadRoom(blob: unknown, loaderId: string, loaderName: string): R
     nextChatId: saved.nextChatId ?? 1,
     mirroredLogId: saved.mirroredLogId ?? 0,
     suggestionLog: saved.suggestionLog ?? [],
-    notes: saved.notes ?? {}, // restore everyone's Detective Notes from the snapshot
+    notes: saved.notes ?? {}, // restore everyone's Case Notes from the snapshot
     settings: saved.settings ?? { botDifficulty: DEFAULT_BOT_DIFFICULTY },
   };
   room.game!.code = room.code;

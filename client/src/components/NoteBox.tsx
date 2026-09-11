@@ -1,6 +1,6 @@
 import { memo, type CSSProperties } from 'react';
 
-// A single Detective-Notes cell. Clicking cycles through 15 fill states, in the order specified:
+// A single Case-Notes cell. Clicking cycles through 15 fill states, in the order specified:
 // 0 blank, 1 full, 2 X, 3-6 diagonal halves (UR, LR, LL, UL), 7-10 straight halves (top, right,
 // bottom, left), 11-14 quarters (UL, UR, LR, LL), then back to blank.
 export const NOTE_STATES = 15;

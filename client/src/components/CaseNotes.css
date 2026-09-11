@@ -1,4 +1,4 @@
-/* Bottom dock: two manila-folder drawers (Manor Map + Detective Notes). A persistent tab bar sits
+/* Bottom dock: two manila-folder drawers (Manor Map + Case Notes). A persistent tab bar sits
    at the screen bottom; clicking a tab slides that folder up over everything (above every pop-up).
    Only one folder is open at a time. */
 .dock__panel {
@@ -89,8 +89,8 @@
   transform: translateY(-2px);
 }
 
-/* Clickable header bar — clicking it closes the Detective Notes folder back down to its tab. */
-.dnotes__bar {
+/* Clickable header bar — clicking it closes the Case Notes folder back down to its tab. */
+.cnotes__bar {
   flex-shrink: 0;
   width: 100%;
   text-align: center;
@@ -105,10 +105,10 @@
   border-bottom: 2px solid #b1934b;
   cursor: pointer;
 }
-.dnotes__bar:hover {
+.cnotes__bar:hover {
   background: linear-gradient(180deg, #e3ce93, #d6bf80);
 }
-.dnotes__barclose {
+.cnotes__barclose {
   font-weight: 400;
   font-style: italic;
   font-size: 0.78rem;
@@ -117,7 +117,7 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
-   The sheet itself. Modelled on a printed detective's note pad: three pages (Suspects /
+   The sheet itself. Modelled on a printed case-notes pad: three pages (Suspects /
    Weapons / Rooms) laid on a dark, scuffed slate ground. Each page is parchment with a rounded
    title pill, one rotated column heading per seat (up to 40), and a ruled ink grid. Pages sit side
    by side while they fit and wrap into a stack once the table is wide. The body scrolls both ways;
@@ -246,13 +246,16 @@
 }
 
 /* --- rows ------------------------------------------------------------------------------------ */
+/* A row is one cell tall plus its 1px rule, so the cells sit above the rule rather than over it
+   (a shaded or tinted cell would otherwise paint the line out). */
 .notes__row {
   display: flex;
   align-items: stretch;
-  height: var(--cell);
+  height: calc(var(--cell) + 1px);
   border-bottom: 1px solid var(--line);
 }
 .notes__row:last-child {
+  height: var(--cell);
   border-bottom: none;
 }
 
@@ -321,15 +324,17 @@
   display: block;
 }
 
-/* sepia: every other block of five columns is shaded, as on the printed sheet */
-.notes__body--sepia .notes__boxes > :nth-child(10n + 6),
-.notes__body--sepia .notes__boxes > :nth-child(10n + 7),
-.notes__body--sepia .notes__boxes > :nth-child(10n + 8),
-.notes__body--sepia .notes__boxes > :nth-child(10n + 9),
-.notes__body--sepia .notes__boxes > :nth-child(10n + 10) {
+/* sepia, 10+ seats: every other block of five columns is shaded to help the eye along a wide row */
+.notes__body--sepia.notes__body--banded .notes__boxes > :nth-child(10n + 6),
+.notes__body--sepia.notes__body--banded .notes__boxes > :nth-child(10n + 7),
+.notes__body--sepia.notes__body--banded .notes__boxes > :nth-child(10n + 8),
+.notes__body--sepia.notes__body--banded .notes__boxes > :nth-child(10n + 9),
+.notes__body--sepia.notes__body--banded .notes__boxes > :nth-child(10n + 10) {
   background: var(--shade);
 }
-.notes__body--sepia .notes__phead--you {
+/* …but your own heading stays inked even inside a shaded block (as specific as the band rule, and
+   later, so it wins). */
+.notes__body .notes__boxes > .notes__phead.notes__phead--you {
   background: var(--ink);
 }
 

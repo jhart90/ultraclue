@@ -42,7 +42,7 @@ export const SOCKET_EVENTS = {
   TAKE_SEAT: 'takeSeat', // join an in-progress (loaded) game by taking over a bot/empty seat
   JOIN_OBSERVER: 'joinObserver', // join an in-progress game to watch only (not as a player)
   SET_ACCUSING: 'setAccusing', // a player opened/closed the accusation picker (warn the table)
-  SET_NOTES: 'setNotes', // client pushes its Detective Notes so they ride along in every save
+  SET_NOTES: 'setNotes', // client pushes its Case Notes so they ride along in every save
   SET_DICE: 'setDice', // a human picks the colours of their dice
   PUBLIC_STATS: 'publicStats', // ask for the public table's history + all-time numbers (answered via ack)
   PLAYER_PROFILE: 'playerProfile', // look up the long-term profile for a name + optional PIN (answered via ack)
@@ -52,7 +52,7 @@ export const SOCKET_EVENTS = {
   LOBBY: 'lobby',
   CHAT: 'chat', // broadcast of the full chat list; works in both lobby and in-game
   GAME_STARTED: 'gameStarted',
-  NOTES: 'notes', // server hands a player the Detective Notes for the seat they hold
+  NOTES: 'notes', // server hands a player the Case Notes for the seat they hold
   REJOIN_FAILED: 'rejoinFailed', // the saved seat is gone; client should reset to the title
   SAVE_GAME_DATA: 'saveGameData', // a snapshot to stash in browser storage (manual save / auto-save)
   ERROR: 'errorMsg',
@@ -185,7 +185,7 @@ export interface SetDicePayload {
   pips: string;
 }
 export interface SetNotesPayload {
-  /** Serialized Detective Notes (the localStorage JSON) for this player's seat. */
+  /** Serialized Case Notes (the localStorage JSON) for this player's seat. */
   notes: string;
 }
 export interface NotesPayload {

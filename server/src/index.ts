@@ -313,7 +313,7 @@ function recordSuggestion(room: Room): void {
     revealedCardId: revealed ? sg.revealedCardId : undefined,
   });
 }
-/** Refresh every bot's Detective Notes sheet from its current deduction, stored under its seat (so
+/** Refresh every bot's Case Notes sheet from its current deduction, stored under its seat (so
  *  the notes ride along in saves and a human taking over a bot inherits its reasoning). */
 function updateBotNotes(room: Room): void {
   const g = room.game;
@@ -344,7 +344,7 @@ function whisperReveal(room: Room): void {
   addChat(room, '', `${responder} reveals ${card} to ${suggester}.`, false, [sg.responderId, sg.suggesterId], true);
 }
 
-/** Hand a player the saved Detective Notes for the seat they hold (on resume / rejoin / takeover). */
+/** Hand a player the saved Case Notes for the seat they hold (on resume / rejoin / takeover). */
 function sendNotes(socket: Socket, room: Room, id: string): void {
   const notes = room.notes?.[id];
   if (notes) socket.emit(SOCKET_EVENTS.NOTES, { notes });
@@ -470,7 +470,7 @@ function progress(room: Room): void {
     }
   }
   recordSuggestion(room); // log a resolved suggestion so every bot can deduce from it
-  updateBotNotes(room); // refresh each bot's Detective Notes from its latest deduction
+  updateBotNotes(room); // refresh each bot's Case Notes from its latest deduction
   mirrorLog(room, deferChat(room)); // fold new game events into the chat feed
   armTurnTimer(room); // public: (re)start the 90s clock for whichever human the table waits on
   broadcastGame(room);
@@ -1139,7 +1139,7 @@ io.on('connection', (socket) => {
     else emitLobby(room);
   });
 
-  // A player's Detective Notes changed — keep the server copy current so every save carries them.
+  // A player's Case Notes changed — keep the server copy current so every save carries them.
   socket.on(SOCKET_EVENTS.SET_NOTES, (p: SetNotesPayload) => {
     const room = findRoomByOccupant(cid(socket));
     if (!room || typeof p?.notes !== 'string') return;

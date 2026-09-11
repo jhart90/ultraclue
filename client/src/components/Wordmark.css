@@ -18,6 +18,7 @@
 .wordmark--lg {
   display: block;
   margin: 0 auto;
-  width: clamp(280px, 60vw, 560px);
+  width: clamp(470px, 90vw, 940px);
+  max-width: 100%;
   height: auto;
 }

@@ -91,7 +91,9 @@
 .title__h1 {
   font-size: 3.4rem;
   letter-spacing: 0.12em;
-  margin: 0.2rem 0 0;
+  /* The logo art is cropped tight, so its bottom edge is the blood drop, which then sits just
+     above the tagline (.title__tag's small top margin is the whole gap). */
+  margin: 5.25rem 0 0;
   color: var(--accent, #c8a24a);
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
 }

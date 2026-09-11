@@ -1,4 +1,4 @@
-import wordmark from '../../../ultra_clue_wordmark.png';
+import wordmark from '../../../40_alibis_wordmark_black_transparent.png';
 import './CardBack.css';
 
 /** The back of a card: the Ultra Clue wordmark on a maroon playing-card lattice. */

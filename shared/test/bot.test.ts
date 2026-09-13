@@ -262,6 +262,32 @@ describe('bots read the table', () => {
     expect(said.length).toBeGreaterThan(0);
     expect(said.every((t) => t === copied.join('|'))).toBe(true);
   });
+
+  /** A Bluffer of the given tier with `suspects` still open (weapon and room pinned) and a rival's
+   *  undisproved trio on the table: how many times in 100 rolls it copies that trio. */
+  const copies = (difficulty: BotMind['difficulty'], suspects: number) => {
+    const copied = ['suspect-dijon', 'weapon-rope', 'room-study'];
+    const m = mind({ difficulty, persona: BOT_PERSONAS.bluffer, events: [tellFrom('A', copied)] });
+    for (const s of SUSPECTS.slice(0, suspects)) m.k.ruledOut.delete(s.id);
+    const rng = makeRng(11);
+    let n = 0;
+    for (let i = 0; i < 100; i++) {
+      const acc = botDecideAccusation(m, rng);
+      if (acc && [acc.suspectId, acc.weaponId, acc.roomId].join('|') === copied.join('|')) n++;
+    }
+    return n;
+  };
+
+  it('a hard Bluffer only trusts a copied trio once its own field is down to ten', () => {
+    expect(copies('hard', 10)).toBeGreaterThan(0);
+    expect(copies('hard', 12)).toBe(0);
+  });
+
+  it('a medium Bluffer trusts a copied trio on longer odds than a hard one', () => {
+    expect(copies('medium', 12)).toBeGreaterThan(0);
+    expect(copies('medium', 30)).toBeGreaterThan(0);
+    expect(copies('medium', 40)).toBe(0);
+  });
 });
 
 describe('bots learn from a failed accusation', () => {

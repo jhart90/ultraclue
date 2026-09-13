@@ -82,6 +82,11 @@ const PATIENT_ROUNDS = 6; // rounds an impatient persona sits through before its
 const RACE_GATE = 0.6; // no swinging wildly until the threat is real...
 const RACE_MAX_COMBOS = 60; // ...and never on odds so long that accusing just hands the seat away
 const MIN_ODDS = 1 / 40; // however impatient, no bot accuses on worse than this
+// A copied trio is only as good as the field it lands in: a medium or hard bot will not swallow a
+// rival's undisproved suggestion while its own open trios still number more than this allows, and
+// the hard tier wants a tighter field still before it trusts one. The easy tier never reaches the
+// copycat branch, so its entry is moot.
+const COPYCAT_MIN_ODDS: Record<BotDifficulty, number> = { easy: 0, medium: 1 / 30, hard: 1 / 10 };
 // Global balance dial on top of every persona's own nerve: each one holds out for this much better
 // odds than its dials alone would ask, and takes the wild routes (racing, copying) proportionally
 // less often. Raise it to calm the whole table down, lower it to wind everyone up.
@@ -430,8 +435,9 @@ export function botDecideAccusation(m: BotMind, rng: RNG): BotAccusation | null 
   if (combos <= 0) return null;
 
   // Somebody just floated a trio nobody could disprove: a copycat takes it at face value, which is
-  // as often a bluff swallowed whole as it is a solution stolen.
-  if (P.copycatChance > 0 && rng() < P.copycatChance / CAUTION) {
+  // as often a bluff swallowed whole as it is a solution stolen — but only once its own field has
+  // narrowed enough for the copy to be a real shot rather than a first-turn guess.
+  if (P.copycatChance > 0 && 1 / combos >= COPYCAT_MIN_ODDS[m.difficulty] && rng() < P.copycatChance / CAUTION) {
     const copy = copycatTrio(m, refuted);
     if (copy) return copy;
   }

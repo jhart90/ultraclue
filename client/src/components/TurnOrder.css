@@ -11,6 +11,23 @@
   background: #2a2245;
 }
 
+/* The invisible, unrotated copy of every chip that TurnOrder measures (see turnOrderLayout.ts). It
+   takes no room in the strip and keeps the strip's gap so chip spacing measures true. */
+.po-measure {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  gap: inherit;
+}
+.po-measure__row {
+  display: flex;
+  width: max-content;
+  gap: inherit;
+}
+
 /* Full roster overlay — the lobby's seat rows, in turn order. */
 .roster__backdrop {
   position: fixed;

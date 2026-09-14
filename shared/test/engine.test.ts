@@ -205,6 +205,23 @@ describe('accusations', () => {
     expect(state.turnOrder[state.activeIdx]).toBe('p2'); // skipped the eliminated player
   });
 
+  // The redistribution animation replays who got each card, and finds a viewer's new cards by
+  // comparing hands before and after: the new cards are appended in the order they were dealt.
+  it('records who received each redistributed card, in the order they were dealt', () => {
+    const st = baseState();
+    st.players[0].hand = ['weapon-dagger', 'weapon-pillow', 'suspect-mulberry'];
+    st.players[1].hand = ['room-library'];
+    st.players[2].hand = ['suspect-violet'];
+
+    const { state } = makeAccusation(st, 'p1', 'suspect-valentine', 'weapon-rope', 'room-study', makeRng(3));
+    expect(state.redeal).toEqual({ seq: state.announcement!.seq, fromId: 'p1', recipients: ['p2', 'p3', 'p2'] });
+    expect(state.players[1].hand).toHaveLength(3);
+    expect(state.players[1].hand[0]).toBe('room-library');
+    expect(state.players[2].hand).toHaveLength(2);
+    expect(state.players[2].hand[0]).toBe('suspect-violet');
+    expect(viewFor(state, 'p3').redeal).toEqual(state.redeal);
+  });
+
   it('awards the win by default when elimination leaves one player', () => {
     const st: GameState = {
       code: 'T',

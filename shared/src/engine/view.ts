@@ -67,6 +67,7 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     yourHand: getPlayer(state, viewerId)?.hand ?? [],
     currentSuggestion,
     announcement: state.announcement,
+    redeal: state.redeal,
     // Elimination only ever follows a wrong accusation (makeAccusation), so an eliminated viewer is
     // the accuser who has earned a look; their client turns the three cards over for them alone.
     envelope: state.phase === 'ended' || getPlayer(state, viewerId)?.eliminated ? state.envelope : undefined,

@@ -89,8 +89,14 @@ export function makeAccusation(
   const hand = shuffle(accuser.hand, rng);
   accuser.hand = [];
   const recipients = activePlayers(s);
+  /** Who got each card, in the order they were dealt: every screen replays the redistribution. */
+  const dealtTo: string[] = [];
   if (recipients.length > 0) {
-    hand.forEach((cardId, i) => recipients[i % recipients.length].hand.push(cardId));
+    hand.forEach((cardId, i) => {
+      const to = recipients[i % recipients.length];
+      to.hand.push(cardId);
+      dealtTo.push(to.id);
+    });
     if (hand.length > 0) {
       log(s, `Their ${hand.length} cards are shuffled and redistributed to the remaining players.`);
     }
@@ -105,6 +111,7 @@ export function makeAccusation(
     return { state: s, correct: false };
   }
 
+  if (dealtTo.length > 0) s.redeal = { seq: s.announcement?.seq ?? 0, fromId: accuserId, recipients: dealtTo };
   concludeTurn(s, rng);
   return { state: s, correct: false };
 }

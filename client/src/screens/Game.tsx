@@ -22,6 +22,7 @@ import { soundEnabled, setSoundEnabled } from '../util/sound';
 import { contrastInk } from '../render/colorUtils';
 import { highlightChat } from '../util/highlightChat';
 import { OpeningDeal } from '../components/OpeningDeal';
+import { Redeal, REDEAL_FILM_MS } from '../components/Redeal';
 import './Game.css';
 
 /** A screen that arrives this soon after a game began still plays the opening deal from the top;
@@ -265,6 +266,72 @@ function GameTable() {
     });
   }, [game?.announcement?.seq, game?.phase, game?.envelope, game?.winnerId, game?.players, myId]);
 
+  // ---- a wrong accuser's cards, redistributed ----
+  // After the envelope reveal every screen watches the eliminated player's cards gathered into one
+  // deck, shuffled, and dealt round the players still in (Redeal); cards coming to you turn face up
+  // and slot into your fan. Only a redistribution that arrives while this screen is up is played.
+  const [redeal, setRedeal] = useState<{
+    seq: number;
+    /** Local Date.now() when it starts: as soon as this screen's envelope reveal is over. */
+    startAt: number;
+    fromId: string;
+    fromName: string;
+    recipients: string[];
+    /** The cards you already held and keep. */
+    baseHand: string[];
+    /** The cards coming to you, in the order they are dealt. */
+    newCards: string[];
+    /** Your own hand, when it is yours being redistributed: gathered up out of your fan first. */
+    gatherHand: string[];
+  } | null>(null);
+  const [redealLanded, setRedealLanded] = useState(0);
+  const [redealGathered, setRedealGathered] = useState(false);
+  const redealSeqRef = useRef(game?.redeal?.seq ?? 0);
+  /** When the redistribution now playing will be over: the next turn's flash waits for it too. */
+  const redealUntilRef = useRef(0);
+  /** Your hand as of the previous view, to tell which cards a redistribution brought you. */
+  const handBeforeRef = useRef<string[]>(game?.yourHand ?? []);
+  useEffect(() => {
+    const before = handBeforeRef.current;
+    handBeforeRef.current = game?.yourHand ?? [];
+    const r = game?.redeal;
+    if (!game || !r || r.seq === redealSeqRef.current) return;
+    redealSeqRef.current = r.seq;
+    if (game.phase !== 'play' || r.recipients.length === 0) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    // It follows this screen's envelope reveal, which the effect above has just timed.
+    const startAt = Math.max(Date.now(), revealUntilRef.current);
+    redealUntilRef.current = startAt + REDEAL_FILM_MS;
+    const yours = r.fromId === myId;
+    setRedealLanded(0);
+    setRedealGathered(false);
+    setRedeal({
+      seq: r.seq,
+      startAt,
+      fromId: r.fromId,
+      fromName: game.players.find((p) => p.id === r.fromId)?.name ?? 'The accuser',
+      recipients: r.recipients,
+      baseHand: yours ? [] : before.filter((c) => game.yourHand.includes(c)),
+      newCards: yours ? [] : game.yourHand.filter((c) => !before.includes(c)),
+      gatherHand: yours ? before : [],
+    });
+  }, [game?.redeal?.seq, game?.yourHand, myId]);
+
+  // The hand as it should show right now: filling card by card during the opening deal; during a
+  // redistribution, the cards you kept plus those landed so far — or, when it is your hand being
+  // redistributed, your old hand until it has been gathered up.
+  const handNow = game?.yourHand ?? [];
+  const handIds = dealFilm
+    ? handNow.slice(0, dealtToMe)
+    : redeal
+      ? redeal.gatherHand.length > 0
+        ? redealGathered
+          ? []
+          : redeal.gatherHand
+        : [...redeal.baseHand, ...redeal.newCards.slice(0, redealLanded)]
+      : handNow;
+  const handAnimating = dealFilm || !!redeal;
+
   // Floating notices — the "<name>'s turn" flash and each new event card's toast — share one spot
   // over the board. A new notice goes on top and pushes whatever is still showing down a row, so
   // two never overlap; each leaves on its own timer.
@@ -341,7 +408,8 @@ function GameTable() {
     // A turn that opens with an accusation (a wrong one ends the accuser's turn in the same update)
     // is announced only once the envelope reveal has finished playing.
     // Turn 1 likewise waits for the opening deal.
-    const gap = TURN_GAP_MS + Math.max(0, revealUntilRef.current - Date.now(), dealUntilRef.current - Date.now());
+    // …and a turn that follows a redistribution waits for that too.
+    const gap = TURN_GAP_MS + Math.max(0, revealUntilRef.current - Date.now(), dealUntilRef.current - Date.now(), redealUntilRef.current - Date.now());
     flashAtRef.current = Date.now() + gap;
     // Dice still resting from the previous turn fade out as this one begins — and are gone before
     // this turn's own roll (which waits out the flash) lands.
@@ -693,12 +761,12 @@ function GameTable() {
         {observer ? (
           <div className="game__observing">👁 Observer Mode — watching the game. You hold no cards and make no moves.</div>
         ) : fan ? (
-          // While the deal plays your hand fills as each card lands; the deal flies them in itself.
-          <HandFan cardIds={dealFilm ? game.yourHand.slice(0, dealtToMe) : game.yourHand} entrance={!dealFilm} />
+          // While a deal or a redistribution plays, the cards fly in (and out) by themselves.
+          <HandFan cardIds={handIds} entrance={!handAnimating} />
         ) : (
           <div className="game__handwrap">
-            <div className="game__handlabel">Your hand · {dealFilm ? dealtToMe : (me?.handCount ?? game.yourHand.length)} cards</div>
-            <Hand cardIds={dealFilm ? game.yourHand.slice(0, dealtToMe) : game.yourHand} />
+            <div className="game__handlabel">Your hand · {handAnimating ? handIds.length : (me?.handCount ?? game.yourHand.length)} cards</div>
+            <Hand cardIds={handIds} />
           </div>
         )}
       </div>
@@ -870,6 +938,25 @@ function GameTable() {
       )}
       {deal && !deal.film && dealing && <div className="deal-hold">The cards are being dealt…</div>}
 
+      {redeal && (
+        <Redeal
+          // Its own key: the accusation reveal beside it is keyed by the same announcement seq.
+          key={`redeal-${redeal.seq}`}
+          startAt={redeal.startAt}
+          seats={game.players.map((p) => ({ id: p.id }))}
+          myId={observer ? null : myId}
+          fromId={redeal.fromId}
+          fromName={redeal.fromName}
+          recipients={redeal.recipients}
+          baseHand={redeal.baseHand}
+          newCards={redeal.newCards}
+          gatherHand={redeal.gatherHand}
+          onGathered={() => setRedealGathered(true)}
+          onDealtToMe={setRedealLanded}
+          onDone={() => setRedeal(null)}
+        />
+      )}
+
       {accFlow && accFlow.revealing && (
         <AccusationReveal
           key={accFlow.ann.seq}
@@ -885,7 +972,8 @@ function GameTable() {
           }
         />
       )}
-      {accFlow && !accFlow.revealing && (
+      {/* A wrong accuser's verdict panel waits until their cards have been redistributed. */}
+      {accFlow && !accFlow.revealing && !redeal && (
         <AccusationFlow
           key={accFlow.ann.seq}
           announcement={accFlow.ann}

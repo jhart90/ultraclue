@@ -87,6 +87,12 @@ export interface Room {
    *  may act, the computers and the public clock wait, and the opening narration stays out of the
    *  chat. Never saved, so a loaded game carries straight on. */
   dealUntil?: number;
+  /** When the table may move on after the latest accusation: its envelope reveal, plus the
+   *  redistribution of a wrong accuser's cards when there was one. Bots and the public clock wait. */
+  accusationHoldUntil?: number;
+  /** While a wrong accuser's cards are being redistributed on screen, turn intents are refused until
+   *  this time. Unset when the latest accusation redistributed nothing. */
+  redealUntil?: number;
   /** SERVER-ONLY: each human occupant's long-term profile id (from their name + optional PIN),
    *  keyed by occupant id. Never part of a lobby view, game view, or save. */
   profileIds?: Record<string, string>;

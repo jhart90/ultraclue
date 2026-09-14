@@ -25,6 +25,10 @@ export const ACCUSATION_ANIM_MS = 16_400;
  *  keeps the opening narration out of the chat until it is over. Keep in step with the client's
  *  OpeningDeal storyboard, which must finish inside it. */
 export const DEAL_ANIM_MS = 20_000;
+/** How long a wrong accuser's cards take to be redistributed on screen, after the accusation reveal:
+ *  gathered into one deck, shuffled, and dealt round the players still in. The table waits for it
+ *  as it waits for the opening deal. Keep in step with the client's Redeal storyboard. */
+export const REDEAL_ANIM_MS = 10_000;
 /** Public games: a human on the clock has this long to act before the turn is passed for them. */
 export const PUBLIC_TURN_MS = 90_000;
 
@@ -133,6 +137,16 @@ export interface LogEntry {
   id: number;
   text: string;
   card?: LogCard;
+}
+
+/** A wrong accuser's hand as it was redistributed, so every screen can replay it. `recipients[i]` is
+ *  the player who got the i-th card of the shuffled hand (round-robin over the players still in);
+ *  each recipient's new cards are appended to their hand in that order. Which card went where stays
+ *  hidden — a player learns only their own. `seq` is the accusation's announcement seq. */
+export interface Redistribution {
+  seq: number;
+  fromId: string;
+  recipients: string[];
 }
 
 /** A suggestion or accusation just made — broadcast so every client can pop up the three cards. */
@@ -256,6 +270,8 @@ export interface GameState {
   envelope: Envelope;
   currentSuggestion?: Suggestion;
   announcement?: Announcement;
+  /** The latest redistribution of an eliminated player's hand (see Redistribution). */
+  redeal?: Redistribution;
   winnerId?: string;
   /** Tallies for the details screen (absent on games saved before they were tracked). */
   stats?: GameStats;
@@ -344,6 +360,8 @@ export interface GameView {
   yourHand: string[];
   currentSuggestion?: SuggestionView;
   announcement?: Announcement;
+  /** The latest redistribution of an eliminated player's hand (see Redistribution). */
+  redeal?: Redistribution;
   /** Only present once the game has ended. */
   envelope?: Envelope;
   winnerId?: string;

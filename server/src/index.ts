@@ -12,6 +12,7 @@ import {
   TURN_FLASH_MS,
   TURN_GAP_MS,
   ACCUSATION_ANIM_MS,
+  REDEAL_ANIM_MS,
   PUBLIC_TURN_MS,
   BOT_SPEED_PACE,
   BOT_SPEED_PASS_PACE,
@@ -193,10 +194,13 @@ const botDelay = (room: Room): number => (room.isPublic ? PUBLIC_BOT_DELAY : BOT
 function botWait(room: Room): number {
   const rollEnds = (room.lastRollAt ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS + 400;
   // …and an accusation's envelope reveal, which every screen plays before the next turn is shown.
-  const revealEnds = (room.lastAccusationAt ?? 0) + ACCUSATION_ANIM_MS + 400;
-  // …and a new game's opening deal, after which turn 1's opening roll plays out like any other.
+  // (including the redistribution of a wrong accuser's cards that follows it)
+  const revealEnds = (room.accusationHoldUntil ?? 0) + 400;
+  // …and a new game's opening deal or a redistribution, after either of which the next turn's opening
+  // roll plays out like any other.
   const dealEnds = (room.dealUntil ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS + 400;
-  return Math.max(botDelay(room), rollEnds - Date.now(), revealEnds - Date.now(), dealEnds - Date.now());
+  const redealEnds = (room.redealUntil ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS + 400;
+  return Math.max(botDelay(room), rollEnds - Date.now(), revealEnds - Date.now(), dealEnds - Date.now(), redealEnds - Date.now());
 }
 /** A bot answering a suggestion: the usual pause, but a bot with nothing to show answers much
  *  faster on the Fast setting (there's nothing to think about). Always at least a second, so a
@@ -457,6 +461,10 @@ function withGame(socket: Socket, fn: (room: Room, g: GameState) => GameState): 
     emitError(socket, 'The cards are still being dealt.');
     return;
   }
+  if (room.redealUntil !== undefined && Date.now() < room.redealUntil) {
+    emitError(socket, 'The cards are still being redistributed.');
+    return;
+  }
   try {
     room.game = fn(room, room.game);
     progress(room);
@@ -482,6 +490,11 @@ function progress(room: Room): void {
   if (ann?.kind === 'accusation' && room.lastAccusationSeq !== ann.seq) {
     room.lastAccusationSeq = ann.seq;
     room.lastAccusationAt = Date.now();
+    // A wrong accuser's cards redistributed: every screen plays that once the reveal is over, and
+    // nobody moves until it has.
+    const redealt = g.phase === 'play' && g.redeal?.seq === ann.seq;
+    room.accusationHoldUntil = room.lastAccusationAt + ACCUSATION_ANIM_MS + (redealt ? REDEAL_ANIM_MS : 0);
+    room.redealUntil = redealt ? room.accusationHoldUntil : undefined;
   }
   if (g.phase === 'ended' && ann?.kind === 'accusation' && ann.correct && room.winAnnounced !== ann.seq) {
     room.winAnnounced = ann.seq;
@@ -838,7 +851,7 @@ function armTurnTimer(room: Room): void {
   // …and turn 1 gets its full time once the opening deal and its opening roll have played.
   const hold = Math.max(
     0,
-    (room.lastAccusationAt ?? 0) + ACCUSATION_ANIM_MS - Date.now(),
+    (room.accusationHoldUntil ?? 0) - Date.now(), // the reveal, and any redistribution after it
     (room.dealUntil ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS - Date.now(),
   );
   room.turnDeadline = Date.now() + hold + PUBLIC_TURN_MS;

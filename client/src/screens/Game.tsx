@@ -534,7 +534,8 @@ export function Game() {
 
           {showBar && (
           <div className="game__controls game__controls--mine" style={barStyle}>
-            {game.lastRoll && !suggestionPending && <Dice values={game.lastRoll} />}
+            {/* Standing in a room with Suggest / Accuse / End Turn up, the roll is spent: no dice. */}
+            {game.lastRoll && !suggestionPending && !(game.turnPhase === 'postMove' && me?.inRoomId) && <Dice values={game.lastRoll} />}
             {revealedCard && (
               <div className="game__revealed" title="A card was revealed only to you">
                 <span className="game__revealedlbl">Shown to you:</span>

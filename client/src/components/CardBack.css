@@ -86,3 +86,12 @@
 .cardback--xs .cardback__mark {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85));
 }
+/* A back that opens in the card viewer on a click, like a zoomable face. */
+.cardback--zoomable {
+  cursor: zoom-in;
+}
+.cardback--zoomable:hover,
+.cardback--zoomable:focus-visible {
+  filter: brightness(1.12);
+  outline: none;
+}

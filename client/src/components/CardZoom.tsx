@@ -1,17 +1,24 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
-import type { AnyCard } from 'shared';
+import type { AnyCard, CardBackId } from 'shared';
 import { Card } from './Card';
+import { CardBack } from './CardBack';
+import { CARD_BACK_LABEL } from '../render/cardBacks';
 import './CardZoom.css';
 
 // One app-wide "look closer" pop-up. Any card drawn anywhere (gallery, hand, pop-ups, chat log)
 // opens here at the largest size the viewport allows — the override art is 900px square, so this
 // is where it's actually seen at full resolution. Opened with a list, it also pages prev/next.
+// A face-down card opens here too, as its back design.
+
+/** Something the viewer can show: a card face, or a card back by design. */
+export type ZoomItem = AnyCard | { back: CardBackId };
+const isBack = (item: ZoomItem): item is { back: CardBackId } => 'back' in item;
 
 interface ZoomState {
-  cards: AnyCard[];
+  cards: ZoomItem[];
   index: number;
-  open: (cards: AnyCard | AnyCard[], index?: number) => void;
+  open: (cards: ZoomItem | ZoomItem[], index?: number) => void;
   step: (delta: number) => void;
   close: () => void;
 }
@@ -29,7 +36,9 @@ export const useCardZoom = create<ZoomState>((set, get) => ({
 }));
 
 /** Open the zoom pop-up on a card (or on a list of cards, starting at `index`). */
-export const openCardZoom = (cards: AnyCard | AnyCard[], index = 0) => useCardZoom.getState().open(cards, index);
+export const openCardZoom = (cards: ZoomItem | ZoomItem[], index = 0) => useCardZoom.getState().open(cards, index);
+/** Open the zoom pop-up on a card back. */
+export const openCardBackZoom = (back: CardBackId) => useCardZoom.getState().open({ back });
 
 // The card is authored at 200×306; scale it to fill ~90% of the viewport's tighter dimension.
 const CARD_W = 200;
@@ -69,9 +78,10 @@ export function CardZoomOverlay() {
   }, [card, many, close, step]);
 
   if (!card) return null;
+  const label = isBack(card) ? `${CARD_BACK_LABEL[card.back]} card back` : `${card.title} card`;
 
   return (
-    <div className="cardzoom" onClick={close} role="dialog" aria-modal="true" aria-label={`${card.title} card`}>
+    <div className="cardzoom" onClick={close} role="dialog" aria-modal="true" aria-label={label}>
       <button className="cardzoom__x" onClick={close} aria-label="Close">
         ✕
       </button>
@@ -89,7 +99,7 @@ export function CardZoomOverlay() {
           </button>
         )}
         <div className="cardzoom__card" style={{ zoom }} onClick={(e) => e.stopPropagation()}>
-          <Card card={card} zoomable={false} hiRes />
+          {isBack(card) ? <CardBack back={card.back} /> : <Card card={card} zoomable={false} hiRes />}
         </div>
         {many && (
           <button

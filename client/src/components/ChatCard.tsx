@@ -121,7 +121,7 @@ export function ChatCard({
       <div className={`chatcard chatcard--reveal${shown ? ' chatcard--private' : ''}`}>
         <div className="chatcard__caption">{caption}</div>
         <div className="chatcard__trio">
-          {shown ? <Mini id={shown.id} /> : <span className="chatcard__mini chatcard__mini--back"><CardBack small /></span>}
+          {shown ? <Mini id={shown.id} /> : <span className="chatcard__mini chatcard__mini--back"><CardBack small zoomable /></span>}
           {shown && <span className="chatcard__note">Only you two can see which card.</span>}
         </div>
       </div>

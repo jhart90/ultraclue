@@ -238,7 +238,10 @@ export function OpeningDeal(props: OpeningDealProps) {
 
     const running: Animation[] = [];
     const play = (el: Element | null | undefined, frames: Keyframe[], duration: number, opts: KeyframeAnimationOptions = {}) => {
-      if (el) running.push(el.animate(frames, { duration, fill: 'forwards', ...opts }));
+      if (!el) return undefined;
+      const anim = el.animate(frames, { duration, fill: 'forwards', ...opts });
+      running.push(anim);
+      return anim;
     };
 
     /** A beat: `run` does the motion and sound (told when it is running late, to keep quiet);
@@ -277,8 +280,9 @@ export function OpeningDeal(props: OpeningDealProps) {
     }
 
     // ---- the envelope arrives open and takes the top card of each deck ----
+    let envSwoop: Animation | undefined;
     at(T.envIn, (late) => {
-      play(
+      envSwoop = play(
         envEl,
         [
           { opacity: 0, transform: 'translate(-110%, -90%) rotate(-24deg) scale(0.3)' },
@@ -290,6 +294,13 @@ export function OpeningDeal(props: OpeningDealProps) {
         { easing: 'cubic-bezier(0.22, 0.9, 0.3, 1)' },
       );
       cue(late, playEnvelopeWhoosh);
+    });
+    // Landed, the envelope must stop being a layer of its own (an animation holding its opacity and
+    // transform makes it one), so its pieces stack with the decks: the open flap under the decks, the
+    // card dropping in over them, and the pocket's front over that card.
+    at(T.envIn + T.envInDur, () => {
+      envSwoop?.cancel();
+      if (envEl) envEl.style.opacity = '1';
     });
     tucks.forEach((el, i) =>
       at(T.tuck + i * T.tuckGap, (late) => {
@@ -311,7 +322,9 @@ export function OpeningDeal(props: OpeningDealProps) {
 
     // ---- closed, sealed, stamped ----
     at(T.close, (late) => {
-      play(flap, [{ transform: 'rotateX(176deg)' }, { transform: 'rotateX(0deg)' }], T.closeDur, { easing: 'ease-in-out' });
+      // The perspective rides in the flap's own transform: one on a parent would make a layer again.
+      const hinge = `perspective(${env.w * 2}px)`;
+      play(flap, [{ transform: `${hinge} rotateX(176deg)` }, { transform: `${hinge} rotateX(0deg)` }], T.closeDur, { easing: 'ease-in-out' });
       play(flapShadow, [{ opacity: 0 }, { opacity: 1 }], 300, { delay: T.closeDur * 0.55 });
       cue(late, playPaperFlap);
     });
@@ -369,6 +382,7 @@ export function OpeningDeal(props: OpeningDealProps) {
       const box = root.getBoundingClientRect();
       const from = { x: env.x + env.w / 2, y: env.y + env.h / 2 };
       const slot = boardEnvelopeSlot(box);
+      if (envEl) envEl.style.zIndex = '30'; // sealed now, it flies over the decks
       cue(late, playEnvelopeWhoosh);
       if (slot) {
         const dx = slot.x - from.x;
@@ -623,7 +637,7 @@ export function OpeningDeal(props: OpeningDealProps) {
             data-env=""
             style={{ left: geo.env.x, top: geo.env.y, width: geo.env.w, height: geo.env.h }}
           >
-            <div className="odeal__envin" data-envin="" style={{ perspective: geo.env.w * 2 }}>
+            <div className="odeal__envin" data-envin="">
               <div className="odeal__l odeal__tucks">
                 {SLOT_LEFT.map((left, i) => (
                   <div key={i} className="odeal__tuck" data-tuck="" style={{ left: geo.env.w * left, top: geo.env.h * SLOT_TOP, width: geo.cw }}>
@@ -640,7 +654,7 @@ export function OpeningDeal(props: OpeningDealProps) {
               <svg className="odeal__l odeal__flapshadow" data-flapshadow="" viewBox={VB} xmlns="http://www.w3.org/2000/svg">
                 <EnvelopeFlapShadow idPrefix="odeal" />
               </svg>
-              <div className="odeal__l odeal__flap" data-flap="">
+              <div className="odeal__l odeal__flap" data-flap="" style={{ transform: `perspective(${geo.env.w * 2}px) rotateX(176deg)` }}>
                 <svg viewBox={VB} xmlns="http://www.w3.org/2000/svg">
                   <EnvelopeFlap idPrefix="odeal" stamp="CLASSIFIED" />
                 </svg>

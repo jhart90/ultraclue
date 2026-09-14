@@ -138,8 +138,8 @@
 .dock__pop:hover {
   background: linear-gradient(180deg, #e6cf92 0%, #d3ba7a 100%);
 }
-.dock__tabset .dock__tab {
-  border-top-right-radius: 0;
+.dock__tabset .dock__tab:not(:last-child) {
+  border-top-right-radius: 0; /* squared against its pop-out stub (no stub in the itch.io embed) */
 }
 .game--fan .dock__pop {
   padding: 0.45rem 0.45rem;

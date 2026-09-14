@@ -6,6 +6,7 @@ import { DiceOverlay, DICE_FADE_MS, type DiceRollShow } from '../components/Dice
 import { DiceSettings } from '../components/DiceSettings';
 import { CardBackSettings } from '../components/CardBackSettings';
 import { PopOut, usePopOut } from '../components/PopOut';
+import { onItch } from '../util/embed';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
 import { HandFan } from '../components/HandFan';
@@ -834,14 +835,17 @@ function GameTable() {
           >
             <span className="dock__tabicon">🗺️</span> <span className="dock__tablabel">Manor Map</span>
           </button>
-          <button
-            className="dock__pop"
-            title={mapOut ? 'Bring the map back into this window' : 'Open the map in its own window'}
-            aria-label={mapOut ? 'Bring the map back into this window' : 'Open the map in its own window'}
-            onClick={() => (mapOut ? setMapOut(false) : popOut('map'))}
-          >
-            {mapOut ? '⇲' : '⧉'}
-          </button>
+          {/* No pop-out windows inside the itch.io embed: its player frame can block them. */}
+          {!onItch && (
+            <button
+              className="dock__pop"
+              title={mapOut ? 'Bring the map back into this window' : 'Open the map in its own window'}
+              aria-label={mapOut ? 'Bring the map back into this window' : 'Open the map in its own window'}
+              onClick={() => (mapOut ? setMapOut(false) : popOut('map'))}
+            >
+              {mapOut ? '⇲' : '⧉'}
+            </button>
+          )}
         </span>
         {!observer && (
           <span className="dock__tabset">
@@ -855,14 +859,16 @@ function GameTable() {
             >
               <span className="dock__tabicon">📓</span> <span className="dock__tablabel">Case Notes</span>
             </button>
-            <button
-              className="dock__pop"
-              title={notesOut ? 'Bring your notes back into this window' : 'Open your notes in their own window'}
-              aria-label={notesOut ? 'Bring your notes back into this window' : 'Open your notes in their own window'}
-              onClick={() => (notesOut ? setNotesOut(false) : popOut('notes'))}
-            >
-              {notesOut ? '⇲' : '⧉'}
-            </button>
+            {!onItch && (
+              <button
+                className="dock__pop"
+                title={notesOut ? 'Bring your notes back into this window' : 'Open your notes in their own window'}
+                aria-label={notesOut ? 'Bring your notes back into this window' : 'Open your notes in their own window'}
+                onClick={() => (notesOut ? setNotesOut(false) : popOut('notes'))}
+              >
+                {notesOut ? '⇲' : '⧉'}
+              </button>
+            )}
           </span>
         )}
       </div>

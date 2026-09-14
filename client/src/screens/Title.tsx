@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { PIN_LENGTH, PIN_RE } from 'shared';
 import { useStore, initialJoinCode, savedName } from '../store';
 import { Wordmark } from '../components/Wordmark';
@@ -71,6 +71,12 @@ export function Title() {
   const rollTableBack = useStore((s) => s.rollTableBack);
   // A new card back each time the title screen comes up, for the scatter here and any game after.
   useEffect(() => rollTableBack(), [rollTableBack]);
+  // The title screen always opens scrolled to the top, even if the menu then runs off the bottom.
+  // Screens swap without a page load, so the window would otherwise keep wherever the last screen
+  // (the gallery, the statistics) was scrolled to. Before paint, so it never flashes lower down.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const [mode, setMode] = useState<Mode>(initialJoinCode ? 'join' : 'menu');
   const [name, setName] = useState(() => savedName());

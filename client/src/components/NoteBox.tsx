@@ -6,11 +6,20 @@ import { memo, type CSSProperties } from 'react';
 export const NOTE_STATES = 15;
 
 const MARK = 'var(--note-mark, #e9dfc4)';
+// A small square set into a filled cell. Transparent everywhere except your own inked column, where
+// a solid paper square would read as a blank cell: there it shows as a thick paper frame around an
+// ink square.
+const INSET = 'var(--note-inset, transparent)';
 
 function Shape({ state }: { state: number }) {
   switch (state) {
     case 1:
-      return <rect x="0" y="0" width="20" height="20" fill={MARK} />;
+      return (
+        <>
+          <rect x="0" y="0" width="20" height="20" fill={MARK} />
+          <rect x="5.5" y="5.5" width="9" height="9" fill={INSET} />
+        </>
+      );
     case 2: // X
       return (
         <g stroke={MARK} strokeWidth="3.4" strokeLinecap="round">

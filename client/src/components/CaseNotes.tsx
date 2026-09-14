@@ -19,6 +19,7 @@ const YOU_STYLE = {
   '--col-bg': 'var(--ink)',
   '--col-head': 'var(--ink)',
   '--note-mark': 'var(--paper)',
+  '--note-inset': 'var(--ink)', // a filled cell: paper frame around an ink square, not a blank-looking block
   '--hover-ring': 'var(--paper)',
   background: 'var(--ink)',
 } as CSSProperties;

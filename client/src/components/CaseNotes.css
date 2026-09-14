@@ -91,10 +91,20 @@
 /* A tab and its pop-out button sit as one unit; the button is a slim stub on the tab's right. */
 .dock__tabset {
   display: inline-flex;
-  align-items: flex-end;
+  align-items: stretch; /* the stub is always as tall as its tab, even when the label wraps */
+  pointer-events: none;
+}
+.dock__tabset:has(.dock__tab--active) {
+  transform: translateY(-2px); /* the whole unit lifts, not just the tab */
+}
+.dock__tabset .dock__tab--active {
+  transform: none;
 }
 .dock__pop {
   pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-left: -2px;
   padding: 0.5rem 0.55rem;
   background: linear-gradient(180deg, #d8c082 0%, #c5ac6e 100%);
@@ -113,6 +123,10 @@
 }
 .dock__tabset .dock__tab {
   border-top-right-radius: 0;
+}
+.game--fan .dock__pop {
+  padding: 0.45rem 0.45rem;
+  font-size: 0.92rem;
 }
 /* The folder is in its own window: the tab just brings it forward. */
 .dock__tab--out {
@@ -148,6 +162,37 @@
   margin-left: 0.4rem;
 }
 
+/* Pinned under the sheet: the two printable-pad downloads, side by side. */
+.cnotes__foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  background: linear-gradient(180deg, #cdb472, #d8c082);
+  border-top: 2px solid #b1934b;
+}
+.cnotes__pdf {
+  font-family: 'Georgia', serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #3f3114;
+  background: linear-gradient(180deg, #f3e3b3, #e2cc8f);
+  border: 1.5px solid #9c8040;
+  border-radius: 8px;
+  padding: 0.35rem 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
+}
+.cnotes__pdf:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f8ebc3, #eadaa3);
+}
+.cnotes__pdf:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 /* ---------------------------------------------------------------------------------------------
    The sheet itself. Modelled on a printed case-notes pad: three pages (Suspects /
    Weapons / Rooms) laid on a dark, scuffed slate ground. Each page is parchment with a rounded
@@ -164,6 +209,7 @@
   --cell: 20px;
   --head-h: 108px;
   --label-w: 168px;
+  --body-pad: 1rem;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -171,7 +217,7 @@
   overflow: auto;
   /* keep the width steady whether or not the scrollbar shows, so the fit-to-width zoom can't see-saw */
   scrollbar-gutter: stable;
-  padding: 1rem;
+  padding: var(--body-pad);
   background-color: #56503f;
   background-image:
     repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.055) 0 2px, transparent 2px 7px),
@@ -233,9 +279,13 @@
 }
 
 /* --- column headings ------------------------------------------------------------------------- */
+/* A sticky box pins at the scroll area's padding edge, which left a strip the height of the body's
+   padding where rows showed through above the headings. Pinning at minus that padding puts the
+   headings flush with the top edge instead. The offset is divided by the page's zoom (set on
+   .sheet as --sheet-zoom), because lengths inside a zoomed page are scaled up by it. */
 .notes__colhead {
   position: sticky;
-  top: 0;
+  top: calc(-1 * var(--body-pad) / var(--sheet-zoom, 1));
   z-index: 3;
   display: flex;
   align-items: stretch;
@@ -296,7 +346,7 @@
 
 .notes__label {
   position: sticky;
-  left: 0;
+  left: calc(-1 * var(--body-pad) / var(--sheet-zoom, 1)); /* flush left, as the headings are flush top */
   z-index: 2;
   width: var(--label-w);
   flex-shrink: 0;
@@ -377,7 +427,7 @@
   .notes__body {
     --label-w: 148px;
     --head-h: 92px;
-    padding: 0.5rem;
+    --body-pad: 0.5rem;
     gap: 0.6rem;
   }
   .notes__label {

@@ -14,17 +14,21 @@ interface PopOutOptions {
   title: string;
   width: number;
   height: number;
-  /** Called when the person closes the window themselves (or the browser refused to open one). */
+  /** Called when the window goes away: the person closed it, or the browser refused to open it. */
   onClose: () => void;
+  /** Called (before `onClose`) when a pop-up blocker refused to open the window. */
+  onBlocked?: () => void;
 }
 
 /** Open (while `open`) a window for a panel; `container` is where to portal the panel, `focus`
  *  brings the window to the front. Closing the window from its own chrome calls `onClose`. */
-export function usePopOut(open: boolean, { name, title, width, height, onClose }: PopOutOptions) {
+export function usePopOut(open: boolean, { name, title, width, height, onClose, onBlocked }: PopOutOptions) {
   const winRef = useRef<Window | null>(null);
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const onBlockedRef = useRef(onBlocked);
+  onBlockedRef.current = onBlocked;
 
   useEffect(() => {
     if (!open) return;
@@ -32,7 +36,9 @@ export function usePopOut(open: boolean, { name, title, width, height, onClose }
     const left = Math.round(window.screenX + Math.max(0, (window.outerWidth - width) / 2));
     const top = Math.round(window.screenY + Math.max(0, (window.outerHeight - height) / 2));
     const w = window.open('', `popout-${name}`, `popup=yes,width=${width},height=${height},left=${left},top=${top}`);
-    if (!w) {
+    // Blockers either return nothing or hand back a window that is already closed.
+    if (!w || w.closed) {
+      onBlockedRef.current?.();
       onCloseRef.current(); // blocked: stay in the dock
       return;
     }

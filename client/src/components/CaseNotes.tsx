@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { NoteBox, NOTE_STATES } from './NoteBox';
 import { WeaponIcon } from './CardName';
 import { shade } from '../render/colorUtils';
+import type { NotesPdfColumn } from '../render/caseNotesPdf';
 import './CaseNotes.css';
 
 /** A sheet holds one column per seat, and a table seats at most 40. */
@@ -193,6 +194,64 @@ export function CaseNotes({
     [columnPlayers, colour],
   );
 
+  // --- printable pads -----------------------------------------------------------------------
+  // Two downloads under the sheet: a blank pad and a copy with this viewer's marks. Both are built
+  // from THIS game — its trimmed suspect / weapon / room lists and one column per seat — in the
+  // look chosen in Settings. The marked copy is only offered once something has been marked.
+  const pdfPages = useMemo(
+    () => [
+      { title: 'Suspects', cards: sortedSuspects as AnyCard[] },
+      { title: 'Weapons', cards: sortedWeapons as AnyCard[] },
+      { title: 'Rooms', cards: sortedRooms as AnyCard[] },
+    ],
+    [sortedSuspects, sortedWeapons, sortedRooms],
+  );
+  const hasMarks = useMemo(
+    () => pdfPages.some((pg) => pg.cards.some((c) => (notes[c.id] ?? EMPTY_ROW).slice(0, cols).some((v) => v > 0))),
+    [pdfPages, notes, cols],
+  );
+  const [pdfBusy, setPdfBusy] = useState<null | 'blank' | 'marked'>(null);
+  const downloadPdf = async (marked: boolean) => {
+    if (pdfBusy) return;
+    setPdfBusy(marked ? 'marked' : 'blank');
+    try {
+      const { downloadCaseNotesPdf } = await import('../render/caseNotesPdf');
+      const ink = '#2a2219';
+      const columns: NotesPdfColumn[] = columnPlayers.map((p, i) => {
+        const base = suspectCard(p.suspectId)?.color ?? '#777777';
+        const band = !colour && cols >= BAND_FROM_COLS && i % 10 >= 5 ? '#dcd5c2' : undefined;
+        return {
+          label: columnLabel(p),
+          you: p.id === selfId,
+          head: colour ? shade(base, 0.58) : band,
+          bg: colour ? shade(base, 0.82) : band,
+          mark: colour ? inkOf(base) : ink,
+        };
+      });
+      downloadCaseNotesPdf({
+        roomCode,
+        pages: pdfPages.map((pg) => ({
+          title: pg.title,
+          rows: pg.cards.map((c) => ({
+            cardId: c.id,
+            title: c.title,
+            swatch: colour && c.type === 'suspect' ? (c as SuspectCard).color : undefined,
+          })),
+        })),
+        columns,
+        notes: marked ? notes : undefined,
+        paper: colour ? '#faf7ee' : '#f4eedd',
+        line: colour ? '#a39b88' : '#8b8270',
+        ink,
+        fileName: `40-alibis-case-notes-${roomCode.toLowerCase()}-${marked ? 'marked' : 'blank'}.pdf`,
+      });
+    } catch (err) {
+      console.error('[case notes] could not build the PDF:', err);
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+
   // Denser cells once the table is wide, so a 40-seat page needs less sideways scrolling.
   const sheetStyle = { '--cell': cols > 24 ? '18px' : '20px', '--cols': cols } as CSSProperties;
 
@@ -226,7 +285,8 @@ export function CaseNotes({
     ro.observe(body);
     return () => ro.disconnect();
   }, [cols]);
-  const pageStyle = zoom === 1 ? sheetStyle : ({ ...sheetStyle, zoom } as CSSProperties);
+  // --sheet-zoom lets the sticky headings undo the zoom on their offset (see .notes__colhead).
+  const pageStyle = zoom === 1 ? sheetStyle : ({ ...sheetStyle, zoom, '--sheet-zoom': zoom } as CSSProperties);
 
   const renderPage = (title: string, cards: AnyCard[], page: number) => (
     <section className="sheet" key={title} style={pageStyle}>
@@ -281,6 +341,26 @@ export function CaseNotes({
         {renderPage('Suspects', sortedSuspects, 1)}
         {renderPage('Weapons', sortedWeapons, 2)}
         {renderPage('Rooms', sortedRooms, 3)}
+      </div>
+      <div className="cnotes__foot">
+        <button
+          className="cnotes__pdf"
+          onClick={() => downloadPdf(false)}
+          disabled={!!pdfBusy}
+          title="A printable blank pad for this game: its suspects, weapons and rooms, with a column for every seat"
+        >
+          {pdfBusy === 'blank' ? 'Preparing…' : '⬇ Blank Case Notes (PDF)'}
+        </button>
+        {hasMarks && (
+          <button
+            className="cnotes__pdf"
+            onClick={() => downloadPdf(true)}
+            disabled={!!pdfBusy}
+            title="A printable copy of this sheet with every mark you have made"
+          >
+            {pdfBusy === 'marked' ? 'Preparing…' : '⬇ Case Notes with my marks (PDF)'}
+          </button>
+        )}
       </div>
     </>
   );

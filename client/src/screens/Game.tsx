@@ -134,8 +134,8 @@ export function Game() {
   // brings that window forward, and closing the window puts the folder back in the dock.
   const [mapOut, setMapOut] = useState(false);
   const [notesOut, setNotesOut] = useState(false);
-  const mapPop = usePopOut(mapOut, { name: 'map', title: '40 Alibis — Manor Map', width: 960, height: 800, onClose: () => setMapOut(false) });
-  const notesPop = usePopOut(notesOut, { name: 'notes', title: '40 Alibis — Case Notes', width: 1180, height: 820, onClose: () => setNotesOut(false) });
+  const mapPop = usePopOut(mapOut, { name: 'map', title: '40 Alibis — Manor Map', width: 960, height: 800, onClose: () => setMapOut(false), onBlocked: () => popupBlocked('map') });
+  const notesPop = usePopOut(notesOut, { name: 'notes', title: '40 Alibis — Case Notes', width: 1180, height: 820, onClose: () => setNotesOut(false), onBlocked: () => popupBlocked('notes') });
   const popOut = (which: 'map' | 'notes') => {
     if (which === 'map') setMapMounted(true);
     setDock((d) => (d === which ? null : d));
@@ -212,9 +212,11 @@ export function Game() {
   // Floating notices — the "<name>'s turn" flash and each new event card's toast — share one spot
   // over the board. A new notice goes on top and pushes whatever is still showing down a row, so
   // two never overlap; each leaves on its own timer.
-  // Every notice stays up for the same beat, whatever its kind, unless it is clicked away.
-  type Notice = { id: string; kind: 'flash' | 'toast'; text: string; color?: string };
+  // Every notice stays up for the same beat, whatever its kind, unless it is clicked away — except an
+  // error, which is given longer to read.
+  type Notice = { id: string; kind: 'flash' | 'toast' | 'error'; text: string; color?: string };
   const NOTICE_MS = 4200;
+  const ERROR_MS = 6500; // matches .pill--error's animation in Game.css
   const [notices, setNotices] = useState<Notice[]>([]);
   const noticeTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const dismissNotice = useCallback((id: string) => {
@@ -238,6 +240,16 @@ export function Game() {
     const timers = noticeTimers.current;
     return () => timers.forEach((t) => clearTimeout(t));
   }, []);
+
+  // A pop-up blocker refused a pop-out window: say so, since the folder just stays in the dock.
+  // (Called from usePopOut's effect, after this render has finished, so pushNotice is ready.)
+  function popupBlocked(which: 'map' | 'notes') {
+    const what = which === 'map' ? 'the Manor Map' : 'your Case Notes';
+    pushNotice(
+      { id: `blocked:${which}`, kind: 'error', text: `Your browser blocked ${what} from opening in a new window. Allow pop-ups for this site and try again.` },
+      ERROR_MS,
+    );
+  }
 
   // Announce each new event card (a suggestion, reveal or accusation) as a toast.
   const lastCardIdRef = useRef(0);

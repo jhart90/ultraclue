@@ -375,6 +375,44 @@
     opacity: 0;
   }
 }
+/* Something went wrong on this device (a pop-out window blocked): red, allowed to wrap onto a
+   second line, and left up longer than the rest (ERROR_MS in Game.tsx). */
+.pill--error {
+  font-size: 1.05rem;
+  background: #7d1d27;
+  border-color: #ff8a8a;
+  color: #fff;
+  white-space: normal;
+  text-align: center;
+  max-width: min(560px, 92vw);
+  border-radius: 18px;
+  animation: pill-error 6.5s ease forwards;
+}
+@keyframes pill-error {
+  0% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  3% {
+    opacity: 1;
+    transform: translateX(-8px);
+  }
+  6% {
+    transform: translateX(8px);
+  }
+  9% {
+    transform: translateX(-5px);
+  }
+  12% {
+    transform: translateX(0);
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 /* "<name>'s turn" — the character's own colours, with a pop as it lands. */
 .pill--flash {
   font-size: 1.9rem;
@@ -410,7 +448,8 @@
     top: 3.6rem;
     font-size: 1.35rem;
   }
-  .pill--toast {
+  .pill--toast,
+  .pill--error {
     font-size: 0.9rem;
   }
   .pill--flash {

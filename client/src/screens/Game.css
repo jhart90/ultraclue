@@ -666,6 +666,16 @@
   .dock__tablabel {
     display: none;
   }
+  .dock__tabicon {
+    font-size: 1em; /* the round phone button keeps its icon at the button's own size */
+  }
+  /* No separate windows on a phone: the pop-out stubs would only crowd the round buttons. */
+  .dock__pop {
+    display: none;
+  }
+  .dock__tabset:has(.dock__tab--active) {
+    transform: none;
+  }
   /* a slightly smaller notch so it doesn't crowd the top bar on phones */
   .game__turn {
     font-size: 1.15rem;

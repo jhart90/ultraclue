@@ -118,6 +118,7 @@ import {
   resetPublicRoom,
   electHost,
   setProfileId,
+  dealing,
 } from './rooms';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -193,7 +194,9 @@ function botWait(room: Room): number {
   const rollEnds = (room.lastRollAt ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS + 400;
   // …and an accusation's envelope reveal, which every screen plays before the next turn is shown.
   const revealEnds = (room.lastAccusationAt ?? 0) + ACCUSATION_ANIM_MS + 400;
-  return Math.max(botDelay(room), rollEnds - Date.now(), revealEnds - Date.now());
+  // …and a new game's opening deal, after which turn 1's opening roll plays out like any other.
+  const dealEnds = (room.dealUntil ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS + 400;
+  return Math.max(botDelay(room), rollEnds - Date.now(), revealEnds - Date.now(), dealEnds - Date.now());
 }
 /** A bot answering a suggestion: the usual pause, but a bot with nothing to show answers much
  *  faster on the Fast setting (there's nothing to think about). Always at least a second, so a
@@ -380,6 +383,7 @@ function gameView(room: Room, id: string) {
     accusingId: room.accusingId,
     turnDeadline: room.turnDeadline,
     resetsAt: room.resetsAt,
+    dealUntil: room.dealUntil,
     serverNow: Date.now(),
   };
 }
@@ -449,6 +453,10 @@ function withGame(socket: Socket, fn: (room: Room, g: GameState) => GameState): 
   // Rooms/players are keyed by the stable clientId (not socket.id), so resolve through cid().
   const room = findRoomByOccupant(cid(socket));
   if (!room?.game || room.game.phase !== 'play') return;
+  if (dealing(room)) {
+    emitError(socket, 'The cards are still being dealt.');
+    return;
+  }
   try {
     room.game = fn(room, room.game);
     progress(room);
@@ -569,6 +577,8 @@ function scheduleBotReveal(room: Room, botId: string): void {
 function scheduleBots(room: Room): void {
   const g = room.game;
   if (!g || g.phase !== 'play') return;
+  // Nobody moves during the opening deal; its end sets the table going (startDealClock).
+  if (dealing(room)) return;
   const cur = getPlayer(g, currentPlayerId(g));
   if (!cur || !cur.isBot || cur.eliminated) return;
 
@@ -737,12 +747,31 @@ function armPublicClock(room: Room): void {
   }, delay);
 }
 
+/** A new game's opening deal: say so in the chat, and once it has played out on every screen post the
+ *  opening narration and set the table going (a computer that goes first, the public clock). */
+function startDealClock(room: Room): void {
+  const g = room.game;
+  if (!g || !dealing(room)) return;
+  addChat(room, 'System', 'The cards are being dealt…', true);
+  const started = g.stats?.startedAt;
+  setTimeout(
+    () => {
+      if (!room.isPublic && getRoom(room.code) !== room) return; // everyone left
+      const now = room.game;
+      if (!now || now.phase !== 'play' || now.stats?.startedAt !== started) return;
+      progress(room); // posts the held narration, arms the public clock, starts a computer who goes first
+    },
+    Math.max(0, (room.dealUntil ?? 0) - Date.now()) + 20,
+  );
+}
+
 function startPublicGame(): void {
   const room = getPublicRoom();
   if (!room || room.phase !== 'lobby') return;
   try {
     botMem.delete(room.code);
     startGameInRoom(room, room.hostId, { force: true });
+    startDealClock(room);
     addChat(room, 'System', 'The clock has run out — the public game begins!', true);
     emitLobby(room);
     mirrorLog(room, deferChat(room));
@@ -806,7 +835,12 @@ function armTurnTimer(room: Room): void {
   clearTurnTimer(room);
   room.turnKey = key;
   // A turn that opens under an accusation's envelope reveal gets its full time after the reveal.
-  const hold = Math.max(0, (room.lastAccusationAt ?? 0) + ACCUSATION_ANIM_MS - Date.now());
+  // …and turn 1 gets its full time once the opening deal and its opening roll have played.
+  const hold = Math.max(
+    0,
+    (room.lastAccusationAt ?? 0) + ACCUSATION_ANIM_MS - Date.now(),
+    (room.dealUntil ?? 0) + TURN_GAP_MS + TURN_FLASH_MS + DICE_ANIM_MS - Date.now(),
+  );
   room.turnDeadline = Date.now() + hold + PUBLIC_TURN_MS;
   publicTurnTimer = setTimeout(forcePublicTurn, hold + PUBLIC_TURN_MS);
 }
@@ -1134,7 +1168,7 @@ io.on('connection', (socket) => {
   // A player opened (or closed) the accusation picker — warn the rest of the table.
   socket.on(SOCKET_EVENTS.SET_ACCUSING, (p: SetAccusingPayload) => {
     const room = findRoomByOccupant(cid(socket));
-    if (!room?.game || room.game.phase !== 'play') return;
+    if (!room?.game || room.game.phase !== 'play' || dealing(room)) return;
     const id = cid(socket);
     // Only the active player can be composing an accusation.
     if (p?.accusing) {
@@ -1244,6 +1278,7 @@ io.on('connection', (socket) => {
     try {
       botMem.delete(room.code); // fresh deductions for a new game
       startGameInRoom(room, cid(socket));
+      startDealClock(room); // the opening deal plays first; its end posts the narration below
       emitLobby(room); // phase is now 'play'
       mirrorLog(room, deferChat(room)); // seed the chat with the opening game-log lines
       emitChat(room); // so the in-game chat panel carries the lobby history

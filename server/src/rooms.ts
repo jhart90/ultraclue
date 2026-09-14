@@ -32,6 +32,7 @@ import {
   type Slot,
   type SuggestionEvent,
   DICE_ANIM_MS,
+  DEAL_ANIM_MS,
   TURN_FLASH_MS,
   TURN_GAP_MS,
 } from 'shared';
@@ -82,6 +83,10 @@ export interface Room {
    *  reveal play out on every screen before the table moves on. */
   lastAccusationAt?: number;
   lastAccusationSeq?: number;
+  /** Epoch ms at which a new game's opening deal has played out on every screen. Until then nobody
+   *  may act, the computers and the public clock wait, and the opening narration stays out of the
+   *  chat. Never saved, so a loaded game carries straight on. */
+  dealUntil?: number;
   /** SERVER-ONLY: each human occupant's long-term profile id (from their name + optional PIN),
    *  keyed by occupant id. Never part of a lobby view, game view, or save. */
   profileIds?: Record<string, string>;
@@ -94,6 +99,19 @@ export function setProfileId(room: Room, occupantId: string, profileId: string |
   if (!room.profileIds) room.profileIds = {};
   if (profileId) room.profileIds[occupantId] = profileId;
   else delete room.profileIds[occupantId];
+}
+
+/** How long a new game's opening deal holds the table. DEAL_HOLD_MS overrides it: the smoke scripts
+ *  can run their server with 0 to play straight away (screens then skip the film as well). */
+function dealHoldMs(): number {
+  const raw = process.env.DEAL_HOLD_MS;
+  const ms = raw === undefined || raw.trim() === '' ? NaN : Number(raw);
+  return Number.isFinite(ms) && ms >= 0 ? ms : DEAL_ANIM_MS;
+}
+
+/** True while a new game's opening deal is still playing on everyone's screens. */
+export function dealing(room: Room): boolean {
+  return room.dealUntil !== undefined && Date.now() < room.dealUntil;
 }
 
 const rooms = new Map<string, Room>();
@@ -511,7 +529,8 @@ export function clearThinking(room: Room): void {
  *  the animation has landed, is swapped in place for the roll card via `defer` (which also
  *  re-emits the chat). Without `defer` the roll card is posted at once. */
 export function mirrorLog(room: Room, defer?: (apply: () => boolean, ms: number) => void): void {
-  if (!room.game) return;
+  // A new game's opening narration waits until its deal has played out (the server posts it then).
+  if (!room.game || dealing(room)) return;
   for (const entry of room.game.log) {
     if (entry.id > room.mirroredLogId) {
       const card = entry.card;
@@ -963,5 +982,7 @@ export function startGameInRoom(room: Room, requesterId: string, opts: { force?:
   });
   room.game = game;
   room.phase = 'play';
+  // Every screen now plays the opening deal; the table waits for it (see dealing()).
+  room.dealUntil = Date.now() + dealHoldMs();
   return game;
 }

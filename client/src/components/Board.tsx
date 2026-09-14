@@ -1138,7 +1138,8 @@ export function Board({
                 filter="url(#board-env-shadow)"
                 style={{ pointerEvents: 'none', opacity: envelopeAway ? 0 : 1, transition: 'opacity 0.5s' }}
               >
-                <svg x={-w / 2} y={-h / 2} width={w} height={h} viewBox={`0 0 ${ENVELOPE_VIEWBOX.w} ${ENVELOPE_VIEWBOX.h}`} overflow="visible">
+                {/* data-board-envelope: the opening deal measures this to fly its envelope into place */}
+                <svg data-board-envelope="" x={-w / 2} y={-h / 2} width={w} height={h} viewBox={`0 0 ${ENVELOPE_VIEWBOX.w} ${ENVELOPE_VIEWBOX.h}`} overflow="visible">
                   <defs>
                     <filter id="board-env-shadow" x="-20%" y="-20%" width="140%" height="150%">
                       <feDropShadow dx="0" dy="10" stdDeviation="9" floodColor="#000" floodOpacity="0.6" />

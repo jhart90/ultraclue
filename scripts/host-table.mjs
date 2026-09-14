@@ -40,6 +40,11 @@ console.log('game started');
 const t0 = Date.now();
 while (Date.now() - t0 < 5 * 60_000 && st.game?.phase === 'play') {
   const v = st.game;
+  // Nobody may act while the opening deal plays (the server refuses it); wait it out.
+  if (v.dealUntil && Date.now() < v.dealUntil) {
+    await sleep(500);
+    continue;
+  }
   if (v.turnOrder[v.activeIdx] === st.id) {
     if (v.turnPhase === 'awaitMove' && v.reachable?.length) s.emit('moveTo', { tile: v.reachable[0] });
     else if (v.turnPhase === 'awaitRoll') s.emit('skipMove');

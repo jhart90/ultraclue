@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { getCard, shortcutDestForRoom, boardFor, poolOf, PUBLIC_ROOM_CODE, DICE_ANIM_MS, TURN_FLASH_MS, TURN_GAP_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
+import { getCard, shortcutDestForRoom, boardFor, poolOf, PUBLIC_ROOM_CODE, DICE_ANIM_MS, DEAL_ANIM_MS, TURN_FLASH_MS, TURN_GAP_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement, type GameView } from 'shared';
 import { useStore, savedDice } from '../store';
 import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
 import { DiceOverlay, DICE_FADE_MS, type DiceRollShow } from '../components/DiceOverlay';
@@ -21,7 +21,25 @@ import { AccusationReveal, revealTotalMs, type RevealVariant } from '../componen
 import { soundEnabled, setSoundEnabled } from '../util/sound';
 import { contrastInk } from '../render/colorUtils';
 import { highlightChat } from '../util/highlightChat';
+import { OpeningDeal } from '../components/OpeningDeal';
 import './Game.css';
+
+/** A screen that arrives this soon after a game began still plays the opening deal from the top;
+ *  one that arrives later (a reload mid-deal) just waits the deal out. */
+const DEAL_JOIN_GRACE_MS = 1500;
+
+/** The opening deal this screen has to sit through, judged from the first view it gets: when the
+ *  table's deal ends and when it began (both on the local clock), and whether to play the film or
+ *  only wait. Null once a game is under way. */
+function openingDealOf(game: GameView | null | undefined, serverOffset: number): { until: number; startAt: number; film: boolean } | null {
+  if (!game || game.phase !== 'play' || !game.dealUntil) return null;
+  const until = game.dealUntil - serverOffset;
+  const now = Date.now();
+  if (until <= now) return null;
+  const startAt = until - DEAL_ANIM_MS;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  return { until, startAt, film: !reduced && now - startAt < DEAL_JOIN_GRACE_MS };
+}
 
 function suspectColor(suspectId?: string): string {
   if (!suspectId) return '#555';
@@ -89,7 +107,25 @@ const FLOOR_LABELS: Record<string, string> = {
   basement: 'Basement',
 };
 
+/**
+ * The game screen. The lobby update that switches to this screen lands a moment before the game's
+ * own view does, so the table is mounted only once that view is in — and afresh for each new game
+ * (a new game has a new deal time). Everything the table settles from its first view, the opening
+ * deal above all, then sees the right one.
+ */
 export function Game() {
+  const game = useStore((s) => s.game);
+  if (!game) {
+    return (
+      <div className="game game--loading">
+        <p>Dealing the cards…</p>
+      </div>
+    );
+  }
+  return <GameTable key={`${game.code}:${game.dealUntil ?? 0}`} />;
+}
+
+function GameTable() {
   const game = useStore((s) => s.game);
   const chat = useStore((s) => s.chat);
   const myId = useStore((s) => s.myId);
@@ -164,6 +200,24 @@ export function Game() {
   const seededRef = useRef(false);
   const statusSigRef = useRef('');
   const rollSeqRef = useRef(0);
+
+  // ---- the opening deal ----
+  // A game that has only just begun plays the deal over the map (OpeningDeal), and turn 1 is held
+  // until the table's deal is over. Settled once, from the first view this screen got.
+  const [deal] = useState(() => openingDealOf(game, serverOffset));
+  const dealUntilRef = useRef(deal?.until ?? 0);
+  /** True until the shared hold ends: no controls, no highlighted squares, and the notch says why. */
+  const [dealing, setDealing] = useState(!!deal);
+  /** True while the film plays: your hand fills one card at a time as each one lands in it. */
+  const [dealFilm, setDealFilm] = useState(!!deal?.film);
+  const [dealtToMe, setDealtToMe] = useState(0);
+  /** The board's envelope stays hidden until the film's envelope has flown onto it. */
+  const [envelopePlaced, setEnvelopePlaced] = useState(!deal?.film);
+  useEffect(() => {
+    if (!deal) return;
+    const t = setTimeout(() => setDealing(false), Math.max(0, deal.until - Date.now()));
+    return () => clearTimeout(t);
+  }, [deal]);
 
   // Null-safe values the effects depend on (computed before the early return so hook order is stable).
   const myTurnNow = !!game && game.turnOrder[game.activeIdx] === myId;
@@ -268,7 +322,8 @@ export function Game() {
   // happens; a roll that opens the turn waits for that beat, so a reveal or a move never runs
   // straight into the next player's dice.
   const turnKey = game ? `${game.round ?? 0}:${game.activeIdx}` : '';
-  const turnKeyRef = useRef(turnKey);
+  // During the opening deal turn 1 has not been announced yet, so its flash is still to come.
+  const turnKeyRef = useRef(deal ? '' : turnKey);
   /** When the current turn's flash shows (or showed): a turn is announced TURN_GAP_MS after it begins. */
   const flashAtRef = useRef(0);
   /** The player the top notch names — it follows the real turn after the same gap. */
@@ -283,7 +338,8 @@ export function Game() {
     turnKeyRef.current = turnKey;
     // A turn that opens with an accusation (a wrong one ends the accuser's turn in the same update)
     // is announced only once the envelope reveal has finished playing.
-    const gap = TURN_GAP_MS + Math.max(0, revealUntilRef.current - Date.now());
+    // Turn 1 likewise waits for the opening deal.
+    const gap = TURN_GAP_MS + Math.max(0, revealUntilRef.current - Date.now(), dealUntilRef.current - Date.now());
     flashAtRef.current = Date.now() + gap;
     // Dice still resting from the previous turn fade out as this one begins — and are gone before
     // this turn's own roll (which waits out the flash) lands.
@@ -320,7 +376,8 @@ export function Game() {
       const style = roller?.dice ?? defaultDice(roller?.suspectId);
       // A roll that arrived together with the turn flash waits for the gap and the flash; a mid-turn
       // roll shows at once.
-      const wait = rollSeqRef.current > 0 ? Math.max(0, flashAtRef.current + TURN_FLASH_MS - Date.now()) : 0;
+      // Turn 1's opening roll, which arrives with the first view, waits out the opening deal too.
+      const wait = rollSeqRef.current > 0 || deal ? Math.max(0, flashAtRef.current + TURN_FLASH_MS - Date.now()) : 0;
       animUntilRef.current = Date.now() + wait + DICE_ANIM_MS;
       const show = { seq: rs, values: game.lastRoll, color: style.color, pips: style.pips, name: roller?.name ?? 'Someone' };
       rollSeqRef.current = rs;
@@ -407,7 +464,7 @@ export function Game() {
   // The notch lags the real turn by TURN_GAP_MS (see the flash effect); before it has caught up
   // once it simply shows the live player.
   const notchPlayer = game.players.find((p) => p.id === notchActiveId) ?? activePlayer;
-  const turnLabel = notchPlayer?.id === myId ? 'Your turn' : `${notchPlayer?.name ?? '—'}'s turn`;
+  const turnLabel = dealing ? 'Dealing the cards…' : notchPlayer?.id === myId ? 'Your turn' : `${notchPlayer?.name ?? '—'}'s turn`;
   const orderedPlayers = game.turnOrder
     .map((id) => game.players.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => !!p);
@@ -497,7 +554,7 @@ export function Game() {
   // The bar above the map is only a back-up for that pop-up: it shows on your own turn, once the
   // pop-up is closed, painted in your character's colour. Other players' turns are already told in
   // the chat log, so the bar is hidden then and the map takes its height.
-  const showBar = myTurn && !suggestionPending && !showStatus;
+  const showBar = myTurn && !suggestionPending && !showStatus && !dealing;
   const barColour = suspectColor(me?.suspectId);
   const barStyle = { '--bar-bg': barColour, '--bar-ink': contrastInk(barColour) } as CSSProperties;
   // Someone else is composing an accusation — warn this player (not the accuser).
@@ -518,7 +575,11 @@ export function Game() {
         </div>
         <div
           className="game__turn"
-          style={{ background: suspectColor(notchPlayer?.suspectId), color: contrastInk(suspectColor(notchPlayer?.suspectId)) }}
+          style={
+            dealing
+              ? { background: '#2a2046', color: '#c8a24a' }
+              : { background: suspectColor(notchPlayer?.suspectId), color: contrastInk(suspectColor(notchPlayer?.suspectId)) }
+          }
         >
           {turnLabel}
         </div>
@@ -597,16 +658,16 @@ export function Game() {
 
           <Board
             players={orderedPlayers}
-            reachable={game.reachable}
+            reachable={dealing ? undefined : game.reachable}
             lastMove={game.lastMove}
             cameraLock={cameraLock}
             weaponLocations={game.weaponLocations}
-            canMove={myTurn && game.turnPhase === 'awaitMove' && !suggestionPending}
+            canMove={myTurn && game.turnPhase === 'awaitMove' && !suggestionPending && !dealing}
             onMoveTo={moveTo}
             myId={myId}
             activeId={activeId}
             round={game.round ?? 0}
-            envelopeAway={!!accFlow?.revealing}
+            envelopeAway={!!accFlow?.revealing || !envelopePlaced}
             board={board}
           />
         </div>
@@ -620,11 +681,12 @@ export function Game() {
         {observer ? (
           <div className="game__observing">👁 Observer Mode — watching the game. You hold no cards and make no moves.</div>
         ) : fan ? (
-          <HandFan cardIds={game.yourHand} />
+          // While the deal plays your hand fills as each card lands; the deal flies them in itself.
+          <HandFan cardIds={dealFilm ? game.yourHand.slice(0, dealtToMe) : game.yourHand} entrance={!dealFilm} />
         ) : (
           <div className="game__handwrap">
-            <div className="game__handlabel">Your hand · {me?.handCount ?? game.yourHand.length} cards</div>
-            <Hand cardIds={game.yourHand} />
+            <div className="game__handlabel">Your hand · {dealFilm ? dealtToMe : (me?.handCount ?? game.yourHand.length)} cards</div>
+            <Hand cardIds={dealFilm ? game.yourHand.slice(0, dealtToMe) : game.yourHand} />
           </div>
         )}
       </div>
@@ -778,6 +840,23 @@ export function Game() {
           onClose={() => setStatusOpen(false)}
         />
       )}
+
+      {deal?.film && dealFilm && (
+        <OpeningDeal
+          startAt={deal.startAt}
+          seats={game.players.map((p) => ({ id: p.id, handCount: p.handCount }))}
+          myId={observer ? null : myId}
+          yourHand={game.yourHand}
+          deckSizes={[pool.suspects.length, pool.weapons.length, pool.rooms.length]}
+          onEnvelopePlaced={() => setEnvelopePlaced(true)}
+          onDealtToMe={setDealtToMe}
+          onDone={() => {
+            setEnvelopePlaced(true);
+            setDealFilm(false);
+          }}
+        />
+      )}
+      {deal && !deal.film && dealing && <div className="deal-hold">The cards are being dealt…</div>}
 
       {accFlow && accFlow.revealing && (
         <AccusationReveal

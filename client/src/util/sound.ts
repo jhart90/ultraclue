@@ -198,3 +198,35 @@ export function playSealPress(): void {
     /* ignore */
   }
 }
+
+/** A deck riffled: a ripple of card edges catching, quickening, then the deck squared up. */
+export function playShuffle(): void {
+  const c = ctx();
+  if (!c) return;
+  try {
+    const t = c.currentTime;
+    const ticks = 14;
+    for (let i = 0; i < ticks; i++) {
+      const at = t + 0.42 * Math.pow(i / ticks, 0.8);
+      burst(c, at, 0.018, { type: 'bandpass', freq: 2900 + Math.random() * 1400, q: 1.4 }, 0.05 + Math.random() * 0.03, 0.002);
+    }
+    burst(c, t + 0.46, 0.07, { type: 'lowpass', freq: 1600 }, 0.09, 0.005);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** One card snapped off the deck in the opening deal. Tiny and quiet — it plays over a hundred
+ *  times in a few seconds — and pitched alternately so the run doesn't drone. */
+let dealTick = false;
+export function playCardDeal(): void {
+  if (typeof document !== 'undefined' && document.hidden) return;
+  const c = ctx();
+  if (!c) return;
+  try {
+    dealTick = !dealTick;
+    burst(c, c.currentTime, 0.035, { type: 'bandpass', freq: dealTick ? 3400 : 2700, q: 1.1 }, 0.045, 0.002);
+  } catch {
+    /* ignore */
+  }
+}

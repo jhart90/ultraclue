@@ -1,0 +1,190 @@
+/* The opening deal (OpeningDeal.tsx). Everything moves by the Web Animations API; this file only sets
+   each piece's resting look, and the resting state of anything that has not had its moment yet is
+   hidden. The overlay covers the map area like the accusation reveal, and never takes a click. */
+.odeal {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: var(--pad, 0);
+  right: var(--map-right, 0); /* over the map only — the chat stays usable */
+  z-index: 248; /* over the hand fan (240), so your cards land on top of it; under the folders (250) */
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* The table darkens behind the cards, but not over the hand, where your cards arrive. */
+.odeal__dim {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(120% 90% at 50% 40%, rgba(12, 9, 24, 0.5) 0%, rgba(12, 9, 24, 0.8) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fan-band, 132px) - 80px), transparent calc(100% - var(--fan-band, 132px) + 10px));
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fan-band, 132px) - 80px), transparent calc(100% - var(--fan-band, 132px) + 10px));
+}
+
+/* ---- the decks ---- */
+.odeal__deck {
+  position: absolute;
+  opacity: 0;
+}
+.odeal__layer {
+  position: absolute;
+  inset: 0;
+}
+/* A stack of eight full card shadows would read as a smudge: only the bottom card casts one. */
+.odeal__layer .cardback {
+  box-shadow:
+    inset 0 0 34px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.odeal__layer:first-child .cardback {
+  box-shadow:
+    inset 0 0 34px rgba(0, 0, 0, 0.5),
+    0 10px 22px rgba(0, 0, 0, 0.6);
+}
+.odeal__label {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 14px);
+  transform: translateX(-50%);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--accent, #c8a24a);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.odeal__count {
+  position: absolute;
+  top: -14px;
+  right: -12px;
+  z-index: 20;
+  min-width: 2em;
+  padding: 0.12em 0.5em;
+  border-radius: 999px;
+  border: 1px solid rgba(200, 162, 74, 0.75);
+  background: #1b1430;
+  color: #f3e6c2;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- the envelope: the reveal's layers, in the same fixed order ---- */
+.odeal__env {
+  position: absolute;
+  opacity: 0;
+}
+.odeal__envin {
+  position: absolute;
+  inset: 0;
+}
+.odeal__l {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.odeal__tucks {
+  z-index: 1; /* behind the body, so a card dropping through the mouth disappears inside */
+}
+.odeal__tuck {
+  position: absolute;
+  visibility: hidden;
+}
+.odeal__body {
+  z-index: 2;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.55));
+}
+.odeal__flapshadow {
+  z-index: 3;
+  opacity: 0;
+}
+.odeal__flap {
+  z-index: 5;
+  transform-origin: 50% 13.64%; /* the fold line, y=60 of 440 */
+  transform: rotateX(176deg); /* arrives open */
+}
+.odeal__flap svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.35));
+}
+.odeal__seal {
+  z-index: 6;
+  opacity: 0;
+  transform-origin: 50% 56.8%; /* the seal's centre, (320, 250) */
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35));
+}
+.odeal__slam {
+  z-index: 7;
+  opacity: 0;
+  transform-origin: 50% 28.2%; /* the flap stamp's centre, (320, 124) */
+}
+/* Open past vertical we see the flap's plain inside, behind the cards. */
+.odeal__env.flap-open .odeal__flap {
+  z-index: 0;
+}
+.odeal__env.flap-open .env-flap__paper {
+  fill: url(#odeal-flapin);
+}
+.odeal__env:not(.stamped) .env-flap__stamp {
+  opacity: 0;
+}
+
+/* ---- the dealt cards: fan-sized, positioned entirely by their transforms ---- */
+.odeal__card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 150px; /* BASE_W */
+  height: 229.5px; /* BASE_H */
+  visibility: hidden;
+  will-change: transform;
+}
+.odeal__card--mine {
+  perspective: 900px;
+}
+.odeal__flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+.odeal__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.odeal__face--front {
+  transform: rotateY(180deg);
+}
+
+/* A screen that arrives mid-deal, or prefers reduced motion, skips the film and waits with this. */
+.deal-hold {
+  position: fixed;
+  top: 40%;
+  left: var(--pad, 0);
+  right: var(--map-right, 0);
+  z-index: 248;
+  margin-inline: auto;
+  width: max-content;
+  max-width: calc(100% - 2rem);
+  padding: 0.7rem 1.3rem;
+  border-radius: 12px;
+  border: 1px solid rgba(200, 162, 74, 0.6);
+  background: rgba(27, 20, 48, 0.94);
+  color: #f3e6c2;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}

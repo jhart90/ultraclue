@@ -68,6 +68,8 @@ try {
   const drive = (C) => {
     const v = C.state.game;
     if (!v || v.phase !== 'play') return;
+    // Nobody may act while the opening deal plays (run the server with DEAL_HOLD_MS=0 to skip it).
+    if (v.dealUntil && Date.now() < v.dealUntil) return;
     const cur = v.turnOrder[v.activeIdx];
     if (cur !== C.state.id) return;
     if (v.turnPhase === 'awaitMove' && v.reachable?.length) {
@@ -82,7 +84,8 @@ try {
     }
   };
   const t0 = Date.now();
-  while (Date.now() - t0 < 30000 && !(A.state.game?.phase === 'ended')) {
+  // 60 s: the opening deal holds the first 20 s unless the server runs with DEAL_HOLD_MS=0.
+  while (Date.now() - t0 < 60000 && !(A.state.game?.phase === 'ended')) {
     drive(A);
     drive(B);
     await new Promise((r) => setTimeout(r, 150));

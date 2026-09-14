@@ -8,6 +8,7 @@ import {
   viewFor,
   makeRng,
   BOT_PERSONA_IDS,
+  SUSPECTS,
 } from '../src';
 import type { GameState, Player } from '../src';
 
@@ -75,6 +76,17 @@ describe('setup / dealing', () => {
     const b = startGame('ROOM', lobby, makeRng(7));
     expect(a.envelope).toEqual(b.envelope);
     expect(a.players.map((p) => p.hand)).toEqual(b.players.map((p) => p.hand));
+  });
+
+  // The opening-deal animation replays the deal on every screen from hand sizes alone: card k of
+  // the shuffled deck goes to seat k % n (seat order, not turn order), and each hand keeps deal order.
+  it('deals round-robin in seat order and hands each viewer their cards in deal order', () => {
+    const taken = new Set(lobby.map((p) => p.suspectId));
+    const fourth = SUSPECTS.find((c) => !taken.has(c.id))!.id;
+    const s = startGame('ROOM', [...lobby, player('p4', fourth)], makeRng(11));
+    // 117 cards over 4 seats: the first seat takes the one left over.
+    expect(s.players.map((p) => p.hand.length)).toEqual([30, 29, 29, 29]);
+    for (const p of s.players) expect(viewFor(s, p.id).yourHand).toEqual(p.hand);
   });
 });
 

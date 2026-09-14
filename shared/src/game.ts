@@ -19,6 +19,12 @@ export const TURN_GAP_MS = 1000;
  *  longest cut (a wrong accuser's private look, the stamp, and the envelope leaving). Bots wait it out
  *  before acting, like the dice. Keep in step with the client's AccusationReveal timeline. */
 export const ACCUSATION_ANIM_MS = 16_400;
+/** How long the opening deal holds the table when a game starts: every screen watches the three
+ *  decks shuffle, the envelope get sealed and set on the board, and the cards dealt round the table.
+ *  The wait is real — the server refuses turn intents, holds the computers and the public clock, and
+ *  keeps the opening narration out of the chat until it is over. Keep in step with the client's
+ *  OpeningDeal storyboard, which must finish inside it. */
+export const DEAL_ANIM_MS = 20_000;
 /** Public games: a human on the clock has this long to act before the turn is passed for them. */
 export const PUBLIC_TURN_MS = 90_000;
 
@@ -320,6 +326,9 @@ export interface GameView {
   suspectIds?: string[];
   /** The table's card back for this game (see GameState.cardBack). */
   cardBack?: CardBackId;
+  /** Epoch ms (server clock) at which the opening deal ends and turn 1 may begin. Set by the server;
+   *  long past for any game that is under way. Absent on loaded saves. */
+  dealUntil?: number;
   yourId: string;
   /** Room host's id, so an observing host still gets host-only controls (set by the server). */
   hostId?: string;

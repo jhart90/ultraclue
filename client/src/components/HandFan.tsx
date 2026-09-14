@@ -4,6 +4,7 @@ import { Card } from './Card';
 import { openCardZoom } from './CardZoom';
 import { compareCards } from '../util/cardSort';
 import { playCardHover } from '../util/sound';
+import { BASE_H, BASE_W, CARD_H, CARD_W, layoutFan, type Layout } from '../util/fanLayout';
 import './HandFan.css';
 
 // The player's hand as a fan of real card faces along the bottom of the screen, Hearthstone-style:
@@ -16,46 +17,8 @@ import './HandFan.css';
 // strip of each card), never from which element is under the pointer. That is what lets the mouse
 // pan smoothly from card to card: the enlarged card never steals the hover from its neighbours.
 
-const CARD_W = 200; // the Card component's authored size
-const CARD_H = 306;
-const BASE_W = 150; // a resting card's width
-const BASE_H = (BASE_W * CARD_H) / CARD_W;
-const VISIBLE = 0.5; // share of a resting card kept above the screen bottom
-const MAX_STEP = 0.72; // widest exposed strip per card (as a share of its width) before they spread out
 const RAISED_MAX_W = 300;
 const RAISE_LIFT = 10; // gap between a raised card's bottom edge and the screen bottom
-
-interface Slot {
-  x: number; // left edge of the unrotated card, in band coordinates
-  y: number; // top edge
-  rot: number; // degrees, about the card's bottom centre
-}
-
-interface Layout {
-  slots: Slot[];
-  step: number;
-  startX: number;
-  total: number;
-}
-
-/** Resting positions for `n` cards across a band `w` wide and `h` tall. */
-function layoutFan(n: number, w: number, h: number): Layout {
-  if (n === 0) return { slots: [], step: 0, startX: 0, total: 0 };
-  const step = n > 1 ? Math.min(BASE_W * MAX_STEP, Math.max(1, (w - BASE_W) / (n - 1))) : 0;
-  const total = BASE_W + step * (n - 1);
-  const startX = (w - total) / 2;
-  const centre = (n - 1) / 2;
-  // Tilt grows with the hand but never beyond ±11° at the ends; the arc sags a little at the ends.
-  const perCard = n > 1 ? Math.min(2.5, 22 / (n - 1)) : 0;
-  const sag = Math.min(18, 1.4 * n);
-  const restTop = h - BASE_H * VISIBLE;
-  const slots: Slot[] = [];
-  for (let i = 0; i < n; i++) {
-    const t = centre > 0 ? (i - centre) / centre : 0;
-    slots.push({ x: startX + step * i, y: restTop + sag * t * t, rot: (i - centre) * perCard });
-  }
-  return { slots, step, startX, total };
-}
 
 /** How far each card slides sideways to clear the raised card at `h`, by index (positive = right). */
 function pushOffsets(lay: Layout, n: number, h: number, raisedW: number, w: number): number[] {
@@ -82,7 +45,9 @@ function pushOffsets(lay: Layout, n: number, h: number, raisedW: number, w: numb
   return out;
 }
 
-export function HandFan({ cardIds }: { cardIds: string[] }) {
+/** `entrance` plays the rise-in for newly added cards; the opening deal turns it off while it flies
+ *  each of your cards into its slot itself. */
+export function HandFan({ cardIds, entrance = true }: { cardIds: string[]; entrance?: boolean }) {
   const cards = useMemo(
     () =>
       cardIds
@@ -220,7 +185,7 @@ export function HandFan({ cardIds }: { cardIds: string[] }) {
   // Newly dealt cards animate in from below, staggered in hand order.
   let fresh = 0;
   const entry = cards.map((c) => {
-    if (seen.current.has(c.id)) return null;
+    if (!entrance || seen.current.has(c.id)) return null;
     return fresh++;
   });
   useEffect(() => {
@@ -250,6 +215,7 @@ export function HandFan({ cardIds }: { cardIds: string[] }) {
     <div
       ref={bandRef}
       className="fan"
+      data-hand-fan=""
       role="listbox"
       aria-label={`Your hand, ${n} cards`}
       tabIndex={0}

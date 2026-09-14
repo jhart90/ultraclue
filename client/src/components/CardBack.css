@@ -49,9 +49,14 @@
 }
 
 /* Art backs: the picture is the whole back, so the lattice and the inset keyline give way to it.
-   The gold border stays so a back keeps the same footprint as a face beside it. */
+   The gold border stays so a back keeps the same footprint as a face beside it. The art is cut to
+   the card's exact shape at 3x (600x918), so nothing is trimmed here and no margin ever shows;
+   the back is composited as one layer so it stays crisp when tilted or scaled. */
 .cardback--art {
   background: #10131c;
+  isolation: isolate;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 .cardback--art::before {
   content: none;

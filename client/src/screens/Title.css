@@ -81,6 +81,10 @@
   position: absolute;
   transform-origin: center center;
   filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.55));
+  /* Composite each tilted card as its own layer so its edges and art are resampled smoothly at
+     the angle, rather than rasterised upright and then rotated with stair-stepping. */
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 .title__crest {

@@ -1,52 +1,33 @@
 import { useState } from 'react';
 import './TitleDice.css';
 
-const PIPS: Record<number, [number, number][]> = {
-  1: [[1, 1]],
-  2: [[0, 0], [2, 2]],
-  3: [[0, 0], [1, 1], [2, 2]],
-  4: [[0, 0], [2, 0], [0, 2], [2, 2]],
-  5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]],
-  6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]],
-};
+// Emerald dice with inlaid gold pips, pre-rendered in Blender (Cycles) with a transparent background.
+// Each die comes in two poses (`a` turned left, `b` turned right) for every top value, all lit by the
+// same rig, so any pairing looks like one throw. Files are named die_<pose><value>.webp.
+const urls = import.meta.glob('../../../assets/title/dice/*.webp', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>;
 
-function Pips({ value }: { value: number }) {
-  return (
-    <div className="tdie__grid">
-      {Array.from({ length: 9 }, (_, i) => {
-        const c = i % 3;
-        const r = Math.floor(i / 3);
-        const on = PIPS[value]?.some(([pc, pr]) => pc === c && pr === r);
-        return <span key={i} className={`tdie__pip${on ? ' tdie__pip--on' : ''}`} />;
-      })}
-    </div>
-  );
+function dieArt(pose: 'a' | 'b', value: number): string | undefined {
+  return Object.entries(urls).find(([path]) => path.endsWith(`/die_${pose}${value}.webp`))?.[1];
 }
 
-/** One die seen from above, lying on the table: its top face (the rolled value) with a thin visible
- *  edge and a soft cast shadow, turned a little in-plane so the pair looks freshly tossed. */
-function Die({ value, tone, spin }: { value: number; tone: 'gold' | 'maroon'; spin: number }) {
-  return (
-    <div className={`tdie tdie--${tone}`} style={{ transform: `rotate(${spin}deg)` }}>
-      <div className="tdie__face">
-        <Pips value={value} />
-      </div>
-    </div>
-  );
-}
+const roll = () => 1 + Math.floor(Math.random() * 6);
 
-/** A rolled pair of dice — one gold, one maroon — lying flat (top-down) to the upper-right of the
- *  title logo. */
+/** A freshly rolled pair of emerald dice resting in the upper-right corner of the title screen. */
 export function TitleDice() {
   const [dice] = useState(() => [
-    { tone: 'gold' as const, value: 1 + Math.floor(Math.random() * 6), spin: Math.round(-30 + Math.random() * 22) },
-    { tone: 'maroon' as const, value: 1 + Math.floor(Math.random() * 6), spin: Math.round(8 + Math.random() * 26) },
+    { pose: 'a' as const, value: roll() },
+    { pose: 'b' as const, value: roll() },
   ]);
   return (
     <div className="title__dice" aria-hidden="true">
-      {dice.map((d, i) => (
-        <Die key={i} value={d.value} tone={d.tone} spin={d.spin} />
-      ))}
+      {dice.map((d, i) => {
+        const src = dieArt(d.pose, d.value);
+        return src ? <img key={i} className="tdie" src={src} alt="" draggable={false} /> : null;
+      })}
     </div>
   );
 }

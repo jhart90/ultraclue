@@ -120,8 +120,9 @@
    The sheet itself. Modelled on a printed case-notes pad: three pages (Suspects /
    Weapons / Rooms) laid on a dark, scuffed slate ground. Each page is parchment with a rounded
    title pill, one rotated column heading per seat (up to 40), and a ruled ink grid. Pages sit side
-   by side while they fit and wrap into a stack once the table is wide. The body scrolls both ways;
-   each page's column headings stick to the top and its row labels to the left as it does. */
+   by side while they fit and wrap into a stack once the table is wide, and CaseNotes zooms them all
+   up so the first row fills the width. The body scrolls both ways; each page's column headings
+   stick to the top and its row labels to the left as it does. */
 .notes__body {
   --ink: #2a2219;
   --line: #8b8270;
@@ -136,6 +137,8 @@
   align-items: flex-start;
   gap: 1rem;
   overflow: auto;
+  /* keep the width steady whether or not the scrollbar shows, so the fit-to-width zoom can't see-saw */
+  scrollbar-gutter: stable;
   padding: 1rem;
   background-color: #56503f;
   background-image:

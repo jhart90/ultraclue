@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { SUSPECTS, WEAPONS, ROOMS, getCard, type AnyCard, type PlayerView, type RoomCard, type SuspectCard, type WeaponCard } from 'shared';
 import { useStore } from '../store';
 import { NoteBox, NOTE_STATES } from './NoteBox';
@@ -196,8 +196,40 @@ export function CaseNotes({
   // Denser cells once the table is wide, so a 40-seat page needs less sideways scrolling.
   const sheetStyle = { '--cell': cols > 24 ? '18px' : '20px', '--cols': cols } as CSSProperties;
 
+  // Fill the folder's width. At their natural size, as many pages as fit sit side by side (1 to 3);
+  // then every page is zoomed up by the same factor until that first row spans the width. Pages
+  // never shrink: one that doesn't fit at natural size keeps it and scrolls sideways as before.
+  // CSS zoom (unlike a transform) re-lays the page out, so text stays crisp and the wrap still works.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const fit = () => {
+      const sheet = body.querySelector<HTMLElement>('.sheet');
+      if (!sheet) return;
+      const cs = getComputedStyle(body);
+      const avail = body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const gap = parseFloat(cs.columnGap) || 0;
+      // Divide out the zoom the page actually has on screen, read from the DOM: the resize observer
+      // can fire again before React has applied the last value we set.
+      const applied = parseFloat(getComputedStyle(sheet).zoom) || 1;
+      const natural = sheet.getBoundingClientRect().width / applied;
+      if (avail <= 0 || natural <= 0) return;
+      const perRow = Math.max(1, Math.min(3, Math.floor((avail + gap) / (natural + gap))));
+      // a couple of pixels' slack so rounding never tips the last page of the row onto the next
+      const next = Math.max(1, Math.floor(((avail - (perRow - 1) * gap - 2) / (perRow * natural)) * 1000) / 1000);
+      if (Math.abs(next - applied) > 0.002) setZoom(next);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(body);
+    return () => ro.disconnect();
+  }, [cols]);
+  const pageStyle = zoom === 1 ? sheetStyle : ({ ...sheetStyle, zoom } as CSSProperties);
+
   const renderPage = (title: string, cards: AnyCard[], page: number) => (
-    <section className="sheet" key={title} style={sheetStyle}>
+    <section className="sheet" key={title} style={pageStyle}>
       <div className="sheet__title">{title}</div>
       <div className="sheet__grid">
         <div className="notes__colhead">
@@ -245,7 +277,7 @@ export function CaseNotes({
       <button className="cnotes__bar" onClick={onClose} title="Close Case Notes">
         Case Notes <span className="cnotes__barclose">▾ click to close</span>
       </button>
-      <div className={`notes__body notes__body--${theme}${cols >= BAND_FROM_COLS ? ' notes__body--banded' : ''}`}>
+      <div ref={bodyRef} className={`notes__body notes__body--${theme}${cols >= BAND_FROM_COLS ? ' notes__body--banded' : ''}`}>
         {renderPage('Suspects', sortedSuspects, 1)}
         {renderPage('Weapons', sortedWeapons, 2)}
         {renderPage('Rooms', sortedRooms, 3)}

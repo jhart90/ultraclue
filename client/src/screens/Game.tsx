@@ -199,6 +199,8 @@ function GameTable() {
   const revealUntilRef = useRef(0);
   const seededRef = useRef(false);
   const statusSigRef = useRef('');
+  /** A status pop-up has been scheduled for the current state but has not opened yet. */
+  const statusOwedRef = useRef(false);
   const rollSeqRef = useRef(0);
 
   // ---- the opening deal ----
@@ -407,11 +409,15 @@ function GameTable() {
   useEffect(() => {
     if (!game || game.phase !== 'play' || !myTurnNow || suggestionPendingNow) {
       statusSigRef.current = '';
+      statusOwedRef.current = false;
       setStatusOpen(false);
       return;
     }
     const sig = `${game.turnPhase}|${game.lastRoll?.join('-') ?? ''}|${meNow?.inRoomId ?? ''}`;
-    if (sig === statusSigRef.current) return;
+    // The same state as last time has nothing new to show, unless its pop-up was scheduled and then
+    // cancelled before it opened. React re-runs effects (twice on mount in development), and turn 1
+    // waits out the ~20 s opening deal, so without this the first turn's pop-up could be lost.
+    if (sig === statusSigRef.current && !statusOwedRef.current) return;
     statusSigRef.current = sig;
     // If my token just walked a path, wait for it to finish entering before popping the menu so the
     // suspect/accuse/end-turn options don't appear while the piece is still mid-move.
@@ -422,11 +428,16 @@ function GameTable() {
     // And a turn that opens in a room (no dice) still waits for its own announcement.
     const gapWait = Math.max(0, flashAtRef.current - Date.now());
     if (tilesToWalk <= 0 && diceWait <= 0 && gapWait <= 0) {
+      statusOwedRef.current = false;
       setStatusOpen(true);
       return;
     }
     setStatusOpen(false);
-    const t = setTimeout(() => setStatusOpen(true), Math.max(tilesToWalk * WALK_STEP_MS + 80, diceWait, gapWait));
+    statusOwedRef.current = true;
+    const t = setTimeout(() => {
+      statusOwedRef.current = false;
+      setStatusOpen(true);
+    }, Math.max(tilesToWalk * WALK_STEP_MS + 80, diceWait, gapWait));
     return () => clearTimeout(t);
     // lastMove is intentionally omitted: it changes in lock-step with turnPhase/inRoomId (which are
     // listed), and including the fresh object each tick would cancel the pending timeout.

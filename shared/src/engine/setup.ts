@@ -38,7 +38,9 @@ export function dealHands(players: Player[], envelope: Envelope, rng: RNG, pool:
   deck.forEach((cardId, i) => players[i % players.length].hand.push(cardId));
 }
 
-/** Sort players into seats by their suspect's fixed turn order (Ruby Valentine first). */
+/** Sort players into seats by their suspect's fixed turn order. The order runs through the colour
+ *  families (reds, browns, yellows, greens, blues, purples, pinks, then greys), lightest to darkest
+ *  within each, so the colour-coded Case Notes read as bands; Chairwoman Coral goes first. */
 function turnOrderOf(players: Player[]): string[] {
   const rank = new Map(SUSPECTS.map((s) => [s.id, s.turnOrder]));
   return [...players]

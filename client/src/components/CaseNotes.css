@@ -420,7 +420,7 @@
   line-height: 0;
 }
 .notebox:hover {
-  box-shadow: inset 0 0 0 2px var(--ink);
+  box-shadow: inset 0 0 0 2px var(--hover-ring, var(--ink));
 }
 .notebox svg {
   display: block;

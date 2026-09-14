@@ -211,7 +211,8 @@ const CHAMFER_DEFS: ChamferDef[] = [
 ];
 
 // ---- start tiles: every suspect starts near a room that suits them, 3–4 steps from its door ---
-// Listed in turn order, sections interleaved so early seats are spread across the whole house.
+// Looked up by suspect id, so the order of this list does not matter (it follows the original turn
+// order). The turn order now groups the colour families; board.test.ts checks the starts still spread.
 const START_DEFS: [string, string][] = [
   ['suspect-valentine', 'room-theatre'],
   ['suspect-dijon', 'room-armory'],

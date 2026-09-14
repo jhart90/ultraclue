@@ -29,8 +29,14 @@ describe('card data integrity', () => {
     }
   });
 
-  it('Ruby Valentine leads the turn order', () => {
-    expect(suspectsByTurnOrder()[0].id).toBe('suspect-valentine');
+  it('Chairwoman Coral leads the turn order', () => {
+    expect(suspectsByTurnOrder()[0].id).toBe('suspect-coral');
+  });
+
+  it('runs the turn order through the colour families, lightest to darkest within each', () => {
+    const order = suspectsByTurnOrder().map((s) => s.id.replace('suspect-', ''));
+    expect(order.slice(0, 5)).toEqual(['coral', 'valentine', 'crimson', 'maroon', 'burgundy']);
+    expect(order.slice(-7)).toEqual(['pearl', 'ivory', 'sterling', 'slate', 'charcoal', 'sable', 'onyx']);
   });
 
   it('getCard resolves by id', () => {

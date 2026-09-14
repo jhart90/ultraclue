@@ -13,6 +13,15 @@ export const MAX_NOTE_COLS = 40;
  *  smaller table's row is short enough to follow without them. */
 const BAND_FROM_COLS = 10;
 const EMPTY_ROW: number[] = [];
+/** Your own column, on either look: inked solid from heading to last row, marks in the paper colour,
+ *  so your seat stands out at a glance. The inline background also beats the sepia banding. */
+const YOU_STYLE = {
+  '--col-bg': 'var(--ink)',
+  '--col-head': 'var(--ink)',
+  '--note-mark': 'var(--paper)',
+  '--hover-ring': 'var(--paper)',
+  background: 'var(--ink)',
+} as CSSProperties;
 
 // Two looks, chosen in Settings and remembered per browser:
 //  - 'sepia'  — the printed sheet: parchment, ink grid, and (10+ seats) every other block of five
@@ -179,10 +188,11 @@ export function CaseNotes({
   );
 
   // One style object per column (shared by its header and all its cells) carrying the tints for the
-  // colour-coded look; the sepia look ignores colour altogether.
+  // colour-coded look; the sepia look ignores colour altogether. Your own column is inked either way.
   const colStyles = useMemo<(CSSProperties | undefined)[]>(
     () =>
       columnPlayers.map((p) => {
+        if (p.id === selfId) return YOU_STYLE;
         if (!colour) return undefined;
         const base = suspectCard(p.suspectId)?.color ?? '#777777';
         return {
@@ -191,7 +201,7 @@ export function CaseNotes({
           '--note-mark': inkOf(base),
         } as CSSProperties;
       }),
-    [columnPlayers, colour],
+    [columnPlayers, colour, selfId],
   );
 
   // --- printable pads -----------------------------------------------------------------------

@@ -47,14 +47,14 @@ function baseState(): GameState {
 
 describe('setup / dealing', () => {
   const lobby = [
-    player('p1', 'suspect-verdant', true), // turnOrder 5
-    player('p2', 'suspect-valentine'), //     turnOrder 1
-    player('p3', 'suspect-mulberry'), //        turnOrder 4
+    player('p1', 'suspect-verdant', true), // turnOrder 19
+    player('p2', 'suspect-valentine'), //     turnOrder 2
+    player('p3', 'suspect-mulberry'), //        turnOrder 30
   ];
 
-  it('seats players by their suspect turn order (Ruby Valentine first)', () => {
+  it('seats players by their suspect turn order (lowest first)', () => {
     const s = startGame('ROOM', lobby, makeRng(42));
-    expect(s.turnOrder).toEqual(['p2', 'p3', 'p1']);
+    expect(s.turnOrder).toEqual(['p2', 'p1', 'p3']);
   });
 
   it('deals all 117 non-solution cards evenly with no duplicates or envelope leaks', () => {

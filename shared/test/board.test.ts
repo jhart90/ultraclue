@@ -248,8 +248,13 @@ describe('board (2D themed sections)', () => {
       expect(steps, `${suspectId} nearest room`).toBeLessThanOrEqual(5);
       sections.push(c!.sectionId);
     }
-    // any table of 8 (or fewer) consecutive seats is spread over all four sections
-    for (let i = 0; i + 8 <= sections.length; i++) expect(new Set(sections.slice(i, i + 8)).size, `seats ${i + 1}-${i + 8}`).toBe(4);
+    // Characters are dealt to seats at random, so a table is never a run of consecutive seats, and the
+    // turn order groups the colour families (for the colour-coded Case Notes) with the themed starts
+    // following along. The starts must still not bunch: every section starts ten suspects, and no run
+    // of 8 seats crowds into fewer than three sections.
+    expect(new Set(sections).size).toBe(4);
+    for (const id of new Set(sections)) expect(sections.filter((s) => s === id).length, `starts in ${id}`).toBe(10);
+    for (let i = 0; i + 8 <= sections.length; i++) expect(new Set(sections.slice(i, i + 8)).size, `seats ${i + 1}-${i + 8}`).toBeGreaterThanOrEqual(3);
     for (let i = 2; i < sections.length; i++) expect(sections[i] === sections[i - 1] && sections[i] === sections[i - 2], `seats ${i - 1}-${i + 1} all in ${sections[i]}`).toBe(false);
   });
 

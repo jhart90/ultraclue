@@ -17,7 +17,7 @@ export interface SuspectCard extends BaseCard {
   type: 'suspect';
   /** Hex colour of this character's game piece. */
   color: string;
-  /** Fixed seat in the turn order, 1..40 (lower goes first; Ruby Valentine is 1). */
+  /** Fixed seat in the turn order, 1..40 (lower goes first; Chairwoman Coral is 1). */
   turnOrder: number;
 }
 

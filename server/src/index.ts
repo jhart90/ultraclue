@@ -224,8 +224,9 @@ function memFor(room: Room) {
  *  a computer in that seat failed to note are left off. Those lapses are rolled the first time the
  *  seat looks at a suggestion — normally the moment it resolves, when every computer's notes are
  *  refreshed — and kept on the log entry, so a mark that slipped past stays forgotten for good.
- *  `upTo` truncates the history (e.g. -1 leaves out the game's final suggestion). */
-function eventsForPlayer(room: Room, playerId: string, upTo?: number): SuggestionEvent[] {
+ *  `upTo` truncates the history (e.g. -1 leaves out the game's final suggestion). With `perfect`
+ *  nothing is forgotten (and no lapses are rolled) — a human's notes as they could have kept them. */
+function eventsForPlayer(room: Room, playerId: string, upTo?: number, perfect = false): SuggestionEvent[] {
   const difficulty = (room.game && getPlayer(room.game, playerId)?.difficulty) ?? roomBotDifficulty(room);
   return room.suggestionLog.slice(0, upTo).map((e) => {
     const view: SuggestionEvent = {
@@ -235,6 +236,7 @@ function eventsForPlayer(room: Room, playerId: string, upTo?: number): Suggestio
       responderId: e.responderId,
       revealedCardId: e.suggesterId === playerId ? e.revealedCardId : undefined,
     };
+    if (perfect) return view;
     const lapses = (e.lapses ??= {});
     const forgot = (lapses[playerId] ??= rollForgotten(view, difficulty, RNG));
     if (forgot.length) view.forgot = forgot;
@@ -243,8 +245,9 @@ function eventsForPlayer(room: Room, playerId: string, upTo?: number): Suggestio
 }
 /** A bot's current understanding of the game, as good as its difficulty allows. With
  *  `beforeFinalSuggestion` it is the understanding it had before the game's last suggestion was
- *  made — what it knew before the case gave itself away. */
-function mindFor(g: GameState, playerId: string, room: Room, opts?: { beforeFinalSuggestion?: boolean }): BotMind {
+ *  made — what it knew before the case gave itself away. With `perfect` it is the sharpest reading
+ *  of that seat's information (hard-tier deduction, nothing forgotten), used for human seats. */
+function mindFor(g: GameState, playerId: string, room: Room, opts?: { beforeFinalSuggestion?: boolean; perfect?: boolean }): BotMind {
   const p = getPlayer(g, playerId);
   // A seat that became a computer mid-game (a dropped or booted human) is dealt its personality
   // the first time it has to think; seats that started as computers got theirs in startGame().
@@ -257,18 +260,36 @@ function mindFor(g: GameState, playerId: string, room: Room, opts?: { beforeFina
     round: g.round ?? 0,
     wrongTrios: wrongAccusationTrios(g),
   };
-  const events = eventsForPlayer(room, playerId, opts?.beforeFinalSuggestion ? -1 : undefined);
-  return botMind(p?.difficulty ?? roomBotDifficulty(room), playerId, p?.hand ?? [], g.turnOrder, events, handCounts, poolOf(g), boardOf(g), p?.persona, table);
+  const events = eventsForPlayer(room, playerId, opts?.beforeFinalSuggestion ? -1 : undefined, opts?.perfect);
+  const difficulty = opts?.perfect ? 'hard' : (p?.difficulty ?? roomBotDifficulty(room));
+  return botMind(difficulty, playerId, p?.hand ?? [], g.turnOrder, events, handCounts, poolOf(g), boardOf(g), p?.persona, table);
 }
 /**
- * An accusation has just been resolved (`before` → `after`). If it ended the game, ask every
- * computer that never accused what it would have named — judged on what it knew BEFORE the game's
- * final suggestion and the closing accusation, since the last suggestion is so often the one that
- * gives the case away (nobody could disprove it) — and file the guesses in the finished game's
+ * An accusation has just been resolved (`before` → `after`). First, stamp the accusation with how
+ * many combinations were still open to the accuser as they made it: a computer's own notes, lapses
+ * and all, or for a human the most their information could prove. Then, if it ended the game, ask
+ * every computer that never accused what it would have named — judged on what it knew BEFORE the
+ * game's final suggestion and the closing accusation, since the last suggestion is so often the one
+ * that gives the case away (nobody could disprove it) — and file the guesses in the finished game's
  * stats for the details screen. A seat that already accused keeps that record instead.
  */
 function recordFinalGuesses(room: Room, before: GameState, after: GameState): void {
-  if (after.phase !== 'ended' || before.phase !== 'play') return;
+  if (before.phase !== 'play') return;
+  const accuserId = currentPlayerId(before);
+  const record = accuserId ? after.stats?.players[accuserId]?.accusation : undefined;
+  if (accuserId && record && record.combos === undefined) {
+    try {
+      const accuser = getPlayer(before, accuserId);
+      const guess = botBestGuess(mindFor(before, accuserId, room, { perfect: !accuser?.isBot }), RNG);
+      if (guess) record.combos = guess.combos;
+      // mindFor may have just dealt a mid-game computer its personality — on the old state.
+      const now = getPlayer(after, accuserId);
+      if (now && !now.persona && accuser?.persona) now.persona = accuser.persona;
+    } catch (err) {
+      console.error('[accusation] could not count the accuser\'s open combinations:', (err as Error).message);
+    }
+  }
+  if (after.phase !== 'ended') return;
   for (const p of after.players) {
     if (!p.isBot || after.stats?.players[p.id]?.accusation) continue;
     try {

@@ -146,7 +146,8 @@ export interface Guess {
   suspectId: string;
   weaponId: string;
   roomId: string;
-  /** How many combinations were still open to the guesser when they chose (computers only). */
+  /** How many combinations were still open to the guesser when they chose. For a human accuser it
+   *  is the most their information could prove. Absent on games saved before it was tracked. */
   combos?: number;
 }
 

@@ -1,6 +1,6 @@
 /* End-of-game details screen. Sits in the same transparent backdrop as the other pop-ups (centred
-   on the map, stops before the chat) and is ONE scrolling pane: the banner, every section and the
-   footer all scroll together, so nothing is pinned over the content on a phone. */
+   on the map, stops before the chat) and is ONE scrolling pane. Only the banner is pinned (so its
+   close button stays in reach); every section and the footer scroll beneath it. */
 .end {
   --end-line: rgba(200, 162, 74, 0.22);
   --end-panel: rgba(255, 255, 255, 0.025);
@@ -24,7 +24,10 @@
 
 /* ---- banner -------------------------------------------------------------------------------- */
 .end__banner {
-  position: relative;
+  /* pinned to the top of the scrolling panel; its background is the winner's colour, set inline */
+  position: sticky;
+  top: 0;
+  z-index: 2;
   padding: 1.1rem 3rem 1rem;
   text-align: center;
   border-bottom: 2px solid var(--accent, #c8a24a);
@@ -561,6 +564,9 @@
   overflow: visible;
   animation: none;
   box-shadow: none;
+}
+.end--capture .end__banner {
+  position: relative;
 }
 .end--capture .end__tablewrap {
   overflow: visible;

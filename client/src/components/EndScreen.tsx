@@ -162,7 +162,7 @@ function GuessCards({ line }: { line: AccusationLine }) {
   const ids = [g.suspectId, g.weaponId, g.roomId];
   const combos = g.combos;
   const note =
-    line.kind === 'would' && combos !== undefined
+    combos !== undefined
       ? combos <= 1
         ? 'was certain'
         : `${combos.toLocaleString()} combinations still open`

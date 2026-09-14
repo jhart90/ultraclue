@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { getCard, shortcutDestForRoom, boardFor, poolOf, PUBLIC_ROOM_CODE, DICE_ANIM_MS, TURN_FLASH_MS, TURN_GAP_MS, defaultDice, BOT_DIFFICULTY_LABEL, type Announcement } from 'shared';
 import { useStore, savedDice } from '../store';
 import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
@@ -494,6 +494,12 @@ export function Game() {
   const showNoEvidence = iMustPass && !!sug && !showAccFlow;
   const showStatus =
     statusOpen && !!statusDesc && !showAccFlow && !showDisprove && !showNoEvidence && !showEnd && !modal && !iAmResponder;
+  // The bar above the map is only a back-up for that pop-up: it shows on your own turn, once the
+  // pop-up is closed, painted in your character's colour. Other players' turns are already told in
+  // the chat log, so the bar is hidden then and the map takes its height.
+  const showBar = myTurn && !suggestionPending && !showStatus;
+  const barColour = suspectColor(me?.suspectId);
+  const barStyle = { '--bar-bg': barColour, '--bar-ink': contrastInk(barColour) } as CSSProperties;
   // Someone else is composing an accusation — warn this player (not the accuser).
   const accuser = game.accusingId && game.accusingId !== myId ? game.players.find((p) => p.id === game.accusingId) : undefined;
   const showAccusing = !!accuser && !showAccFlow && !showEnd;
@@ -523,10 +529,11 @@ export function Game() {
       </header>
 
       <div className="game__main">
-        <div className="game__board">
+        <div className={`game__board${showBar ? '' : ' game__board--nobar'}`}>
           <TurnOrder players={orderedPlayers} activeId={activeId} myId={myId} onOpenRoster={() => setRosterOpen(true)} />
 
-          <div className="game__controls">
+          {showBar && (
+          <div className="game__controls game__controls--mine" style={barStyle}>
             {game.lastRoll && !suggestionPending && <Dice values={game.lastRoll} />}
             {revealedCard && (
               <div className="game__revealed" title="A card was revealed only to you">
@@ -585,6 +592,7 @@ export function Game() {
               </div>
             )}
           </div>
+          )}
 
           <Board
             players={orderedPlayers}

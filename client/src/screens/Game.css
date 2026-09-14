@@ -77,6 +77,10 @@
   gap: 0.6rem;
   min-height: 0;
 }
+/* No bar above the map (it only shows on your own turn): the board takes that row. */
+.game__board--nobar {
+  grid-template-rows: auto minmax(0, 1fr);
+}
 
 .game__controls {
   display: flex;
@@ -117,6 +121,47 @@
 .game__cbtns .btn {
   padding: 0.4rem 0.9rem;
   font-size: 0.9rem;
+}
+/* Your turn's bar: your character's colour (--bar-bg) with ink that reads on it (--bar-ink). The
+   main action is solid ink with coloured text; the others are ink outlines. */
+.game__controls--mine {
+  background: var(--bar-bg);
+  border: 2px solid color-mix(in srgb, var(--bar-ink) 40%, transparent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.game__controls--mine .game__ctext {
+  color: var(--bar-ink);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.game__controls--mine .btn {
+  background: transparent;
+  color: var(--bar-ink);
+  border: 2px solid var(--bar-ink);
+  font-weight: 700;
+  box-shadow: none;
+}
+.game__controls--mine .btn:hover {
+  background: color-mix(in srgb, var(--bar-ink) 14%, transparent);
+}
+.game__controls--mine .btn.btn--primary {
+  background: var(--bar-ink);
+  color: var(--bar-bg);
+  border-color: var(--bar-ink);
+}
+.game__controls--mine .btn.btn--primary:hover {
+  background: color-mix(in srgb, var(--bar-ink) 85%, var(--bar-bg));
+}
+.game__controls--mine .game__revealed {
+  background: color-mix(in srgb, var(--bar-ink) 12%, transparent);
+  border-color: var(--bar-ink);
+}
+.game__controls--mine .game__revealedlbl,
+.game__controls--mine .game__revealedname {
+  color: var(--bar-ink);
+}
+.game__controls--mine .dice__sum {
+  color: var(--bar-ink); /* the gold total is unreadable on a coloured bar */
 }
 
 .game__boardplace {
@@ -642,6 +687,9 @@
   /* The page is auto-height here, so give the board a real floor so it can't collapse to nothing. */
   .game__board {
     grid-template-rows: auto auto minmax(460px, 1fr);
+  }
+  .game__board--nobar {
+    grid-template-rows: auto minmax(460px, 1fr);
   }
   /* the chat is stacked below the board here, so the fan takes the full width */
   .game--fan .fan {

@@ -29,6 +29,7 @@ export const CARD_BACK_LABEL: Record<CardBackId, string> = {
   fingerprint: 'Fingerprint',
   mahogany: 'Mahogany',
   peacock: 'Peacock',
+  knife: 'Knife',
 };
 
 export function randomCardBack(): CardBackId {

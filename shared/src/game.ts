@@ -222,7 +222,7 @@ export interface GameStats {
 /** The card-back designs. `classic` is drawn in CSS (the wordmark on a maroon lattice); the rest
  *  are art in assets/cards/backs/. The table draws one at random for each game, and a viewer may
  *  pin their own in settings. */
-export const CARD_BACKS = ['classic', 'artdeco', 'blueprint', 'stainedglass', 'fingerprint', 'mahogany', 'peacock'] as const;
+export const CARD_BACKS = ['classic', 'artdeco', 'blueprint', 'stainedglass', 'fingerprint', 'mahogany', 'peacock', 'knife'] as const;
 export type CardBackId = (typeof CARD_BACKS)[number];
 
 export interface GameState {

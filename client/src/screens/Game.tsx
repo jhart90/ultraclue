@@ -5,6 +5,7 @@ import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
 import { DiceOverlay, DICE_FADE_MS, type DiceRollShow } from '../components/DiceOverlay';
 import { DiceSettings } from '../components/DiceSettings';
 import { CardBackSettings } from '../components/CardBackSettings';
+import { PopOut, usePopOut } from '../components/PopOut';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
 import { HandFan } from '../components/HandFan';
@@ -129,6 +130,17 @@ export function Game() {
   const [modal, setModal] = useState<null | 'suggest' | 'accuse'>(null);
   const [dock, setDock] = useState<null | 'map' | 'notes'>(null); // bottom dock: Manor Map / Case Notes
   const [mapMounted, setMapMounted] = useState(false); // mount the (heavy) second board only once opened
+  // Either folder can be popped out into its own browser window instead; its dock tab then just
+  // brings that window forward, and closing the window puts the folder back in the dock.
+  const [mapOut, setMapOut] = useState(false);
+  const [notesOut, setNotesOut] = useState(false);
+  const mapPop = usePopOut(mapOut, { name: 'map', title: '40 Alibis — Manor Map', width: 960, height: 800, onClose: () => setMapOut(false) });
+  const notesPop = usePopOut(notesOut, { name: 'notes', title: '40 Alibis — Case Notes', width: 1180, height: 820, onClose: () => setNotesOut(false) });
+  const popOut = (which: 'map' | 'notes') => {
+    if (which === 'map') setMapMounted(true);
+    setDock((d) => (d === which ? null : d));
+    (which === 'map' ? setMapOut : setNotesOut)(true);
+  };
 
   // --- pop-up overlays (status / announcement / reveal) ---
   const [statusOpen, setStatusOpen] = useState(false);
@@ -597,10 +609,12 @@ export function Game() {
       </div>
 
       {/* Bottom dock — Manor Map + Case Notes folders. Only one opens at a time; the open one
-          slides up over everything (above every pop-up), and the tabs stay reachable at the bottom. */}
-      <div className={`dock__panel${dock === 'map' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'map'}>
-        <div className="dock__folder">
-          {mapMounted && (
+          slides up over everything (above every pop-up), and the tabs stay reachable at the bottom.
+          A folder that has been popped out renders in its own window instead (same panel, same
+          state) and its drawer here stays empty until the window is closed. */}
+      {(() => {
+        const mapFolder = mapMounted && (
+          <div className="dock__folder">
             <Board
               players={orderedPlayers}
               weaponLocations={game.weaponLocations}
@@ -612,11 +626,9 @@ export function Game() {
               envelopeAway={!!accFlow?.revealing}
               board={board}
             />
-          )}
-        </div>
-      </div>
-      {!observer && (
-        <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
+          </div>
+        );
+        const notesFolder = !observer && (
           <div className="dock__folder dock__folder--notes">
             <CaseNotes
               roomCode={game.code}
@@ -627,28 +639,68 @@ export function Game() {
               weapons={pool.weapons}
               rooms={pool.rooms}
               theme={notesTheme}
-              onClose={() => setDock(null)}
+              onClose={() => (notesOut ? setNotesOut(false) : setDock(null))}
             />
           </div>
-        </div>
-      )}
+        );
+        return (
+          <>
+            <div className={`dock__panel${dock === 'map' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'map'}>
+              {mapOut ? <div className="dock__folder" /> : mapFolder}
+            </div>
+            {mapOut && <PopOut container={mapPop.container}>{mapFolder}</PopOut>}
+            {!observer && (
+              <div className={`dock__panel${dock === 'notes' ? ' dock__panel--open' : ''}`} aria-hidden={dock !== 'notes'}>
+                {notesOut ? <div className="dock__folder dock__folder--notes" /> : notesFolder}
+              </div>
+            )}
+            {notesOut && <PopOut container={notesPop.container}>{notesFolder}</PopOut>}
+          </>
+        );
+      })()}
       <div className="dock__tabs">
-        <button
-          className={`dock__tab${dock === 'map' ? ' dock__tab--active' : ''}`}
-          onClick={() => {
-            setMapMounted(true);
-            setDock((d) => (d === 'map' ? null : 'map'));
-          }}
-        >
-          <span className="dock__tabicon">🗺️</span> <span className="dock__tablabel">Manor Map</span>
-        </button>
-        {!observer && (
+        <span className="dock__tabset">
           <button
-            className={`dock__tab${dock === 'notes' ? ' dock__tab--active' : ''}`}
-            onClick={() => setDock((d) => (d === 'notes' ? null : 'notes'))}
+            className={`dock__tab${dock === 'map' ? ' dock__tab--active' : ''}${mapOut ? ' dock__tab--out' : ''}`}
+            title={mapOut ? 'The map is open in its own window — click to bring it forward' : undefined}
+            onClick={() => {
+              if (mapOut) return mapPop.focus();
+              setMapMounted(true);
+              setDock((d) => (d === 'map' ? null : 'map'));
+            }}
           >
-            <span className="dock__tabicon">📓</span> <span className="dock__tablabel">Case Notes</span>
+            <span className="dock__tabicon">🗺️</span> <span className="dock__tablabel">Manor Map</span>
           </button>
+          <button
+            className="dock__pop"
+            title={mapOut ? 'Bring the map back into this window' : 'Open the map in its own window'}
+            aria-label={mapOut ? 'Bring the map back into this window' : 'Open the map in its own window'}
+            onClick={() => (mapOut ? setMapOut(false) : popOut('map'))}
+          >
+            {mapOut ? '⇲' : '⧉'}
+          </button>
+        </span>
+        {!observer && (
+          <span className="dock__tabset">
+            <button
+              className={`dock__tab${dock === 'notes' ? ' dock__tab--active' : ''}${notesOut ? ' dock__tab--out' : ''}`}
+              title={notesOut ? 'Your notes are open in their own window — click to bring them forward' : undefined}
+              onClick={() => {
+                if (notesOut) return notesPop.focus();
+                setDock((d) => (d === 'notes' ? null : 'notes'));
+              }}
+            >
+              <span className="dock__tabicon">📓</span> <span className="dock__tablabel">Case Notes</span>
+            </button>
+            <button
+              className="dock__pop"
+              title={notesOut ? 'Bring your notes back into this window' : 'Open your notes in their own window'}
+              aria-label={notesOut ? 'Bring your notes back into this window' : 'Open your notes in their own window'}
+              onClick={() => (notesOut ? setNotesOut(false) : popOut('notes'))}
+            >
+              {notesOut ? '⇲' : '⧉'}
+            </button>
+          </span>
         )}
       </div>
 

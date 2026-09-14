@@ -88,6 +88,38 @@
   background: linear-gradient(180deg, #f7eabf 0%, #ecd9a4 100%);
   transform: translateY(-2px);
 }
+/* A tab and its pop-out button sit as one unit; the button is a slim stub on the tab's right. */
+.dock__tabset {
+  display: inline-flex;
+  align-items: flex-end;
+}
+.dock__pop {
+  pointer-events: auto;
+  margin-left: -2px;
+  padding: 0.5rem 0.55rem;
+  background: linear-gradient(180deg, #d8c082 0%, #c5ac6e 100%);
+  color: #463716;
+  border: 2px solid #b1934b;
+  border-bottom: none;
+  border-left: none;
+  border-radius: 0 14px 0 0;
+  font-size: 1rem;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.45);
+}
+.dock__pop:hover {
+  background: linear-gradient(180deg, #e6cf92 0%, #d3ba7a 100%);
+}
+.dock__tabset .dock__tab {
+  border-top-right-radius: 0;
+}
+/* The folder is in its own window: the tab just brings it forward. */
+.dock__tab--out {
+  background: linear-gradient(180deg, #d4c391 0%, #bfa96e 100%);
+  color: #5c4a1e;
+  font-style: italic;
+}
 
 /* Clickable header bar — clicking it closes the Case Notes folder back down to its tab. */
 .cnotes__bar {

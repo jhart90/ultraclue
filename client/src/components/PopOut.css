@@ -1,0 +1,17 @@
+/* A popped-out window holds one dock folder, filling the window edge to edge. The folder keeps its
+   own look (manila hint strip, notes grid, board) but loses the drawer's rounded top, gold rim and
+   the gap it leaves for the tab bar, none of which exist out here. */
+.popout-body {
+  overflow: hidden;
+}
+.popout {
+  position: fixed;
+  inset: 0;
+  display: flex;
+}
+.popout .dock__folder {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding-bottom: 0;
+}

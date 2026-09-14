@@ -856,25 +856,48 @@ export function Game() {
           <div className="game__settingsback" onClick={() => setSettingsOpen(false)} />
           <div className="game__settings">
             <div className="game__settingshead">Players</div>
-            {orderedPlayers.map((p) => {
-              const status = p.isBot ? `Bot · ${BOT_DIFFICULTY_LABEL[p.difficulty ?? 'medium']}` : p.isHost ? 'Host' : p.connected ? 'Online' : 'Disconnected';
-              const off = !p.isBot && !p.connected;
+            {(() => {
+              // Up to 8 seats, every player gets a row. A bigger table lists just 6 (you, then the
+              // other humans the host may replace, then computers, each group in turn order) and
+              // links to the same full roster the top bar opens.
+              const many = orderedPlayers.length > 8;
+              const rank = (p: (typeof orderedPlayers)[number]) => (p.id === myId ? 0 : p.isBot ? 2 : 1);
+              const shown = many ? [...orderedPlayers].sort((a, b) => rank(a) - rank(b)).slice(0, 6) : orderedPlayers;
               return (
-                <div className="game__setrow" key={p.id}>
-                  <span className="game__setsw" style={{ background: suspectColor(p.suspectId) }} />
-                  <span className="game__setname">
-                    {p.name}
-                    {p.id === myId ? ' (you)' : ''}
-                  </span>
-                  <span className={`game__setstatus${off ? ' game__setstatus--off' : ''}`}>{status}</span>
-                  {iAmHost && !p.isBot && !p.isHost && (
-                    <button className="game__setboot" onClick={() => bootPlayer(p.id)}>
-                      Replace with bot
+                <>
+                  {shown.map((p) => {
+                    const status = p.isBot ? `Bot · ${BOT_DIFFICULTY_LABEL[p.difficulty ?? 'medium']}` : p.isHost ? 'Host' : p.connected ? 'Online' : 'Disconnected';
+                    const off = !p.isBot && !p.connected;
+                    return (
+                      <div className="game__setrow" key={p.id}>
+                        <span className="game__setsw" style={{ background: suspectColor(p.suspectId) }} />
+                        <span className="game__setname">
+                          {p.name}
+                          {p.id === myId ? ' (you)' : ''}
+                        </span>
+                        <span className={`game__setstatus${off ? ' game__setstatus--off' : ''}`}>{status}</span>
+                        {iAmHost && !p.isBot && !p.isHost && (
+                          <button className="game__setboot" onClick={() => bootPlayer(p.id)}>
+                            Replace with bot
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {many && (
+                    <button
+                      className="game__setmore"
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        setRosterOpen(true);
+                      }}
+                    >
+                      …and {orderedPlayers.length - shown.length} more
                     </button>
                   )}
-                </div>
+                </>
               );
-            })}
+            })()}
             {!iAmHost && <div className="game__setnote">Only the host can replace players.</div>}
 
             <DiceSettings current={me?.dice ?? savedDice() ?? defaultDice(me?.suspectId)} onChange={setDice} />

@@ -26,6 +26,9 @@ export const CARD_BACK_LABEL: Record<CardBackId, string> = {
   artdeco: 'Art Deco',
   blueprint: 'Blueprint',
   stainedglass: 'Stained glass',
+  fingerprint: 'Fingerprint',
+  mahogany: 'Mahogany',
+  peacock: 'Peacock',
 };
 
 export function randomCardBack(): CardBackId {

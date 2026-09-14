@@ -574,6 +574,25 @@
   font-style: italic;
   margin-top: 0.4rem;
 }
+/* Bigger tables: after 6 rows, one link to the full roster. */
+.game__setmore {
+  display: block;
+  width: 100%;
+  margin-top: 0.45rem;
+  padding: 0.35rem 0.5rem;
+  background: transparent;
+  border: 1px dashed rgba(200, 162, 74, 0.55);
+  border-radius: 6px;
+  color: var(--accent, #c8a24a);
+  font-family: 'Georgia', serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.game__setmore:hover {
+  background: rgba(200, 162, 74, 0.1);
+  border-style: solid;
+}
 .game__settinghead2 {
   font-size: 0.7rem;
   letter-spacing: 0.16em;

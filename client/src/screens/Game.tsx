@@ -551,10 +551,11 @@ function GameTable() {
   const showNoEvidence = iMustPass && !!sug && !showAccFlow;
   const showStatus =
     statusOpen && !!statusDesc && !showAccFlow && !showDisprove && !showNoEvidence && !showEnd && !modal && !iAmResponder;
-  // The bar above the map is only a back-up for that pop-up: it shows on your own turn, once the
-  // pop-up is closed, painted in your character's colour. Other players' turns are already told in
-  // the chat log, so the bar is hidden then and the map takes its height.
-  const showBar = myTurn && !suggestionPending && !showStatus && !dealing;
+  // The bar above the map shows for the whole of your own turn (pop-ups open or not, and while your
+  // suggestion is being answered), painted in your character's colour, but not while the cards are
+  // still being dealt. Other players' turns are already told in the chat log, so the bar is hidden
+  // then and the map takes its height.
+  const showBar = myTurn && !dealing;
   const barColour = suspectColor(me?.suspectId);
   const barStyle = { '--bar-bg': barColour, '--bar-ink': contrastInk(barColour) } as CSSProperties;
   // Someone else is composing an accusation — warn this player (not the accuser).

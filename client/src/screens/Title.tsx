@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PIN_LENGTH, PIN_RE } from 'shared';
 import { useStore, initialJoinCode, savedName } from '../store';
 import { Wordmark } from '../components/Wordmark';
@@ -68,6 +68,9 @@ export function Title() {
   const loadGame = useStore((s) => s.loadGame);
   const savedMeta = useStore((s) => s.savedMeta);
   const goto = useStore((s) => s.goto);
+  const rollTableBack = useStore((s) => s.rollTableBack);
+  // A new card back each time the title screen comes up, for the scatter here and any game after.
+  useEffect(() => rollTableBack(), [rollTableBack]);
 
   const [mode, setMode] = useState<Mode>(initialJoinCode ? 'join' : 'menu');
   const [name, setName] = useState(() => savedName());

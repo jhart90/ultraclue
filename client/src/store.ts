@@ -20,8 +20,10 @@ import {
   type PlayerProfile,
   type PlayerProfilePayload,
   cleanPin,
+  type CardBackId,
 } from 'shared';
 import { socket } from './socket';
+import { randomCardBack, readCardBackChoice, saveCardBackChoice, type CardBackChoice } from './render/cardBacks';
 
 export type Screen = 'title' | 'lobby' | 'game' | 'gallery' | 'stats' | 'profile';
 
@@ -156,9 +158,16 @@ interface StoreState {
   notesEpoch: number;
   /** serverClock - ourClock (ms), from the last lobby view — corrects the public countdown. */
   serverOffset: number;
+  /** The card back the title screen drew on its last load: what every back shows outside a game. */
+  tableBack: CardBackId;
+  /** This viewer's own pick from settings — `table` follows the game's (or the title's) draw. */
+  backChoice: CardBackChoice;
 
   // actions
   goto: (screen: Screen) => void;
+  /** Draw a fresh card back for the title screen (each load of it). */
+  rollTableBack: () => void;
+  setBackChoice: (choice: CardBackChoice) => void;
   /** Fetch the public table's history and all-time numbers (for the Statistics screen). */
   fetchPublicStats: () => Promise<PublicStats>;
   /** Look up the long-term profile behind a name + optional PIN (null if it has no games yet). */
@@ -209,8 +218,15 @@ export const useStore = create<StoreState>((set) => ({
   savedMeta: readSave()?.meta,
   notesEpoch: 0,
   serverOffset: 0,
+  tableBack: randomCardBack(),
+  backChoice: readCardBackChoice(),
 
   goto: (screen) => set({ screen }),
+  rollTableBack: () => set({ tableBack: randomCardBack() }),
+  setBackChoice: (choice) => {
+    saveCardBackChoice(choice);
+    set({ backChoice: choice });
+  },
   fetchPublicStats: () =>
     new Promise<PublicStats>((resolve, reject) => {
       const t = setTimeout(() => reject(new Error('The server did not answer.')), 8000);

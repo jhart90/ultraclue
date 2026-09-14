@@ -60,6 +60,7 @@ export function viewFor(state: GameState, viewerId: string): GameView {
     wingsOff: state.wingsOff,
     weaponIds: state.weaponIds,
     suspectIds: state.suspectIds,
+    cardBack: state.cardBack,
     yourId: viewerId,
     // A viewer who isn't one of the dealt players is watching in observer mode.
     observer: !state.players.some((p) => p.id === viewerId),

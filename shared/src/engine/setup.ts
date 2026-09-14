@@ -1,5 +1,5 @@
 import { SUSPECTS, getCard, wingsKey } from '../data';
-import type { Envelope, GameState, Player } from '../game';
+import { CARD_BACKS, type Envelope, type GameState, type Player } from '../game';
 import { type RNG, shuffle, pick } from '../rng';
 import { log } from './util';
 import { beginTurn, startTileOf } from './turn';
@@ -97,6 +97,7 @@ export function startGame(code: string, lobbyPlayers: Player[], rng: RNG, option
     ...(wingsOff ? { wingsOff } : {}),
     ...(trimmedWeapons ? { weaponIds: trimmedWeapons } : {}),
     ...(trimmedSuspects ? { suspectIds: trimmedSuspects } : {}),
+    cardBack: pick(CARD_BACKS, rng),
     envelope,
     log: [],
     nextLogId: 1,

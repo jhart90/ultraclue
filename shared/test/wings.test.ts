@@ -9,6 +9,8 @@ import {
   coordKey,
   makeRng,
   startGame,
+  viewFor,
+  CARD_BACKS,
   chooseWeapons,
   chooseSuspects,
   SUSPECTS,
@@ -196,5 +198,19 @@ describe('a trimmed suspect deck', () => {
 describe('WINGS', () => {
   it('names the three optional wings', () => {
     expect(WINGS.map((w) => w.id)).toEqual(['upper-floor', 'grounds', 'basement']);
+  });
+});
+
+describe('the card back', () => {
+  it('is dealt from the designs at random and shown to every viewer', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 24; seed++) {
+      const s = startGame('W', TWO, makeRng(seed));
+      expect(CARD_BACKS).toContain(s.cardBack);
+      expect(viewFor(s, 'p1').cardBack).toBe(s.cardBack);
+      expect(viewFor(s, 'watcher').cardBack).toBe(s.cardBack);
+      seen.add(s.cardBack!);
+    }
+    expect(seen.size).toBeGreaterThan(1);
   });
 });

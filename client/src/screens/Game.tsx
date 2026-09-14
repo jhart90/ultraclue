@@ -4,6 +4,7 @@ import { useStore, savedDice } from '../store';
 import { TurnOrder, PlayerRoster } from '../components/TurnOrder';
 import { DiceOverlay, DICE_FADE_MS, type DiceRollShow } from '../components/DiceOverlay';
 import { DiceSettings } from '../components/DiceSettings';
+import { CardBackSettings } from '../components/CardBackSettings';
 import { Chat } from '../components/Chat';
 import { Hand } from '../components/Hand';
 import { HandFan } from '../components/HandFan';
@@ -813,6 +814,8 @@ export function Game() {
             {!iAmHost && <div className="game__setnote">Only the host can replace players.</div>}
 
             <DiceSettings current={me?.dice ?? savedDice() ?? defaultDice(me?.suspectId)} onChange={setDice} />
+
+            <CardBackSettings />
 
             <div className="game__settinghead2">Camera</div>
             <label className="game__settoggle">

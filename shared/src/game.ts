@@ -219,6 +219,12 @@ export interface GameStats {
   players: Record<string, PlayerStats>;
 }
 
+/** The card-back designs. `classic` is drawn in CSS (the wordmark on a maroon lattice); the rest
+ *  are art in assets/cards/backs/. The table draws one at random for each game, and a viewer may
+ *  pin their own in settings. */
+export const CARD_BACKS = ['classic', 'artdeco', 'blueprint', 'stainedglass'] as const;
+export type CardBackId = (typeof CARD_BACKS)[number];
+
 export interface GameState {
   code: string;
   phase: Phase;
@@ -237,6 +243,9 @@ export interface GameState {
   /** The suspect cards in this game's deck: every seated character plus random others up to the
    *  host's count. Absent = all 40. */
   suspectIds?: string[];
+  /** The card back everyone at the table sees this game (absent on games saved before it was dealt;
+   *  the client then keeps whichever back its title screen drew). */
+  cardBack?: CardBackId;
   /** The solution. SERVER-ONLY — only revealed in views once the game has ended. */
   envelope: Envelope;
   currentSuggestion?: Suggestion;
@@ -309,6 +318,8 @@ export interface GameView {
   weaponIds?: string[];
   /** The suspect cards in this game's deck (see GameState.suspectIds). */
   suspectIds?: string[];
+  /** The table's card back for this game (see GameState.cardBack). */
+  cardBack?: CardBackId;
   yourId: string;
   /** Room host's id, so an observing host still gets host-only controls (set by the server). */
   hostId?: string;

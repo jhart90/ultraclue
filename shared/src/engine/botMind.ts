@@ -19,7 +19,8 @@ import { personaOf, type BotPersona, type BotPersonaId } from './persona';
 //            is in reach. It does at least learn which cards are confirmed in the envelope, so it
 //            stops walking back into the solution room.
 //   easy   — remembers only the last few dozen suggestions, probes at random, never lingers in a
-//            room, and gambles on an accusation once the field looks small.
+//            room, and gambles on an accusation once the field looks small — or, as the rounds
+//            drag on, on an ever longer shot (so a table of easy bots still ends).
 // No tier keeps a perfect sheet: each mark it witnesses has a small chance of never being written
 // down — about one in 400 for hard, one in 200 for medium, one in 50 for easy (`rollForgotten`
 // in botNotes.ts). The server rolls those lapses once per suggestion and passes them in `events`.
@@ -75,6 +76,12 @@ export interface BotTable {
 
 const EASY_MEMORY = 30; // suggestions an easy bot keeps in its head
 const EASY_GAMBLE_COMBOS = 6; // easy guesses once (#suspects × #weapons × #rooms) left is this small
+// …but an easy bot forgets too much to ever narrow the field that far on its own, so it grows
+// restless: after EASY_PATIENT_ROUNDS the field it will settle for doubles every EASY_DOUBLING_ROUNDS.
+// Sooner or later it takes a wild swing — and a wrong one knocks it out — so a table of easy bots
+// always ends instead of wandering forever.
+const EASY_PATIENT_ROUNDS = 6;
+const EASY_DOUBLING_ROUNDS = 2;
 const THREAT_TELL = 0.55; // how much of a threat an undisproved suggestion is on its own
 const THREAT_GATE = 0.5; // the level at which `botThreatened` reads true
 const THREAT_BASE = 0.45; // how much of a rival's raw head start counts before that tell
@@ -410,7 +417,8 @@ export function botDecideAccusation(m: BotMind, rng: RNG): BotAccusation | null 
     // Feeling lucky: once the field is small, guess rather than keep grinding. A gambling persona —
     // or one that can see a rival closing in — is happy with a much longer shot than that.
     const combos = c.suspects.length * c.weapons.length * c.rooms.length - refutedWithin(refuted, c.suspects, c.weapons, c.rooms);
-    const limit = Math.max(EASY_GAMBLE_COMBOS, Math.round(1 / floor));
+    const restless = 2 ** (Math.max(0, m.round - EASY_PATIENT_ROUNDS) / EASY_DOUBLING_ROUNDS);
+    const limit = Math.max(EASY_GAMBLE_COMBOS * restless, Math.round(1 / floor));
     if (combos > 0 && combos <= limit) return pickTrio(c.suspects, c.weapons, c.rooms, refuted, rng);
     return null;
   }

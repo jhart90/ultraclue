@@ -218,6 +218,12 @@ const botMem = new Map<
   string,
   { visited: Map<string, Set<string>>; shown: Map<string, Set<string>>; stays: Map<string, { room: string; n: number }> }
 >();
+/** Whether this room is still the one on file. A private room is deleted a few minutes after its
+ *  last human leaves, and the public room is replaced on every reset — but a bot timer already in
+ *  flight holds the old room object and would otherwise carry on playing it, unseen and forever
+ *  (a table of easy computers never accuses), replaying an ever-longer suggestion log each move. */
+const live = (room: Room): boolean => getRoom(room.code) === room;
+
 function memFor(room: Room) {
   let m = botMem.get(room.code);
   if (!m) {
@@ -396,7 +402,7 @@ function gameView(room: Room, id: string) {
  *  every screen — and re-sends the chat once the held line is swapped in. */
 const deferChat = (room: Room) => (apply: () => boolean, ms: number) =>
   setTimeout(() => {
-    if (apply()) emitChat(room);
+    if (live(room) && apply()) emitChat(room);
   }, ms);
 
 /** Push each human their own tailored game view (observers included — they watch). */
@@ -477,7 +483,7 @@ function withGame(socket: Socket, fn: (room: Room, g: GameState) => GameState): 
  *  otherwise a bot takes its turn if it's up. Humans pending a reveal just wait for their click. */
 function progress(room: Room): void {
   const g = room.game;
-  if (!g) return;
+  if (!g || !live(room)) return;
   // The "is accusing" warning only stands while it's still that player's live turn.
   if (room.accusingId && (g.phase !== 'play' || currentPlayerId(g) !== room.accusingId)) {
     room.accusingId = undefined;
@@ -556,7 +562,7 @@ function scheduleBotReveal(room: Room, botId: string): void {
   setTimeout(() => {
     const s = room.game;
     clearThinking(room);
-    if (!s || s.phase !== 'play') return;
+    if (!s || s.phase !== 'play' || !live(room)) return;
     const sg = s.currentSuggestion;
     if (!sg || sg.resolved || sg.pendingResponderId !== botId) return;
     const trio = [sg.suspectId, sg.weaponId, sg.roomId];
@@ -589,7 +595,7 @@ function scheduleBotReveal(room: Room, botId: string): void {
 /** A bot's turn: deduce, move toward a useful room, suggest, and accuse when confident. */
 function scheduleBots(room: Room): void {
   const g = room.game;
-  if (!g || g.phase !== 'play') return;
+  if (!g || g.phase !== 'play' || !live(room)) return;
   // Nobody moves during the opening deal; its end sets the table going (startDealClock).
   if (dealing(room)) return;
   const cur = getPlayer(g, currentPlayerId(g));
@@ -602,7 +608,7 @@ function scheduleBots(room: Room): void {
     clearThinking(room);
     let s = room.game;
     // re-check isBot: a dropped player may have reconnected and reclaimed human control.
-    if (!s || s.phase !== 'play' || currentPlayerId(s) !== cur.id || !getPlayer(s, cur.id)?.isBot) {
+    if (!live(room) || !s || s.phase !== 'play' || currentPlayerId(s) !== cur.id || !getPlayer(s, cur.id)?.isBot) {
       emitChat(room);
       return;
     }
@@ -613,7 +619,7 @@ function scheduleBots(room: Room): void {
     const mem = memFor(room);
     const movementStep = (): void => {
       let s = room.game;
-      if (!s || s.phase !== 'play' || currentPlayerId(s) !== cur.id || !getPlayer(s, cur.id)?.isBot) {
+      if (!live(room) || !s || s.phase !== 'play' || currentPlayerId(s) !== cur.id || !getPlayer(s, cur.id)?.isBot) {
         emitChat(room);
         return;
       }
@@ -669,7 +675,7 @@ function scheduleBots(room: Room): void {
     setTimeout(() => {
       clearThinking(room);
       let s2 = room.game;
-      if (!s2 || s2.phase !== 'play' || currentPlayerId(s2) !== cur.id || !getPlayer(s2, cur.id)?.isBot) {
+      if (!live(room) || !s2 || s2.phase !== 'play' || currentPlayerId(s2) !== cur.id || !getPlayer(s2, cur.id)?.isBot) {
         emitChat(room);
         return;
       }
@@ -954,6 +960,7 @@ function scheduleCleanupIfEmpty(room: Room): void {
     setTimeout(() => {
       deleteRoom(room.code);
       botMem.delete(room.code);
+      autoSaveTurn.delete(room.code);
       roomCleanup.delete(room.code);
     }, CLEANUP_MS),
   );

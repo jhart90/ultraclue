@@ -1,6 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { backfillPublicStats, emptyPublicStats, foldPublicGame, type GameView, type PublicStats, type WinnerProfile } from 'shared';
+import {
+  backfillPublicStats,
+  emptyPublicStats,
+  foldPublicGame,
+  publicStatsListing,
+  type GameView,
+  type PublicStats,
+  type PublicStatsListing,
+  type WinnerProfile,
+} from 'shared';
 
 // Persistent history of the public table: all-time aggregates plus the last 50 games, kept in a
 // JSON file so it survives restarts. DATA_DIR overrides where it lives (mount a volume there in
@@ -9,6 +18,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const FILE = path.join(DATA_DIR, 'public-stats.json');
 
 let stats: PublicStats = load();
+let listing: PublicStatsListing | undefined; // built on first ask, dropped when a game is recorded
 
 function load(): PublicStats {
   try {
@@ -38,9 +48,16 @@ function save(): void {
 export function recordPublicGame(view: GameView, id: string, winner?: WinnerProfile): void {
   if (stats.recent.some((g) => g.id === id)) return; // already recorded
   foldPublicGame(stats, view, id, winner);
+  listing = undefined;
   save();
 }
 
-export function getPublicStats(): PublicStats {
-  return stats;
+/** The Statistics screen's payload: everything but the archived games' views. */
+export function getPublicStats(): PublicStatsListing {
+  return (listing ??= publicStatsListing(stats));
+}
+
+/** One archived game's details-screen view, fetched when its tile is opened. */
+export function getPublicGameView(id: unknown): GameView | null {
+  return stats.recent.find((g) => g.id === id)?.view ?? null;
 }

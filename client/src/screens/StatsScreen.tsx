@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { getCard, SUSPECTS, WEAPONS, ROOMS, BOT_PERSONAS, BOT_PERSONA_IDS, type ArchivedPublicGame, type PublicStats } from 'shared';
+import { getCard, SUSPECTS, WEAPONS, ROOMS, BOT_PERSONAS, BOT_PERSONA_IDS, type GameView, type PublicGameSummary, type PublicStatsListing } from 'shared';
 import { useStore } from '../store';
 import { Wordmark } from '../components/Wordmark';
 import { EndScreen } from '../components/EndScreen';
@@ -28,7 +28,7 @@ const PERSONAS = BOT_PERSONA_IDS.map((id) => ({ id, title: BOT_PERSONAS[id].titl
 const avg = (num: number, den: number, digits = 1) => (den ? (num / den).toFixed(digits) : '–');
 
 /** One finished game in the history list. */
-function GameTile({ g, onOpen }: { g: ArchivedPublicGame; onOpen: () => void }) {
+function GameTile({ g, onOpen }: { g: PublicGameSummary; onOpen: () => void }) {
   const color = suspectColor(g.winnerSuspectId);
   const env = g.envelope;
   const trio = env ? [env.suspectId, env.weaponId, env.roomId] : null;
@@ -78,9 +78,28 @@ function GameTile({ g, onOpen }: { g: ArchivedPublicGame; onOpen: () => void }) 
 export function StatsScreen() {
   const goto = useStore((s) => s.goto);
   const fetchPublicStats = useStore((s) => s.fetchPublicStats);
-  const [stats, setStats] = useState<PublicStats | null>(null);
+  const fetchPublicGame = useStore((s) => s.fetchPublicGame);
+  const [stats, setStats] = useState<PublicStatsListing | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<ArchivedPublicGame | null>(null);
+  const [open, setOpen] = useState<GameView | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
+  // A game's details view is only fetched when its tile is opened (the list itself is summaries),
+  // and kept so reopening it is instant.
+  const views = useRef(new Map<string, GameView>());
+  const opening = useRef<string | null>(null);
+  const openGame = (id: string) => {
+    const cached = views.current.get(id);
+    if (cached) return setOpen(cached);
+    opening.current = id;
+    setOpenError(null);
+    fetchPublicGame(id)
+      .then((v) => {
+        if (!v) return setOpenError('That game has left the archive — reopen Statistics for the latest list.');
+        views.current.set(id, v);
+        if (opening.current === id) setOpen(v);
+      })
+      .catch((e: Error) => setOpenError(`Could not open that game: ${e.message}`));
+  };
   // The history pane shows 3½ tiles by default (measured from the first tile), scrolling for the rest.
   const listRef = useRef<HTMLDivElement>(null);
   const [listMax, setListMax] = useState<number | undefined>(undefined);
@@ -140,12 +159,13 @@ export function StatsScreen() {
             <h2 className="stats__h2">
               Last {stats.recent.length || ''} public game{stats.recent.length === 1 ? '' : 's'}
             </h2>
+            {openError && <div className="stats__none">{openError}</div>}
             {stats.recent.length === 0 ? (
               <div className="stats__none">No public game has finished yet. The first one will appear here.</div>
             ) : (
               <div className="stats__list" ref={listRef} style={listMax ? { maxHeight: listMax } : undefined}>
                 {stats.recent.map((g) => (
-                  <GameTile key={g.id} g={g} onOpen={() => setOpen(g)} />
+                  <GameTile key={g.id} g={g} onOpen={() => openGame(g.id)} />
                 ))}
               </div>
             )}
@@ -229,7 +249,7 @@ export function StatsScreen() {
         </>
       )}
 
-      {open && <EndScreen game={open.view} myId="" serverOffset={0} closeLabel="Close" onLeave={() => setOpen(null)} />}
+      {open && <EndScreen game={open} myId="" serverOffset={0} closeLabel="Close" onLeave={() => setOpen(null)} />}
     </div>
   );
 }

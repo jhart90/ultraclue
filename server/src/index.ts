@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { getPublicStats, recordPublicGame } from './publicStats';
+import { getPublicGameView, getPublicStats, recordPublicGame } from './publicStats';
 import { describeProfile, findProfile, profileKey, recordProfileGame } from './profiles';
 import express from 'express';
 import { Server, type Socket } from 'socket.io';
@@ -80,6 +80,8 @@ import {
   syncParticipants,
   type RosterEntry,
   type PublicStatsPayload,
+  type PublicGameRequest,
+  type PublicGamePayload,
   type PlayerProfileRequest,
   type PlayerProfilePayload,
   type WinnerProfile,
@@ -975,6 +977,9 @@ io.on('connection', (socket) => {
   // The title screen's "Statistics": the public table's last games and all-time numbers.
   socket.on(SOCKET_EVENTS.PUBLIC_STATS, (_p: unknown, ack?: (p: PublicStatsPayload) => void) => {
     ack?.({ stats: getPublicStats() });
+  });
+  socket.on(SOCKET_EVENTS.PUBLIC_GAME, (p: PublicGameRequest, ack?: (r: PublicGamePayload) => void) => {
+    ack?.({ view: getPublicGameView(p?.id) });
   });
   // The title screen's "Player Profile": the long-term record behind a name + optional PIN. Only the
   // requester ever sees it, and the PIN goes no further than profileKey().

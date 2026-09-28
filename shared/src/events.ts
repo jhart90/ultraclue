@@ -1,6 +1,6 @@
 import type { GameView, BotDifficulty, BotSpeed } from './game';
 import type { LobbyView, ChatMsg } from './lobby';
-import type { PublicStats } from './publicStats';
+import type { PublicStatsListing } from './publicStats';
 import type { PlayerProfile } from './profile';
 import type { Coord } from './data/board';
 
@@ -45,6 +45,7 @@ export const SOCKET_EVENTS = {
   SET_NOTES: 'setNotes', // client pushes its Case Notes so they ride along in every save
   SET_DICE: 'setDice', // a human picks the colours of their dice
   PUBLIC_STATS: 'publicStats', // ask for the public table's history + all-time numbers (answered via ack)
+  PUBLIC_GAME: 'publicGame', // ask for one archived public game's details-screen view (answered via ack)
   PLAYER_PROFILE: 'playerProfile', // look up the long-term profile for a name + optional PIN (answered via ack)
 
   // --- server -> client ---
@@ -63,7 +64,14 @@ export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];
 // ---- payloads ----------------------------------------------------------------------------
 
 export interface PublicStatsPayload {
-  stats: PublicStats;
+  stats: PublicStatsListing;
+}
+export interface PublicGameRequest {
+  id: string;
+}
+export interface PublicGamePayload {
+  /** null when that game has rolled out of the archive. */
+  view: GameView | null;
 }
 export interface PlayerProfileRequest {
   name: string;

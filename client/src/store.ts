@@ -15,7 +15,8 @@ import {
   type ErrorPayload,
   type SavedGameMeta,
   type SaveGameDataPayload,
-  type PublicStats,
+  type PublicStatsListing,
+  type PublicGamePayload,
   type PublicStatsPayload,
   type PlayerProfile,
   type PlayerProfilePayload,
@@ -169,7 +170,9 @@ interface StoreState {
   rollTableBack: () => void;
   setBackChoice: (choice: CardBackChoice) => void;
   /** Fetch the public table's history and all-time numbers (for the Statistics screen). */
-  fetchPublicStats: () => Promise<PublicStats>;
+  fetchPublicStats: () => Promise<PublicStatsListing>;
+  /** Fetch one archived public game's details-screen view (null if it has left the archive). */
+  fetchPublicGame: (id: string) => Promise<GameView | null>;
   /** Look up the long-term profile behind a name + optional PIN (null if it has no games yet). */
   fetchProfile: (name: string, pin: string) => Promise<PlayerProfile | null>;
   syncNotes: (json: string) => void;
@@ -228,11 +231,19 @@ export const useStore = create<StoreState>((set) => ({
     set({ backChoice: choice });
   },
   fetchPublicStats: () =>
-    new Promise<PublicStats>((resolve, reject) => {
+    new Promise<PublicStatsListing>((resolve, reject) => {
       const t = setTimeout(() => reject(new Error('The server did not answer.')), 8000);
       socket.emit(SOCKET_EVENTS.PUBLIC_STATS, {}, (p: PublicStatsPayload) => {
         clearTimeout(t);
         resolve(p.stats);
+      });
+    }),
+  fetchPublicGame: (id) =>
+    new Promise<GameView | null>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('The server did not answer.')), 8000);
+      socket.emit(SOCKET_EVENTS.PUBLIC_GAME, { id }, (p: PublicGamePayload) => {
+        clearTimeout(t);
+        resolve(p.view);
       });
     }),
   fetchProfile: (name, pin) =>

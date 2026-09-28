@@ -76,6 +76,14 @@ export interface PublicStats {
   recent: ArchivedPublicGame[];
 }
 
+/** What the Statistics screen is sent: the aggregates and the history list without each game's
+ *  frozen view (tens of KB apiece) — a game's view is fetched on its own when its tile is opened. */
+export type PublicStatsListing = Omit<PublicStats, 'recent'> & { recent: PublicGameSummary[] };
+
+export function publicStatsListing(stats: PublicStats): PublicStatsListing {
+  return { ...stats, recent: stats.recent.map(({ view: _view, ...summary }) => summary) };
+}
+
 /** A human on the wins leaderboard. */
 export interface HumanWinner {
   name: string;
